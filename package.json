@@ -1,0 +1,11 @@
+{
+  "name": "external-haulage-billing-trip-management-system",
+  "version": "1.0.0",
+  "description": "External haulage billing format linked to price lists and MOQ, trip log, and monthly in-house vs contractor comparison report.",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "python3 -m http.server 8080 || npx --yes serve ."
+  },
+  "license": "UNLICENSED"
+}

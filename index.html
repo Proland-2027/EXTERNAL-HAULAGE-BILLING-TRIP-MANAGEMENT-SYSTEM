@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Haulage Billing</title>
+  <meta name="description" content="External haulage billing, price lists with MOQ, trip log and monthly in-house vs contractor comparison report.">
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- SheetJS for .xlsx export. If the CDN is unreachable the app silently falls back to CSV. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+</head>
+<body>
+  <header class="topbar no-print">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">▣</span>
+      <div>
+        <div class="brand-title">Haulage Billing &amp; Trip Management</div>
+        <div class="brand-sub" id="brand-company"></div>
+      </div>
+    </div>
+    <nav class="tabs" id="nav" aria-label="Sections">
+      <button data-view="dashboard" class="tab">Dashboard</button>
+      <button data-view="trips" class="tab">Trips</button>
+      <button data-view="pricelists" class="tab">Price Lists &amp; MOQ</button>
+      <button data-view="billing" class="tab">Billing</button>
+      <button data-view="report" class="tab">Comparison Report</button>
+      <button data-view="setup" class="tab">Setup</button>
+      <button data-view="data" class="tab">Data</button>
+    </nav>
+    <button class="btn ghost sm" id="theme-toggle" title="Toggle dark mode">Light / Dark</button>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <dialog id="modal" class="modal">
+    <form method="dialog" id="modal-form" class="modal-form"></form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="tooltip" class="tooltip" hidden></div>
+
+  <script src="js/pricing.js"></script>
+  <script src="js/seed.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
