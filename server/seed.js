@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { store, db, makeUser } = require('./server.js');
 const sampleRates = require('../js/core/sample_rates.js');
+const fs2 = require('fs');
 const ROOT = path.join(__dirname, '..');
 const read = (n) => JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'workbook', n), 'utf8'));
 const reset = process.argv.includes('--reset');
@@ -27,8 +28,9 @@ try {
   if (!store.list('assets').length) for (const a of read('assets.json')) store.putDoc('assets', Object.assign({ id: a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), version: 1 }, a));
   if (!store.list('clients').length) for (const c of read('clients.json')) store.putDoc('clients', Object.assign({ version: 1 }, c));
   if (!store.doc('meta', 'locations')) store.putDoc('meta', { id: 'locations', list: read('locations.json'), version: 1 });
-  if (!store.doc('settings', 'main')) store.putDoc('settings', { id: 'main', company: 'JMG Haulage Services', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', version: 1 });
-  if (!store.list('rates').length) for (const r of sampleRates()) store.putDoc('rates', r);
+  if (!store.doc('settings', 'main')) store.putDoc('settings', { id: 'main', company: 'JMG Limited', companyShort: 'JMG', address: '', phone: '', email: '', website: '', tin: '', rcNumber: '', logo: '', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', version: 1 });
+  if (!store.list('rates').length) { const real = fs2.existsSync(path.join(ROOT, 'data', 'workbook', 'rates.json')) ? read('rates.json') : sampleRates(); for (const r of real) store.putDoc('rates', r); }
+  if (!store.doc('meta', 'zones') && fs2.existsSync(path.join(ROOT, 'data', 'workbook', 'zones.json'))) store.putDoc('meta', { id: 'zones', map: read('zones.json'), version: 1 });
   if (!store.list('users').length) for (const u of DEMO_USERS) store.putDoc('users', makeUser(u));
   store.audit({ id: 'a-seed-' + Date.now().toString(36), ts: new Date().toISOString(), user: 'system', userName: 'Seed script', role: '', action: 'import', entity: 'workbook', entityId: 'Haulage_Billing_Sheet_September_R2', label: 'Workbook data loaded', changes: [] });
   db.exec('COMMIT');

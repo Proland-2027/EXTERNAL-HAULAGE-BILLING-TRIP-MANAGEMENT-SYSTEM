@@ -16,11 +16,12 @@ const manifest = [];
 const chunks = new Map();
 for (const t of read('trips.json')) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; if (!chunks.has(m)) chunks.set(m, {}); const c = { ...t }; delete c.history; chunks.get(m)[t.id] = c; }
 for (const [m, trips] of chunks) manifest.push(write('tripchunks', m, { month: m, trips }));
-for (const a of read('assets.json')) manifest.push(write('assets', a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), { id: a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), version: 1, ...a }));
+for (const a of read('assets.json')) { const tb = a.vehicleCategory === 'New Batch' ? 'New Batch' : a.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; manifest.push(write('assets', a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), { id: a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), version: 1, ...a, truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] })); }
 for (const c of read('clients.json')) manifest.push(write('clients', c.id, { version: 1, ...c }));
 manifest.push(write('meta', 'locations', { list: read('locations.json') }));
-manifest.push(write('settings', 'main', { company: 'JMG Haulage Services', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', version: 1 }));
-for (const r of sampleRates()) manifest.push(write('rates', r.id, r));
+manifest.push(write('meta', 'zones', { map: read('zones.json') }));
+manifest.push(write('settings', 'main', { company: 'JMG Limited', companyShort: 'JMG', address: '', phone: '', email: '', website: '', tin: '', rcNumber: '', logo: '', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', version: 1 }));
+for (const r of (fs.existsSync(path.join(ROOT, 'data', 'workbook', 'rates.json')) ? read('rates.json') : sampleRates())) manifest.push(write('rates', r.id, r));
 for (const u of DEMO_USERS) { const salt = crypto.randomBytes(16).toString('hex'); manifest.push(write('users', u.username, { id: u.username, username: u.username, name: u.name, role: u.role, salt, hash: hashPassword(u.password, salt), active: true, createdAt: new Date().toISOString(), version: 1 })); }
 fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));
 const big = manifest.filter((m) => m.bytes > 200 * 1024);

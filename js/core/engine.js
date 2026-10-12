@@ -15,13 +15,16 @@
   const RETURN_WAYBILL = ['', 'Received', 'Not Received'];
   const TRIP_STATUSES = ['Invoice Not Sent', 'Awaiting Payment', 'Part Paid - Balance Due', 'Closed', 'Internal Client'];
   const INVOICE_DOC_STATUSES = ['Draft', 'Sent', 'Paid', 'Void'];
+  const VAT_TREATMENTS = ['exclusive', 'inclusive'];
+  const VAT_TREATMENT_LABELS = { exclusive: 'Price Excluding VAT', inclusive: 'Price Including VAT' };
+  const TRUCK_BATCHES = ['New Batch', 'Old Batch'];
   const ROLES = ['admin', 'operations', 'billing', 'finance', 'management'];
   const ROLE_LABELS = { admin: 'Administrator', operations: 'Operations Team', billing: 'Billing Team', finance: 'Finance Team', management: 'Management' };
 
   // Field groups on a trip. Each role may edit the groups listed in ROLE_FIELDS.
   const FIELD_GROUPS = {
     operations: ['dateDispatched', 'dateDelivered', 'plate', 'contractType', 'client', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'returnWaybill', 'note', 'agreedRateId'],
-    billing: ['sellingPrice', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceStatus', 'invoiceNo', 'invoiceId', 'agreedRateId'],
+    billing: ['sellingPrice', 'vatTreatment', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceStatus', 'invoiceNo', 'invoiceId', 'agreedRateId'],
     finance: ['paymentStatus', 'advance', 'invoiceStatus', 'note'],
   };
   const ROLE_FIELDS = {
@@ -48,6 +51,7 @@
     { key: 'vehicleType', label: 'Vehicle Type', type: 'derived', excel: 'E' },
     { key: 'vehicleCategory', label: 'Vehicle Category', type: 'derived', excel: 'F' },
     { key: 'costCenter', label: 'Cost Center', type: 'derived', excel: 'G' },
+    { key: 'truckBatch', label: 'Truck Batch', type: 'derived' },
     { key: 'contractType', label: 'Contract Type', type: 'text', excel: 'H' },
     { key: 'client', label: 'Client Name', type: 'client', excel: 'I' },
     { key: 'loadingFrom', label: 'Loading From', type: 'location', excel: 'J' },
@@ -60,6 +64,8 @@
     { key: 'sellingPrice', label: 'Selling Price (₦)', type: 'money', excel: 'P' },
     { key: 'variance', label: 'Price Variance (₦)', type: 'computed-money' },
     { key: 'variancePct', label: 'Price Variance (%)', type: 'computed-pct' },
+    { key: 'vatTreatment', label: 'VAT Treatment', type: 'enum', options: VAT_TREATMENTS },
+    { key: 'netSales', label: 'Net Sales excl. VAT (₦)', type: 'computed-money' },
     { key: 'vat', label: 'VAT (₦)', type: 'computed-money', excel: 'Q' },
     { key: 'billing', label: 'Billing After VAT (₦)', type: 'computed-money', excel: 'R' },
     { key: 'quoteNo', label: 'Quote Number', type: 'text', excel: 'S' },
@@ -88,6 +94,44 @@
   const addDays = (iso, days) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + Number(days || 0)); return d.toISOString().slice(0, 10); };
   const endOfMonth = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
 
+  // ---------------------------------------------------------- matching helpers
+  /** "45T" → "45", "30T-LCL" → "30-lcl", "45" → "45": tonnage contracts compare without the T. */
+  const normContract = (s) => norm(s).replace(/\s+/g, '').replace(/(\d)t(?=$|[^a-z0-9])/g, '$1');
+  const locKey = (s) => norm(s).replace(/[^a-z0-9]+/g, ' ').trim();
+  /** Tokens of a zone-style location such as "VI-Lekki-AJAH" or "FESTAC-MILE2 --AMOWO-OKOTA". */
+  const locTokens = (s) => String(s == null ? '' : s).split(/\s*(?:--|[-\/,;&]|\bor\b)\s*/i).map(locKey).filter(Boolean);
+  /** Zone lookup: zones = { "gbagada": "Lagos", ... } keyed by locKey. */
+  const zoneOf = (loc, zones) => { if (!zones) return ''; const k = locKey(loc); const z = zones[k] !== undefined ? zones[k] : zones[norm(loc)]; return z ? locKey(z) : ''; };
+  /** 3 = exact, 2 = same zone, 1 = the rate's zone list contains the trip location, 0 = no match. */
+  function locMatch(tripLoc, rateLoc, zones) {
+    const a = locKey(tripLoc), b = locKey(rateLoc); if (!a || !b) return 0;
+    if (a === b) return 3;
+    const za = zoneOf(tripLoc, zones), zb = zoneOf(rateLoc, zones) || b;
+    if (za && za === zb) return 2;
+    const tokens = locTokens(rateLoc); if (tokens.length > 1 && (tokens.includes(a) || (za && tokens.includes(za)))) return 1;
+    const stripped = b.replace(/\s*\d+\s*tons?$/, ''); if (stripped !== b && (stripped === a || stripped === za)) return 2;
+    return 0;
+  }
+  /** VAT arithmetic for one price. exclusive: VAT added on top (workbook rule); inclusive: VAT extracted from the price. */
+  function vatSplit(price, rate, treatment) {
+    const p = num(price); if (p === null) return { net: null, vat: null, gross: null };
+    if (treatment === 'inclusive') { const net = round2(p / (1 + rate)); const vat = round2(p - net); return { net, vat, gross: p }; }
+    const vat = round2(p * rate); return { net: p, vat, gross: p + vat };
+  }
+  /** Truck Batch in force on a date: batchHistory [{batch, effectiveDate}] wins, then truckBatch, then the workbook's Type column. */
+  function batchOn(asset, date) {
+    if (!asset) return '';
+    const hist = Array.isArray(asset.batchHistory) ? [...asset.batchHistory].filter((h) => h && h.batch).sort((x, y) => String(x.effectiveDate || '').localeCompare(String(y.effectiveDate || ''))) : [];
+    let found = '';
+    for (const h of hist) if (!h.effectiveDate || !date || h.effectiveDate <= date) found = h.batch;
+    if (found) return found;
+    if (asset.truckBatch) return asset.truckBatch;
+    const c = norm(asset.vehicleCategory);
+    if (c === 'new batch') return 'New Batch';
+    if (c === '3rd party' || c === 'third party') return '3rd Party';
+    return c ? 'Old Batch' : '';
+  }
+
   // ---------------------------------------------------------------- assets
   function assetFor(plate, assets) {
     if (!plate) return null;
@@ -106,30 +150,45 @@
   }
   /**
    * Find the agreed price for a trip. Documented priority rule:
-   *  1. client, loading from, loading to and vehicle type must all match (case/space-insensitive);
+   *  1. client must match (name, code or alias); loading origin and destination must match exactly, by zone
+   *     (Settings → Location zones, e.g. GBAGADA → Lagos) or as a member of a zone list such as "VI-Lekki-AJAH";
    *  2. the rate must be in force on the dispatch date (effectiveDate <= date <= expiryDate);
-   *  3. a rate whose contractType equals the trip's contract type beats a rate with no contract type;
-   *     a rate with a *different* contract type never matches;
-   *  4. among the remaining, the latest effectiveDate wins;
-   *  5. still tied → status "multiple" and the user must pick (agreedRateId).
+   *  3. a rate whose vehicle type / division matches scores higher; a rate with a different vehicle type never matches;
+   *  4. a rate whose contract type (tonnage) equals the trip's contract type ("45" = "45T") scores highest;
+   *  5. exact location matches beat zone matches, then the latest effectiveDate wins;
+   *  6. still tied with different prices → status "multiple" and the user must pick (agreedRateId).
    */
-  function lookupAgreedRate(trip, rates) {
+  function lookupAgreedRate(trip, rates, zones, clients) {
     const date = trip.dateDispatched || todayISO();
-    const c = norm(trip.client), f = norm(trip.loadingFrom), t = norm(trip.loadingTo), v = norm(trip.vehicleType), ct = norm(trip.contractType);
-    if (!c || !f || !t) return { status: 'none', rate: null, candidates: [] };
-    const cands = (rates || []).filter((r) => norm(r.client) === c && norm(r.loadingFrom) === f && norm(r.loadingTo) === t
-      && (!v || !norm(r.vehicleType) || norm(r.vehicleType) === v)
-      && (!r.effectiveDate || r.effectiveDate <= date) && (!r.expiryDate || r.expiryDate >= date)
-      && (!norm(r.contractType) || norm(r.contractType) === ct));
-    if (!cands.length) return { status: 'none', rate: null, candidates: [] };
+    const c = clientKey(trip.client, clients), v = norm(trip.vehicleType), ct = normContract(trip.contractType);
+    if (!c || !trip.loadingFrom || !trip.loadingTo) return { status: 'none', rate: null, candidates: [] };
+    const scored = [];
+    for (const r of rates || []) {
+      if (clientKey(r.client, clients) !== c) continue;
+      if ((r.effectiveDate && r.effectiveDate > date) || (r.expiryDate && r.expiryDate < date)) continue;
+      if (v && norm(r.vehicleType) && norm(r.vehicleType) !== v) continue;
+      const f = locMatch(trip.loadingFrom, r.loadingFrom, zones), t = locMatch(trip.loadingTo, r.loadingTo, zones);
+      if (!f || !t) continue;
+      const rc = normContract(r.contractType);
+      const score = (rc && rc === ct ? 40 : 0) + (norm(r.vehicleType) && norm(r.vehicleType) === v ? 4 : 0) + f * 3 + t * 3;
+      scored.push({ r, score });
+    }
+    if (!scored.length) return { status: 'none', rate: null, candidates: [] };
+    scored.sort((a, b) => b.score - a.score || String(b.r.effectiveDate || '').localeCompare(String(a.r.effectiveDate || '')));
+    const cands = scored.map((x) => x.r);
     if (trip.agreedRateId) { const pick = cands.find((r) => r.id === trip.agreedRateId); if (pick) return { status: 'found', rate: pick, candidates: cands, picked: true }; }
-    const score = (r) => (norm(r.contractType) && norm(r.contractType) === ct ? 2 : 0) + (norm(r.vehicleType) && norm(r.vehicleType) === v ? 1 : 0);
-    let best = [...cands].sort((a, b) => score(b) - score(a) || String(b.effectiveDate || '').localeCompare(String(a.effectiveDate || '')));
-    const top = best.filter((r) => score(r) === score(best[0]) && (r.effectiveDate || '') === (best[0].effectiveDate || ''));
-    if (top.length > 1 && new Set(top.map((r) => num(r.price))).size > 1) return { status: 'multiple', rate: null, candidates: top };
+    const top = scored.filter((x) => x.score === scored[0].score && (x.r.effectiveDate || '') === (scored[0].r.effectiveDate || '')).map((x) => x.r);
+    if (top.length > 1 && new Set(top.map((r) => num(r.price))).size > 1) return { status: 'multiple', rate: null, candidates: cands };
     return { status: 'found', rate: top[0], candidates: cands };
   }
+  /** Client identity: matches the master list by name, code or alias (e.g. "Mega Manu-Local" → MEGA MANU). */
+  function clientKey(name, clients) {
+    const n = norm(name); if (!n) return '';
+    for (const c of clients || []) { if (norm(c.name) === n || norm(c.code) === n || (Array.isArray(c.aliases) && c.aliases.some((a) => norm(a) === n))) return norm(c.name); }
+    return n;
+  }
 
+  function convertBasis(price, from, to, rate) { if (from === to) return price; return to === 'inclusive' ? round2(price * (1 + rate)) : round2(price / (1 + rate)); }
   function variance(selling, agreed) {
     if (!isNum(selling) || !isNum(agreed)) return { variance: null, variancePct: null, direction: 'na' };
     const v = round2(selling - agreed);
@@ -155,8 +214,10 @@
     const rate = vatRateOf(ctx.settings);
     const p = num(t.sellingPrice);
     t.sellingPrice = p;
-    t.vat = p === null ? null : round2(p * rate);                // Q
-    t.billing = p === null ? null : p + t.vat;                   // R (workbook does not round)
+    t.vatTreatment = t.vatTreatment === 'inclusive' ? 'inclusive' : 'exclusive';
+    if (t.vatTreatment === 'inclusive') { const sp = vatSplit(p, rate, 'inclusive'); t.vat = sp.vat; t.billing = sp.gross; t.netSales = sp.net; }
+    else { t.vat = p === null ? null : round2(p * rate); t.billing = p === null ? null : p + t.vat; t.netSales = p; } // Q, R (workbook does not round R)
+    t.truckBatch = t.truckBatch || batchOn(asset, t.dateDispatched);
     const adv = num(t.advance);
     // Y — five workbook rows had the formula typed over; those keep their value in amountPaidOverride.
     t.amountPaid = isNum(num(t.amountPaidOverride)) ? num(t.amountPaidOverride) : !t.client ? null : t.paymentStatus === 'Paid' ? (t.billing || 0) : t.paymentStatus === 'Advance' ? (adv || 0) : 0;
@@ -164,10 +225,12 @@
     t.total = t.billing;                                           // AA
     t.month = monthKey(t.dateDispatched);                          // AB
     t.tripStatus = tripStatus(t);
-    const lk = lookupAgreedRate(t, ctx.rates);
+    const lk = lookupAgreedRate(t, ctx.rates, ctx.zones, ctx.clients);
     t.agreedStatus = lk.status;
     t.agreedRate = lk.rate;
-    t.agreedPrice = lk.rate ? num(lk.rate.price) : null;
+    t.agreedPriceListed = lk.rate ? num(lk.rate.price) : null;
+    // Compare like with like: the agreed price is shown on the trip's VAT basis.
+    t.agreedPrice = t.agreedPriceListed === null ? null : convertBasis(t.agreedPriceListed, lk.rate.priceBasis === 'inclusive' ? 'inclusive' : 'exclusive', t.vatTreatment, rate);
     t.agreedCandidates = lk.candidates;
     Object.assign(t, variance(p, t.agreedPrice));
     return t;
@@ -183,6 +246,7 @@
     if (num(t.sellingPrice) !== null && num(t.sellingPrice) < 0) errors.push('Selling Price cannot be negative.');
     if (t.paymentStatus && !PAYMENT_STATUSES.includes(t.paymentStatus)) errors.push('Payment Status is invalid.');
     if (t.invoiceStatus && !INVOICE_STATUSES.includes(t.invoiceStatus)) errors.push('Invoice Status is invalid.');
+    if (t.vatTreatment && !VAT_TREATMENTS.includes(t.vatTreatment)) errors.push('VAT treatment is invalid.');
     if (t.paymentStatus === 'Advance' && !(num(t.advance) > 0)) errors.push('Advance amount is required when Payment Status is Advance.');
     if (ctx && ctx.assets && ctx.assets.length && t.plate && !assetFor(t.plate, ctx.assets)) errors.push(`Plate ${t.plate} is not in the Asset List.`);
     return errors;
@@ -220,10 +284,11 @@
     return (trips || []).filter((t) => norm(t.client) === norm(client) && t.dateDispatched >= from && t.dateDispatched <= to
       && t.paymentStatus !== 'Paid' && (opts.includeInvoiced || !t.invoiceId) && t.invoiceStatus !== 'Internal Client');
   }
-  function invoiceTotals(trips, vatRate) {
+  /** Invoice totals. priceType 'inclusive' extracts VAT from each selling price; 'exclusive' adds it (default). */
+  function invoiceTotals(trips, vatRate, priceType) {
     const rate = isNum(vatRate) ? vatRate : 0.075;
     let subtotal = 0, vat = 0, total = 0;
-    for (const t of trips) { const p = num(t.sellingPrice) || 0; const v = round2(p * rate); subtotal += p; vat += v; total += round2(p + v); }
+    for (const t of trips) { const sp = vatSplit(t.sellingPrice, rate, priceType || t.vatTreatment || 'exclusive'); if (sp.net === null) continue; subtotal += sp.net; vat += sp.vat; total += sp.gross; }
     return { subtotal: round2(subtotal), vat: round2(vat), total: round2(total), count: trips.length };
   }
   function invoiceDocStatus(inv, trips) {
@@ -253,6 +318,9 @@
       && (!f.invoiceStatus || t.invoiceStatus === f.invoiceStatus)
       && (!f.tripStatus || t.tripStatus === f.tripStatus)
       && (!f.plate || norm(t.plate) === norm(f.plate))
+      && (!f.truckBatch || t.truckBatch === f.truckBatch)
+      && (!f.contractType || normContract(t.contractType) === normContract(f.contractType))
+      && (!f.vatTreatment || t.vatTreatment === f.vatTreatment)
       && (!f.search || tripMatches(t, f.search)));
   }
   function tripMatches(t, q) {
@@ -313,6 +381,22 @@
     };
   }
 
+  /** Sales Performance by Truck Batch. basis: 'net' (excl. VAT) or 'gross' (invoiced incl. VAT). */
+  function batchPerformance(trips, basis) {
+    const key = basis === 'gross' ? 'billing' : 'netSales';
+    const groups = { 'New Batch': [], 'Old Batch': [], Other: [] };
+    for (const t of trips) (groups[t.truckBatch] || groups.Other).push(t);
+    const kpi = (list) => { const trucks = new Set(list.map((t) => norm(t.plate)).filter(Boolean)).size; const sales = sum(list, key); const paid = sum(list, 'amountPaid'); return { sales, trips: list.length, trucks, perTruck: trucks ? round2(sales / trucks) : 0, perTrip: list.length ? round2(sales / list.length) : 0, paid, outstanding: round2(sum(list, 'billing') - paid), gross: sum(list, 'billing'), net: sum(list, 'netSales') }; };
+    const out = { basis: key === 'billing' ? 'gross' : 'net', newBatch: kpi(groups['New Batch']), oldBatch: kpi(groups['Old Batch']), other: kpi(groups.Other), total: kpi(trips) };
+    const months = [...new Set(trips.map((t) => t.month).filter(Boolean))].sort();
+    out.months = months;
+    out.monthly = { 'New Batch': months.map((m) => sum(groups['New Batch'].filter((t) => t.month === m), key)), 'Old Batch': months.map((m) => sum(groups['Old Batch'].filter((t) => t.month === m), key)) };
+    const share = out.total.sales || 1;
+    out.share = { 'New Batch': round2((out.newBatch.sales / share) * 100), 'Old Batch': round2((out.oldBatch.sales / share) * 100), Other: round2((out.other.sales / share) * 100) };
+    out.topTrucks = { 'New Batch': pivotByMonth(groups['New Batch'], 'plate', key).rows.slice(0, 8), 'Old Batch': pivotByMonth(groups['Old Batch'], 'plate', key).rows.slice(0, 8) };
+    return out;
+  }
+
   // ----------------------------------------------------------------- import
   const HEADER_ALIASES = {
     dateDispatched: ['date dispatched', 'dispatch date', 'date'], dateDelivered: ['date delivered', 'delivery date'], plate: ['plate number', 'plate', 'vehicle number', 'truck'],
@@ -321,6 +405,7 @@
     journeyPlanId: ['journey plan id', 'trip number', 'journey plan'], waybill: ['client waybill number', 'waybill number', 'waybill'], returnWaybill: ['return waybill received?', 'return waybill received', 'return waybill'],
     invoiceStatus: ['invoice status'], sellingPrice: ['selling price (₦)', 'selling price', 'selling price (n)', 'amount'], quoteNo: ['quote number', 'quote no'], soNo: ['so number', 'sales order number', 'so no'],
     manualInvoiceNo: ['manual invoice number', 'manual invoice ref.', 'manual invoice'], invoiceNo: ['invoice number'], paymentStatus: ['payment status'], advance: ['advance (₦)', 'advance'], note: ['note', 'notes', 'remarks'],
+    vatTreatment: ['vat treatment', 'vat basis', 'invoice price type', 'price type'],
   };
   function mapHeaders(headers) {
     const map = {};
@@ -357,15 +442,38 @@
       invoiceStatusRaw: clean(g('invoiceStatus')), invoiceStatus: normalizeInvoiceStatus(g('invoiceStatus'), paymentStatus),
       sellingPrice: num(g('sellingPrice')), quoteNo: clean(g('quoteNo')), soNo: clean(g('soNo')), manualInvoiceNo: clean(g('manualInvoiceNo')), invoiceNo: clean(g('invoiceNo')),
       paymentStatus, advance: num(g('advance')), note: clean(g('note')),
+      vatTreatment: /incl/i.test(String(g('vatTreatment') || '')) ? 'inclusive' : 'exclusive',
     };
+  }
+  /** Maps a price-list sheet (June list layout or the app's own export) to rate objects. */
+  const RATE_HEADERS = { client: ['client', 'client name'], loadingFrom: ['loading point', 'loading from', 'loading origin', 'origin', 'from'], loadingTo: ['destination', 'delivery destination', 'loading to', 'to'], vehicleType: ['divison', 'division', 'vehicle type', 'type of vehicle'], contractType: ['truck tonnage', 'tonnage', 'contract type', 'contract'], contractName: ['contract name'], truckSize: ['truck size'], state: ['state'], region: ['region'], product: ['product type', 'product'],
+    priceExcl: ['plist exl vat', 'plist excl vat', 'price excl vat', 'agreed price (₦) excl vat', 'jmg plist', 'plist', 'plsit', 'pl', 'plist bf vat', 'approved client price', 'agreed price', 'agreed price (₦)', 'price', 'rate', 'agreed client price (₦)'], priceIncl: ['plist inl vat', 'plist incl vat', 'plist vat incl', 'price incl vat', 'pl with vat', 'agreed price (₦) incl vat'], priceRevised: ['price august', 'revised price'], status: ['status', 'approval', 'approval status'],
+    effectiveDate: ['effective date', 'effective'], expiryDate: ['expiry date', 'expiry'], remarks: ['remarks', 'notes'], priceBasis: ['price basis', 'basis'] };
+  function mapRateHeaders(headers) { const map = {}; headers.forEach((h, i) => { const k = norm(h); for (const [f, al] of Object.entries(RATE_HEADERS)) if (al.includes(k) && map[f] === undefined) map[f] = i; }); return map; }
+  function rowToRate(row, map, defaults) {
+    defaults = defaults || {}; const g = (k) => (map[k] === undefined ? undefined : row[map[k]]);
+    const client = clean(g('client')); const from = clean(g('loadingFrom')); const to = clean(g('loadingTo'));
+    const excl = num(g('priceExcl')), incl = num(g('priceIncl'));
+    const basisCol = norm(g('priceBasis'));
+    let price = excl, priceBasis = 'exclusive';
+    if (price === null && incl !== null) { price = incl; priceBasis = 'inclusive'; }
+    if (basisCol.startsWith('incl')) priceBasis = 'inclusive';
+    if (map.priceExcl !== undefined && /incl/.test(norm(defaults.headerText || ''))) priceBasis = 'inclusive';
+    if (!client || !from || !to || price === null) return null;
+    const status = clean(g('status'));
+    const division = clean(g('vehicleType'));
+    const remarks = [clean(g('contractName')), clean(g('truckSize')), division && norm(division) !== 'haulage' ? 'Division ' + division : '', clean(g('state')) ? 'State ' + clean(g('state')) : '', clean(g('region')) ? 'Region ' + clean(g('region')) : '', clean(g('product')), status, clean(g('remarks'))].filter(Boolean).join(' · ');
+    return { client, loadingFrom: from, loadingTo: to, vehicleType: norm(division) === 'haulage' ? 'HAULAGE' : '', contractType: clean(g('contractType')), price: round2(price), priceBasis, priceIncl: incl === null ? null : round2(incl), priceRevised: num(g('priceRevised')), approved: !/not approved/i.test(status),
+      effectiveDate: excelDateToISO(g('effectiveDate')) || defaults.effectiveDate || todayISO(), expiryDate: excelDateToISO(g('expiryDate')) || '', remarks };
   }
   /** Duplicate key: a trip is the same trip when date, plate, client, waybill, journey plan and selling price all match. */
   function dupKey(t) { return [t.dateDispatched, norm(t.plate), norm(t.client), norm(t.waybill), norm(t.journeyPlanId), num(t.sellingPrice)].join('|'); }
 
   return {
-    INVOICE_STATUSES, PAYMENT_STATUSES, RETURN_WAYBILL, TRIP_STATUSES, INVOICE_DOC_STATUSES, ROLES, ROLE_LABELS, ROLE_FIELDS, ROLE_ACTIONS, TRIP_FIELDS, MONTHS,
+    INVOICE_STATUSES, PAYMENT_STATUSES, RETURN_WAYBILL, TRIP_STATUSES, INVOICE_DOC_STATUSES, VAT_TREATMENTS, VAT_TREATMENT_LABELS, TRUCK_BATCHES, ROLES, ROLE_LABELS, ROLE_FIELDS, ROLE_ACTIONS, TRIP_FIELDS, MONTHS,
     round2, isNum, num, norm, clean, monthKey, monthLabel, todayISO, addDays, endOfMonth,
-    assetFor, vatRateOf, rateStatus, lookupAgreedRate, variance, tripStatus, computeTrip, validateTrip,
+    assetFor, vatRateOf, rateStatus, lookupAgreedRate, clientKey, variance, tripStatus, computeTrip, validateTrip,
+    normContract, locKey, locTokens, zoneOf, locMatch, vatSplit, batchOn, convertBasis, batchPerformance, RATE_HEADERS, mapRateHeaders, rowToRate,
     can, canEditField, editableFields,
     clientCode, generateInvoiceNumber, eligibleTrips, invoiceTotals, invoiceDocStatus, findDuplicateInvoiceNumber,
     sum, filterTrips, tripMatches, clientSummary, pivotByMonth, dashboard,

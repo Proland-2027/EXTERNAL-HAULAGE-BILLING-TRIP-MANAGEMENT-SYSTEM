@@ -12,23 +12,23 @@
       if (saved) { this._load(saved); return; }
       progress && progress('Loading the workbook data…');
       try {
-        const [trips, assets, clients, locations] = await Promise.all(['trips', 'assets', 'clients', 'locations'].map((n) => fetch(`data/workbook/${n}.json`).then((r) => (r.ok ? r.json() : []))));
+        const [trips, assets, clients, locations, rates, zones] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones'].map((n) => fetch(`data/workbook/${n}.json`).then((r) => (r.ok ? r.json() : (n === 'zones' ? {} : [])))));
         for (const t of trips) this.state.trips.set(t.id, t);
         this.state.assets = assets.map((a) => Object.assign({ id: a.plate }, a));
-        this.state.clients = clients; this.state.locations = locations;
+        this.state.clients = clients; this.state.locations = locations; this.state.zones = zones || {};
+        this.state.rates = rates.length ? rates : (HB.sampleRates ? HB.sampleRates() : []);
       } catch (e) { console.warn('seed data not available', e); }
-      this.state.rates = HB.sampleRates ? HB.sampleRates() : [];
       await this.ensureDemoUsers();
       this._persist();
     }
     _load(s) {
       this.state.settings = Object.assign({}, HB.DEFAULT_SETTINGS, s.settings || {});
       for (const c of HB.COLLECTIONS) this.state[c] = s[c] || [];
-      this.state.locations = s.locations || []; this.state.audit = s.audit || [];
+      this.state.locations = s.locations || []; this.state.zones = s.zones || {}; this.state.audit = s.audit || [];
       this.state.trips = new Map((s.trips || []).map((t) => [t.id, t]));
     }
     _persist() {
-      const s = { settings: this.state.settings, locations: this.state.locations, audit: this.state.audit.slice(-2000), trips: [...this.state.trips.values()] };
+      const s = { settings: this.state.settings, locations: this.state.locations, zones: this.state.zones, audit: this.state.audit.slice(-2000), trips: [...this.state.trips.values()] };
       for (const c of HB.COLLECTIONS) s[c] = this.state[c];
       U.storage.set(KEY, s);
     }

@@ -4,9 +4,9 @@
   const U = HB.U, E = HB.engine;
 
   const TRIP_COLUMNS = [
-    ['Date Dispatched', 'dateDispatched'], ['Date Delivered', 'dateDelivered'], ['Plate Number', 'plate'], ['Asset Code', 'assetCode'], ['Type of Vehicle', 'vehicleType'], ['Type', 'vehicleCategory'], ['Cost Center', 'costCenter'],
+    ['Date Dispatched', 'dateDispatched'], ['Date Delivered', 'dateDelivered'], ['Plate Number', 'plate'], ['Asset Code', 'assetCode'], ['Type of Vehicle', 'vehicleType'], ['Type', 'vehicleCategory'], ['Truck Batch', 'truckBatch'], ['Cost Center', 'costCenter'],
     ['Contract Type', 'contractType'], ['CLIENT NAME', 'client'], ['Loading From', 'loadingFrom'], ['Loading To', 'loadingTo'], ['Journey Plan ID', 'journeyPlanId'], ['Client Waybill Number', 'waybill'], ['Return Waybill Received?', 'returnWaybill'],
-    ['Invoice Status', 'invoiceStatus'], ['Agreed Client Price (₦)', 'agreedPrice'], ['Selling Price (₦)', 'sellingPrice'], ['Price Variance (₦)', 'variance'], ['Price Variance (%)', 'variancePct'], ['VAT (₦)', 'vat'], ['Billing After VAT (₦)', 'billing'],
+    ['Invoice Status', 'invoiceStatus'], ['Agreed Client Price (₦)', 'agreedPrice'], ['Selling Price (₦)', 'sellingPrice'], ['Price Variance (₦)', 'variance'], ['Price Variance (%)', 'variancePct'], ['VAT Treatment', 'vatTreatment'], ['Net Sales excl. VAT (₦)', 'netSales'], ['VAT (₦)', 'vat'], ['Billing After VAT (₦)', 'billing'],
     ['Quote Number', 'quoteNo'], ['SO Number', 'soNo'], ['Manual Invoice Number', 'manualInvoiceNo'], ['Invoice Number', 'invoiceNo'], ['Payment Status', 'paymentStatus'], ['Advance (₦)', 'advance'], ['Amount Paid (₦)', 'amountPaid'], ['Balance (₦)', 'balance'], ['Trip Status', 'tripStatus'], ['Notes', 'note'],
   ];
   const tripsToRows = (trips) => [TRIP_COLUMNS.map((c) => c[0]), ...trips.map((t) => TRIP_COLUMNS.map((c) => { const v = t[c[1]]; return v === null || v === undefined ? '' : v; }))];
@@ -47,27 +47,34 @@
   }
   async function invoicePdf(inv, trips, settings, clients) {
     const doc = pdfDoc(); const client = (clients || []).find((c) => E.norm(c.name) === E.norm(inv.client));
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text(settings.company || 'Haulage Services', 40, 50);
-    doc.setFontSize(11); doc.text('HAULAGE SERVICES INVOICE', 555, 50, { align: 'right' });
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-    const left = [['Bill to', inv.client], ['Address', (client && client.address) || ''], ['Period', `${U.monthLabel(inv.fromMonth)} – ${U.monthLabel(inv.toMonth)}`]];
-    const right = [['Invoice No.', inv.number], ['Invoice date', U.date(inv.invoiceDate)], ['Due date', U.date(inv.dueDate)], ['Status', inv.status]];
-    left.forEach((l, i) => { doc.setFont('helvetica', 'bold'); doc.text(l[0], 40, 80 + i * 13); doc.setFont('helvetica', 'normal'); doc.text(String(l[1] || ''), 100, 80 + i * 13); });
-    right.forEach((l, i) => { doc.setFont('helvetica', 'bold'); doc.text(l[0], 380, 80 + i * 13); doc.setFont('helvetica', 'normal'); doc.text(String(l[1] || ''), 460, 80 + i * 13); });
-    const rows = trips.map((t, i) => ({ sn: i + 1, date: U.date(t.dateDispatched), from: t.loadingFrom, to: t.loadingTo, plate: t.plate, trip: t.journeyPlanId, wb: t.waybill, ref: t.manualInvoiceNo, amount: money(inv.includesVat ? t.billing : t.sellingPrice), vat: inv.includesVat ? '' : money(t.vat), total: money(t.billing) }));
-    const cols = inv.includesVat
-      ? [{ key: 'sn', title: 'S/N', w: 26 }, { key: 'date', title: 'Date', w: 58 }, { key: 'from', title: 'Loading From', w: 70 }, { key: 'to', title: 'Loading To', w: 70 }, { key: 'plate', title: 'Vehicle', w: 62 }, { key: 'trip', title: 'Trip No.', w: 58 }, { key: 'wb', title: 'Waybill', w: 76 }, { key: 'total', title: 'Amount (Incl. VAT)', w: 95, align: 'right' }]
-      : [{ key: 'sn', title: 'S/N', w: 26 }, { key: 'date', title: 'Date', w: 54 }, { key: 'from', title: 'From', w: 62 }, { key: 'to', title: 'To', w: 62 }, { key: 'plate', title: 'Vehicle', w: 58 }, { key: 'wb', title: 'Waybill', w: 66 }, { key: 'amount', title: 'Amount (Excl. VAT)', w: 72, align: 'right' }, { key: 'vat', title: 'VAT', w: 55, align: 'right' }, { key: 'total', title: 'Total', w: 60, align: 'right' }];
-    let y = table(doc, 40, 140, cols, rows);
-    const tot = E.invoiceTotals(trips, E.vatRateOf(settings));
-    y += 12; doc.setFontSize(9);
-    const line = (k, v, bold) => { doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.text(k, 400, y); doc.text(v, 555, y, { align: 'right' }); y += 14; };
-    if (!inv.includesVat) { line('Subtotal', money(tot.subtotal)); line(`VAT (${(E.vatRateOf(settings) * 100).toFixed(1)}%)`, money(tot.vat)); }
-    line('TOTAL DUE', money(tot.total), true);
-    y += 10; doc.setFont('helvetica', 'bold'); doc.text('Remittance details', 40, y); doc.setFont('helvetica', 'normal'); y += 13;
-    for (const l of [`Bank: ${settings.bankName || '—'}`, `Account name: ${settings.accountName || '—'}`, `Account number: ${settings.accountNumber || '—'}`, settings.invoiceNote || '']) { if (l) { doc.text(l, 40, y); y += 12; } }
-    const blob = doc.output('blob');
-    await U.download(blob, `${inv.number}.pdf`);
+    const co = Object.assign({ name: settings.company, address: settings.address, phone: settings.phone, email: settings.email, tin: settings.tin, rcNumber: settings.rcNumber }, inv.company || {});
+    const priceType = inv.priceType || (inv.includesVat ? 'inclusive' : 'exclusive'); const rate = inv.vatRate || E.vatRateOf(settings);
+    const lines = inv.lines && inv.lines.length ? inv.lines : trips.map((t) => { const sp = E.vatSplit(t.sellingPrice, rate, priceType); return { date: t.dateDispatched, loadingFrom: t.loadingFrom, loadingTo: t.loadingTo, plate: t.plate, journeyPlanId: t.journeyPlanId, waybill: t.waybill, manualInvoiceNo: t.manualInvoiceNo, sellingPrice: t.sellingPrice, net: sp.net, vat: sp.vat, gross: sp.gross }; });
+    let x = 40, y = 44;
+    if (settings.logo) { try { const fmt = /^data:image\/jpe?g/i.test(settings.logo) ? 'JPEG' : 'PNG'; const w = Math.min(120, settings.logoWidth || 120); const hgt = settings.logoHeight && settings.logoWidth ? w * (settings.logoHeight / settings.logoWidth) : 48; doc.addImage(settings.logo, fmt, x, y - 6, w, hgt); x += w + 14; } catch (e) { console.warn('logo not added', e); } }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(co.name || 'JMG Limited', x, y + 6);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); let cy = y + 19;
+    for (const l of [co.address, [co.phone, co.email, settings.website].filter(Boolean).join('  ·  '), [co.tin ? 'TIN ' + co.tin : '', co.rcNumber ? 'RC ' + co.rcNumber : ''].filter(Boolean).join('  ·  ')]) { if (l) { doc.text(String(l), x, cy); cy += 11; } }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('INVOICE', 555, y + 6, { align: 'right' });
+    doc.setFontSize(9); doc.text(String(inv.number), 555, y + 20, { align: 'right' }); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    doc.text(`Invoice date: ${U.date(inv.invoiceDate)}`, 555, y + 32, { align: 'right' }); doc.text(`Due date: ${U.date(inv.dueDate)}`, 555, y + 43, { align: 'right' }); doc.text(E.VAT_TREATMENT_LABELS[priceType], 555, y + 54, { align: 'right' });
+    doc.setDrawColor(23, 59, 99); doc.setLineWidth(1.2); doc.line(40, 112, 555, 112);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text('BILL TO', 40, 128); doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10); doc.text(String(inv.client), 40, 141); doc.setFontSize(8.5); let by = 153;
+    if (client && client.address) { doc.text(String(client.address), 40, by); by += 11; } doc.text(`Period: ${U.monthLabel(inv.fromMonth)} – ${U.monthLabel(inv.toMonth)}`, 40, by);
+    doc.setFont('helvetica', 'bold'); doc.text('REMIT TO', 380, 128); doc.setFont('helvetica', 'normal');
+    [`Bank: ${settings.bankName || '—'}`, `Account name: ${settings.accountName || '—'}`, `Account number: ${settings.accountNumber || '—'}`].forEach((l, k) => doc.text(l, 380, 141 + k * 11));
+    const rows = lines.map((l, i) => ({ sn: i + 1, date: U.date(l.date), from: l.loadingFrom, to: l.loadingTo, plate: l.plate, trip: l.journeyPlanId, wb: l.waybill, net: money(l.net), vat: money(l.vat), total: money(l.gross) }));
+    const cols = [{ key: 'sn', title: 'S/N', w: 24 }, { key: 'date', title: 'Date', w: 54 }, { key: 'from', title: 'Loading From', w: 66 }, { key: 'to', title: 'Loading To', w: 66 }, { key: 'plate', title: 'Vehicle', w: 56 }, { key: 'trip', title: 'Trip No.', w: 50 }, { key: 'wb', title: 'Waybill', w: 62 }, { key: 'net', title: 'Net (Excl. VAT)', w: 58, align: 'right' }, { key: 'vat', title: 'VAT', w: 40, align: 'right' }, { key: 'total', title: 'Total', w: 39, align: 'right' }];
+    let ty = table(doc, 40, 182, cols, rows);
+    ty += 14; doc.setFontSize(9);
+    const line = (k, v, bold) => { doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.text(k, 380, ty); doc.text(v, 555, ty, { align: 'right' }); ty += 14; };
+    line('Subtotal before VAT', money(inv.subtotal)); line(`VAT (${(rate * 100).toFixed(1)}%)${priceType === 'inclusive' ? ' included' : ''}`, money(inv.vat)); line('INVOICE TOTAL', money(inv.total), true);
+    ty += 8; doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+    doc.text(priceType === 'inclusive' ? 'Prices are quoted inclusive of VAT; the VAT component is extracted from each price.' : 'Prices are quoted exclusive of VAT; VAT is added at the rate shown.', 40, ty); ty += 11;
+    if (settings.invoiceNote) { doc.text(String(settings.invoiceNote), 40, ty); ty += 11; }
+    doc.setFontSize(7.5); doc.setTextColor(120); doc.text(`Generated ${U.dateTime(U.nowISO())} · ${co.name || ''}`, 40, 812); doc.setTextColor(0);
+    await U.download(doc.output('blob'), `${inv.number}.pdf`);
   }
   async function statementPdf(client, rows, totals, settings, title) {
     const doc = pdfDoc();

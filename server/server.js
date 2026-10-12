@@ -121,7 +121,7 @@ const routes = {
   'POST /api/logout': (req, res) => { const t = cookieToken(req); if (t) q.delSession.run(t); res.setHeader('Set-Cookie', 'hb_session=; Path=/; HttpOnly; Max-Age=0'); return { ok: true }; },
   'GET /api/me': (req) => ({ user: currentUser(req) }),
   'GET /api/bootstrap': (req) => {
-    const user = requireUser(req); const out = { user, settings: store.settings(), trips: store.trips(), seq: q.maxSeq.get().seq, locations: ((store.doc('meta', 'locations') || {}).list) || [] };
+    const user = requireUser(req); const out = { user, settings: store.settings(), trips: store.trips(), seq: q.maxSeq.get().seq, locations: ((store.doc('meta', 'locations') || {}).list) || [], zones: ((store.doc('meta', 'zones') || {}).map) || {} };
     for (const c of ['clients', 'assets', 'rates', 'invoices', 'payments']) out[c] = store.list(c);
     out.users = store.list('users').map((u) => (E.can(user.role, 'user.manage') ? Object.assign({}, u, { hash: undefined, salt: undefined }) : publicUser(u)));
     return out;
@@ -140,11 +140,11 @@ const routes = {
     const incoming = Object.assign({}, body || {}, { id: params.id });
     // field-level permission: a role may only change the fields it owns
     const allowed = new Set(E.ROLE_FIELDS[user.role] || []);
-    const protectedKeys = ['dateDispatched', 'dateDelivered', 'plate', 'contractType', 'client', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'returnWaybill', 'invoiceStatus', 'sellingPrice', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceNo', 'invoiceId', 'paymentStatus', 'advance', 'note', 'agreedRateId', 'amountPaidOverride'];
+    const protectedKeys = ['dateDispatched', 'dateDelivered', 'plate', 'contractType', 'client', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'returnWaybill', 'invoiceStatus', 'sellingPrice', 'vatTreatment', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceNo', 'invoiceId', 'paymentStatus', 'advance', 'note', 'agreedRateId', 'amountPaidOverride'];
     const next = Object.assign({}, current || {}, { id: params.id });
     for (const k of protectedKeys) {
       if (incoming[k] === undefined) continue; // absent keys are left unchanged (partial updates allowed)
-      const defaults = { invoiceStatus: 'Invoice Not Sent', paymentStatus: 'Not Paid', returnWaybill: '' };
+      const defaults = { invoiceStatus: 'Invoice Not Sent', paymentStatus: 'Not Paid', returnWaybill: '', vatTreatment: 'exclusive' };
       const before = current ? current[k] : defaults[k], after = incoming[k];
       const changed = JSON.stringify(before === undefined || before === null ? '' : before) !== JSON.stringify(after === undefined || after === null ? '' : after);
       if (changed && !allowed.has(k) && user.role !== 'admin') throw new HttpError(403, `Your role cannot change "${k}".`, { code: 'forbidden' });
@@ -153,6 +153,8 @@ const routes = {
     for (const k of ['source', 'xlRow', 'invoiceStatusRaw']) if (incoming[k] !== undefined && next[k] === undefined) next[k] = incoming[k];
     next.sellingPrice = E.num(next.sellingPrice); next.advance = E.num(next.advance);
     const asset = E.assetFor(next.plate, store.list('assets')); if (asset) { next.assetCode = asset.assetCode; next.vehicleType = asset.vehicleType; next.vehicleCategory = asset.vehicleCategory; next.costCenter = asset.costCenter; }
+    if (!current || current.plate !== next.plate || current.dateDispatched !== next.dateDispatched || !next.truckBatch) next.truckBatch = E.batchOn(asset, next.dateDispatched);
+    if (!next.vatTreatment) next.vatTreatment = 'exclusive';
     const errors = E.validateTrip(next, { assets: store.list('assets') }); if (errors.length) throw new HttpError(400, errors.join(' '), { code: 'invalid', errors });
     const ts = nowISO(); if (!current) { next.createdAt = ts; next.createdBy = user.username; } next.updatedAt = ts; next.updatedBy = user.username; next.version = Number(current ? current.version : 0) + 1;
     const changes = diff(current, next); next.history = [...(current && current.history || []), { ts, user: user.name, changes }].slice(-40);
@@ -165,7 +167,7 @@ const routes = {
     const user = requireUser(req); requireAction(user, 'trip.import'); const trips = (body && body.trips) || []; if (!Array.isArray(trips) || trips.length > 20000) throw new HttpError(400, 'Invalid import');
     const assets = store.list('assets'); const out = []; const ts = nowISO();
     db.exec('BEGIN'); try {
-      for (const raw of trips) { const t = Object.assign({}, raw); t.id = t.id || 'imp-' + crypto.randomBytes(6).toString('hex'); const a = E.assetFor(t.plate, assets); if (a) { t.assetCode = a.assetCode; t.vehicleType = a.vehicleType; t.vehicleCategory = a.vehicleCategory; t.costCenter = a.costCenter; } t.sellingPrice = E.num(t.sellingPrice); t.advance = E.num(t.advance); const errors = E.validateTrip(t, {}); if (errors.length) continue; t.version = 1; t.createdAt = t.createdAt || ts; t.createdBy = user.username; t.updatedAt = ts; t.updatedBy = user.username; t.source = t.source || 'import'; store.putTrip(t); out.push(t); }
+      for (const raw of trips) { const t = Object.assign({}, raw); t.id = t.id || 'imp-' + crypto.randomBytes(6).toString('hex'); const a = E.assetFor(t.plate, assets); if (a) { t.assetCode = a.assetCode; t.vehicleType = a.vehicleType; t.vehicleCategory = a.vehicleCategory; t.costCenter = a.costCenter; } t.truckBatch = E.batchOn(a, t.dateDispatched); if (!t.vatTreatment) t.vatTreatment = 'exclusive'; t.sellingPrice = E.num(t.sellingPrice); t.advance = E.num(t.advance); const errors = E.validateTrip(t, {}); if (errors.length) continue; t.version = 1; t.createdAt = t.createdAt || ts; t.createdBy = user.username; t.updatedAt = ts; t.updatedBy = user.username; t.source = t.source || 'import'; store.putTrip(t); out.push(t); }
       store.audit(auditEntry(user, 'import', 'trip', 'bulk', `${out.length} trips imported`, [])); db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
     return { trips: out };

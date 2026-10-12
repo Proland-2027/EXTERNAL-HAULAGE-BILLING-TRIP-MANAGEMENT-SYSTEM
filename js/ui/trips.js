@@ -13,6 +13,7 @@
     { key: 'vehicleType', label: 'Vehicle Type', w: 150 },
     { key: 'vehicleCategory', label: 'Category', w: 90 },
     { key: 'costCenter', label: 'Cost Ctr', w: 70 },
+    { key: 'truckBatch', label: 'Truck Batch', w: 95, batch: true },
     { key: 'contractType', label: 'Contract', w: 80, edit: 'text' },
     { key: 'loadingFrom', label: 'Loading From', w: 120, edit: 'location' },
     { key: 'loadingTo', label: 'Loading To', w: 120, edit: 'location' },
@@ -26,6 +27,8 @@
     { key: 'variancePct', label: 'Variance %', w: 90, pct: true, variance: true },
     { key: 'vat', label: 'VAT (₦)', w: 110, money: true },
     { key: 'billing', label: 'Billing After VAT (₦)', w: 150, money: true },
+    { key: 'vatTreatment', label: 'VAT Basis', w: 120, edit: 'enum', options: E.VAT_TREATMENTS, vatLabel: true },
+    { key: 'netSales', label: 'Net Sales excl. VAT (₦)', w: 150, money: true },
     { key: 'quoteNo', label: 'Quote No.', w: 100, edit: 'text' },
     { key: 'soNo', label: 'SO No.', w: 100, edit: 'text' },
     { key: 'manualInvoiceNo', label: 'Manual Inv. No.', w: 120, edit: 'text' },
@@ -56,6 +59,8 @@
     if (c.variance) { if (t.direction === 'na') return ''; return h('span', { class: 'var-' + t.direction, text: c.pct ? U.pct(v) : U.signedMoney(v) }); }
     if (c.money) return U.money(v);
     if (c.status) return U.pill(v, U.statusKind(v));
+    if (c.batch) return v ? U.pill(v, v === 'New Batch' ? 'info' : v === 'Old Batch' ? 'neutral' : 'warn') : '';
+    if (c.vatLabel) return v === 'inclusive' ? 'Incl. VAT' : 'Excl. VAT';
     if (c.key === 'dateDispatched' || c.key === 'dateDelivered') return U.date(v);
     return v === null || v === undefined ? '' : String(v);
   }
@@ -143,6 +148,9 @@
       U.field('Vehicle type', U.select(opt([...new Set(store.state.assets.map((a) => a.vehicleType))].sort()), f.vehicleType || '', { onChange: set('vehicleType') })),
       U.field('Cost center', U.select(opt([...new Set(store.state.assets.map((a) => a.costCenter))].sort()), f.costCenter || '', { onChange: set('costCenter') })),
       U.field('Plate', U.select(opt(store.state.assets.map((a) => a.plate).sort()), f.plate || '', { onChange: set('plate') })),
+      U.field('Select Truck Batch', U.select([['', 'All Batches'], ['New Batch', 'New Batch'], ['Old Batch', 'Old Batch'], ['3rd Party', '3rd Party / unclassified']], f.truckBatch || '', { onChange: set('truckBatch') })),
+      U.field('Contract type', U.select(opt([...new Set(trips.map((t) => t.contractType).filter(Boolean))].sort()), f.contractType || '', { onChange: set('contractType') })),
+      U.field('VAT basis', U.select([['', 'All'], ['exclusive', 'Price Excluding VAT'], ['inclusive', 'Price Including VAT']], f.vatTreatment || '', { onChange: set('vatTreatment') })),
       U.field('Payment status', U.select(opt(E.PAYMENT_STATUSES), f.paymentStatus || '', { onChange: set('paymentStatus') })),
       U.field('Invoice status', U.select(opt(E.INVOICE_STATUSES), f.invoiceStatus || '', { onChange: set('invoiceStatus') })),
       U.field('Trip status', U.select(opt(E.TRIP_STATUSES), f.tripStatus || '', { onChange: set('tripStatus') })),
@@ -154,7 +162,7 @@
   // ---------------------------------------------------------------- inline editing
   function editor(ctx, c, value) {
     const { store } = ctx;
-    if (c.edit === 'enum') return U.select(c.options.map((o) => [o, o || '—']), value);
+    if (c.edit === 'enum') return U.select(c.options.map((o) => [o, c.vatLabel ? E.VAT_TREATMENT_LABELS[o] : (o || '—')]), value);
     if (c.edit === 'date') return h('input', { type: 'date', value: value || '' });
     if (c.edit === 'money') return h('input', { type: 'number', step: '0.01', min: '0', value: value === null || value === undefined ? '' : value });
     if (c.edit === 'client') return U.datalistInput('dl-clients', store.clientNames(), value);
@@ -212,7 +220,7 @@
   // ---------------------------------------------------------------- detail form
   function openDetail(ctx, id) {
     const { store } = ctx; const raw = id ? store.raw(id) : null; const computed = id ? store.trip(id) : null;
-    const t = Object.assign({ dateDispatched: U.todayISO(), dateDelivered: '', plate: '', client: '', loadingFrom: '', loadingTo: '', journeyPlanId: '', waybill: '', returnWaybill: '', invoiceStatus: 'Invoice Not Sent', sellingPrice: null, quoteNo: '', soNo: '', manualInvoiceNo: '', paymentStatus: 'Not Paid', advance: null, contractType: '', note: '' }, raw || {});
+    const t = Object.assign({ dateDispatched: U.todayISO(), dateDelivered: '', plate: '', client: '', loadingFrom: '', loadingTo: '', journeyPlanId: '', waybill: '', returnWaybill: '', invoiceStatus: 'Invoice Not Sent', sellingPrice: null, vatTreatment: 'exclusive', quoteNo: '', soNo: '', manualInvoiceNo: '', paymentStatus: 'Not Paid', advance: null, contractType: '', note: '' }, raw || {});
     if (!id && !ctx.can('trip.create')) return U.toast('Your role cannot create trips.', 'bad');
     const inputs = {};
     const fld = (key, label, control, opts) => { inputs[key] = control.tagName === 'SPAN' ? control.querySelector('input') : control; const locked = !ctx.canField(key) && !(id === null && ctx.can('trip.create') && E.ROLE_FIELDS.operations.includes(key)); if (locked) { inputs[key].disabled = true; } return U.field(label, control, Object.assign({ locked }, opts || {})); };
@@ -224,9 +232,10 @@
       preview.append(h('div', { class: 'label', text: 'Calculated (from Selling Price)' }),
         line('Agreed Client Price', c.agreedStatus === 'multiple' ? 'Multiple rates — choose below' : c.agreedPrice === null ? 'No Agreed Rate Found' : U.money(c.agreedPrice)),
         line('Price variance', c.direction === 'na' ? '—' : `${U.signedMoney(c.variance)} (${U.pct(c.variancePct)})`, 'var-' + c.direction),
-        line('VAT (7.5%)', U.money(c.vat, { blank: '—' })), line('Billing after VAT', U.money(c.billing, { blank: '—' })), line('Amount paid', U.money(c.amountPaid, { blank: '—' })), line('Balance', U.money(c.balance, { blank: '—' })),
+        line('Net sales excl. VAT', U.money(c.netSales, { blank: '—' })), line(`VAT (${(E.vatRateOf(store.state.settings) * 100).toFixed(1)}%)`, U.money(c.vat, { blank: '—' })), line('Billing after VAT', U.money(c.billing, { blank: '—' })), line('Amount paid', U.money(c.amountPaid, { blank: '—' })), line('Balance', U.money(c.balance, { blank: '—' })),
         h('div', { class: 'row between' }, h('span', { class: 'muted small', text: 'Trip status' }), U.pill(c.tripStatus, U.statusKind(c.tripStatus))),
-        c.vehicleType ? line('Vehicle', `${c.assetCode} · ${c.vehicleType} · ${c.vehicleCategory} · ${c.costCenter}`) : null);
+        c.vehicleType ? line('Vehicle', `${c.assetCode} · ${c.vehicleType} · ${c.vehicleCategory} · ${c.costCenter}`) : null,
+        c.truckBatch ? h('div', { class: 'row between' }, h('span', { class: 'muted small', text: 'Truck Batch' }), U.pill(c.truckBatch, c.truckBatch === 'New Batch' ? 'info' : 'neutral')) : null);
       if (c.agreedCandidates && c.agreedCandidates.length > 1 && ctx.canField('agreedRateId')) {
         const sel = U.select([['', 'Automatic (priority rule)'], ...c.agreedCandidates.map((r) => [r.id, `${U.money(r.price)} · ${r.contractType || 'any contract'} · from ${U.date(r.effectiveDate)}`])], draft.agreedRateId || '', { onChange: (e) => { t.agreedRateId = e.target.value; recompute(); } });
         preview.append(U.field('Agreed rate to apply', sel));
@@ -246,6 +255,7 @@
       fld('returnWaybill', 'Return Waybill Received', U.select(E.RETURN_WAYBILL.map((o) => [o, o || '—']), t.returnWaybill)),
       fld('invoiceStatus', 'Invoice Status', U.select(E.INVOICE_STATUSES, t.invoiceStatus, { onChange: onInput })),
       fld('sellingPrice', 'Selling Price (₦) — manual entry', h('input', { type: 'number', step: '0.01', min: '0', value: t.sellingPrice ?? '', onInput }), { help: 'Never auto-filled from the agreed rate.' }),
+      fld('vatTreatment', 'VAT Treatment', U.select(E.VAT_TREATMENTS.map((v) => [v, E.VAT_TREATMENT_LABELS[v]]), t.vatTreatment || 'exclusive', { onChange: onInput }), { help: 'Set by the invoice price type; "Including VAT" extracts VAT from the selling price.' }),
       fld('quoteNo', 'Quote Number', h('input', { type: 'text', value: t.quoteNo || '' })),
       fld('soNo', 'Sales Order Number', h('input', { type: 'text', value: t.soNo || '' })),
       fld('manualInvoiceNo', 'Manual Invoice Number', h('input', { type: 'text', value: t.manualInvoiceNo || '' }), { help: t.invoiceNo ? `Generated invoice: ${t.invoiceNo}` : '' }),
@@ -306,7 +316,7 @@
             btn.disabled = true; btn.textContent = 'Importing…';
             const now = U.nowISO(); const who = store.user.username;
             const trips = chosen.map((x) => Object.assign(x.t, { id: U.id('t'), source: 'import', version: 1, createdAt: now, createdBy: who, updatedAt: now, updatedBy: who, history: [{ ts: now, user: store.user.name, changes: [{ field: 'import', from: '', to: file.files[0].name }] }] }));
-            for (const t of trips) { const a = E.assetFor(t.plate, store.state.assets); if (a) { t.assetCode = a.assetCode; t.vehicleType = a.vehicleType; t.vehicleCategory = a.vehicleCategory; t.costCenter = a.costCenter; } }
+            for (const t of trips) { const a = E.assetFor(t.plate, store.state.assets); if (a) { t.assetCode = a.assetCode; t.vehicleType = a.vehicleType; t.vehicleCategory = a.vehicleCategory; t.costCenter = a.costCenter; } t.truckBatch = E.batchOn(a, t.dateDispatched); }
             try { await store.bulkWriteTrips(trips); await store.writeAudit(store.auditEntry({ action: 'import', entity: 'trip', entityId: 'bulk', label: `${trips.length} trips imported from ${file.files[0].name}`, changes: [] })); U.toast(`Imported ${trips.length} trips.`, 'good'); m.close(); view.draw(); }
             catch (e) { U.toast(e.message, 'bad'); btn.disabled = false; btn.textContent = 'Import'; }
           } }, `Import ${ok.length} new trips`);

@@ -115,3 +115,48 @@ test('import mapping and duplicate key', () => {
   assert.equal(E.normalizeInvoiceStatus('Closed', 'Paid'), 'Invoice Sent');
   assert.equal(E.normalizeInvoiceStatus('', 'Not Paid'), 'Invoice Not Sent');
 });
+
+test('VAT-inclusive pricing extracts VAT; exclusive adds it (brief example ₦2,000,000)', () => {
+  assert.deepEqual(E.vatSplit(2000000, 0.075, 'inclusive'), { net: 1860465.12, vat: 139534.88, gross: 2000000 });
+  assert.deepEqual(E.vatSplit(2000000, 0.075, 'exclusive'), { net: 2000000, vat: 150000, gross: 2150000 });
+  const inc = E.computeTrip({ client: 'C', plate: 'T33405LA', sellingPrice: 2000000, vatTreatment: 'inclusive', paymentStatus: 'Not Paid', dateDispatched: '2026-09-01' }, { settings, assets });
+  assert.equal(inc.billing, 2000000); assert.equal(inc.vat, 139534.88); assert.equal(inc.netSales, 1860465.12); assert.equal(inc.sellingPrice, 2000000, 'selling price untouched');
+  const tot = E.invoiceTotals([{ sellingPrice: 2000000 }, { sellingPrice: 1000000 }], 0.075, 'inclusive');
+  close(tot.subtotal, 2790697.68, 0.01); close(tot.vat, 209302.32, 0.01); assert.equal(tot.total, 3000000);
+});
+
+test('truck batch derives from the asset and is preserved on the trip', () => {
+  assert.equal(E.batchOn({ vehicleCategory: 'New Batch' }, '2026-01-01'), 'New Batch');
+  assert.equal(E.batchOn({ vehicleCategory: 'CANTER' }, '2026-01-01'), 'Old Batch');
+  assert.equal(E.batchOn({ vehicleCategory: '3rd Party' }, '2026-01-01'), '3rd Party');
+  const a = { vehicleCategory: 'Old Batch', batchHistory: [{ batch: 'Old Batch', effectiveDate: '2024-01-01' }, { batch: 'New Batch', effectiveDate: '2026-07-01' }] };
+  assert.equal(E.batchOn(a, '2026-06-30'), 'Old Batch'); assert.equal(E.batchOn(a, '2026-07-01'), 'New Batch');
+  const t = E.computeTrip({ client: 'C', plate: 'T33405LA', dateDispatched: '2026-09-01', sellingPrice: 1 }, { settings, assets });
+  assert.equal(t.truckBatch, 'New Batch');
+  const kept = E.computeTrip({ client: 'C', plate: 'T33405LA', dateDispatched: '2026-09-01', sellingPrice: 1, truckBatch: 'Old Batch' }, { settings, assets });
+  assert.equal(kept.truckBatch, 'Old Batch', 'stored snapshot wins over the current asset classification');
+  const perf = E.batchPerformance(computed, 'net');
+  assert.equal(perf.newBatch.trips + perf.oldBatch.trips + perf.other.trips, computed.length);
+  close(perf.total.sales, E.sum(computed, 'netSales'), 0.05);
+});
+
+test('price-list matching: zones, zone lists, tonnage contracts, VAT basis conversion', () => {
+  const zones = { gbagada: 'Lagos', apapa: 'Lagos', phc: 'Port Harcourt', vi: 'Lagos' };
+  const rates = [
+    { id: 'j45', client: 'JAMARA', loadingFrom: 'Lagos', loadingTo: 'Port Harcourt', vehicleType: 'HAULAGE', contractType: '45T', price: 2630000, priceBasis: 'exclusive', effectiveDate: '2026-06-01' },
+    { id: 'jlcl', client: 'JAMARA', loadingFrom: 'Lagos', loadingTo: 'VI-Lekki-AJAH', vehicleType: 'HAULAGE', contractType: '30T-LCL', price: 460000, priceBasis: 'exclusive', effectiveDate: '2026-06-01' },
+    { id: 'jlcl2', client: 'JAMARA', loadingFrom: 'Lagos', loadingTo: 'VI-Lekki-AJAH', vehicleType: 'HAULAGE', contractType: '30T-LCL', price: 630000, priceBasis: 'exclusive', effectiveDate: '2026-06-01' },
+    { id: 'saso', client: 'SASO', loadingFrom: 'Lagos', loadingTo: 'Kano', vehicleType: 'HAULAGE', contractType: '45T', price: 4730000, priceBasis: 'inclusive', effectiveDate: '2026-06-01' },
+  ];
+  const cl = [{ name: 'Jamara', code: 'JAM', aliases: ['JAMARA'] }, { name: 'SASO', code: 'SAS' }];
+  const t1 = E.lookupAgreedRate({ client: 'Jamara', loadingFrom: 'GBAGADA', loadingTo: 'PHC', vehicleType: 'HAULAGE', contractType: '45', dateDispatched: '2026-09-11' }, rates, zones, cl);
+  assert.equal(t1.status, 'found'); assert.equal(t1.rate.id, 'j45');
+  const t2 = E.lookupAgreedRate({ client: 'Jamara', loadingFrom: 'GBAGADA', loadingTo: 'VI', vehicleType: 'HAULAGE', contractType: '', dateDispatched: '2026-09-11' }, rates, zones, cl);
+  assert.equal(t2.status, 'multiple'); assert.equal(t2.candidates.length, 2);
+  const t3 = E.lookupAgreedRate({ client: 'Jamara', loadingFrom: 'GBAGADA', loadingTo: 'PHC', vehicleType: 'HAULAGE', contractType: '45', dateDispatched: '2026-05-01' }, rates, zones, cl);
+  assert.equal(t3.status, 'none', 'not in force before the effective date');
+  const c = E.computeTrip({ client: 'SASO', plate: 'T33405LA', loadingFrom: 'Apapa', loadingTo: 'KANO', contractType: '45', dateDispatched: '2026-09-01', sellingPrice: 4400000 }, { settings, assets, rates, zones, clients: cl });
+  assert.equal(c.agreedPriceListed, 4730000); assert.equal(c.agreedPrice, 4400000, 'inclusive list price shown on the trip\'s exclusive basis'); assert.equal(c.direction, 'equal');
+  assert.equal(E.normContract('45T'), '45'); assert.equal(E.normContract('30T-LCL'), '30-lcl');
+  assert.equal(E.locMatch('Ibadan', 'Ibadan 45Tons', {}), 2);
+});

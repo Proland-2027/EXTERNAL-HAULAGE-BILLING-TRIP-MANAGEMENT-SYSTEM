@@ -5,7 +5,8 @@
   "code": "NBL",
   "contractType": "",
   "active": true,
-  "trips": 355
+  "trips": 355,
+  "aliases": []
  },
  {
   "id": "jam",
@@ -13,7 +14,8 @@
   "code": "JAM",
   "contractType": "30",
   "active": true,
-  "trips": 764
+  "trips": 764,
+  "aliases": []
  },
  {
   "id": "mmu",
@@ -21,7 +23,10 @@
   "code": "MMU",
   "contractType": "45",
   "active": true,
-  "trips": 396
+  "trips": 396,
+  "aliases": [
+   "Mega Manu-Local"
+  ]
  },
  {
   "id": "sas",
@@ -29,7 +34,8 @@
   "code": "SAS",
   "contractType": "45",
   "active": true,
-  "trips": 75
+  "trips": 75,
+  "aliases": []
  },
  {
   "id": "orc",
@@ -37,7 +43,8 @@
   "code": "ORC",
   "contractType": "BDG490YL",
   "active": true,
-  "trips": 358
+  "trips": 358,
+  "aliases": []
  },
  {
   "id": "nab",
@@ -45,7 +52,8 @@
   "code": "NAB",
   "contractType": "45",
   "active": true,
-  "trips": 102
+  "trips": 102,
+  "aliases": []
  },
  {
   "id": "ab",
@@ -53,7 +61,8 @@
   "code": "AB",
   "contractType": "",
   "active": true,
-  "trips": 46
+  "trips": 46,
+  "aliases": []
  },
  {
   "id": "ved",
@@ -61,7 +70,10 @@
   "code": "VED",
   "contractType": "",
   "active": true,
-  "trips": 24
+  "trips": 24,
+  "aliases": [
+   "VANDERA"
+  ]
  },
  {
   "id": "jat",
@@ -69,7 +81,10 @@
   "code": "JAT",
   "contractType": "45",
   "active": true,
-  "trips": 129
+  "trips": 129,
+  "aliases": [
+   "JAT"
+  ]
  },
  {
   "id": "tlcp",
@@ -77,7 +92,8 @@
   "code": "TLCP",
   "contractType": "45",
   "active": true,
-  "trips": 209
+  "trips": 209,
+  "aliases": []
  },
  {
   "id": "mam",
@@ -85,7 +101,8 @@
   "code": "MAM",
   "contractType": "3",
   "active": true,
-  "trips": 618
+  "trips": 618,
+  "aliases": []
  },
  {
   "id": "psm",
@@ -93,7 +110,8 @@
   "code": "PSM",
   "contractType": "",
   "active": true,
-  "trips": 7
+  "trips": 7,
+  "aliases": []
  },
  {
   "id": "giv",
@@ -101,7 +119,8 @@
   "code": "GIV",
   "contractType": "45",
   "active": true,
-  "trips": 105
+  "trips": 105,
+  "aliases": []
  },
  {
   "id": "int",
@@ -109,7 +128,8 @@
   "code": "INT",
   "contractType": "30",
   "active": true,
-  "trips": 41
+  "trips": 41,
+  "aliases": []
  },
  {
   "id": "abb",
@@ -117,7 +137,8 @@
   "code": "ABB",
   "contractType": "ABBA",
   "active": true,
-  "trips": 36
+  "trips": 36,
+  "aliases": []
  },
  {
   "id": "nig",
@@ -125,7 +146,8 @@
   "code": "NIG",
   "contractType": "NIGER BISCUITS",
   "active": true,
-  "trips": 19
+  "trips": 19,
+  "aliases": []
  },
  {
   "id": "wac",
@@ -133,7 +155,8 @@
   "code": "WAC",
   "contractType": "45",
   "active": true,
-  "trips": 100
+  "trips": 100,
+  "aliases": []
  },
  {
   "id": "mik",
@@ -141,7 +164,8 @@
   "code": "MIK",
   "contractType": "",
   "active": true,
-  "trips": 12
+  "trips": 12,
+  "aliases": []
  },
  {
   "id": "orc2",
@@ -149,7 +173,8 @@
   "code": "ORC2",
   "contractType": "",
   "active": true,
-  "trips": 3
+  "trips": 3,
+  "aliases": []
  },
  {
   "id": "stp",
@@ -157,7 +182,8 @@
   "code": "STP",
   "contractType": "",
   "active": true,
-  "trips": 3
+  "trips": 3,
+  "aliases": []
  },
  {
   "id": "mbc",
@@ -165,7 +191,8 @@
   "code": "MBC",
   "contractType": "",
   "active": true,
-  "trips": 0
+  "trips": 0,
+  "aliases": []
  },
  {
   "id": "ila",
@@ -173,7 +200,10 @@
   "code": "ILA",
   "contractType": "",
   "active": true,
-  "trips": 2
+  "trips": 2,
+  "aliases": [
+   "ILERA AGRO"
+  ]
  },
  {
   "id": "orc3",
@@ -181,7 +211,8 @@
   "code": "ORC3",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "tlcp2",
@@ -189,7 +220,8 @@
   "code": "TLCP2",
   "contractType": "30",
   "active": true,
-  "trips": 24
+  "trips": 24,
+  "aliases": []
  },
  {
   "id": "leb",
@@ -197,7 +229,8 @@
   "code": "LEB",
   "contractType": "LEBRUNI-30T",
   "active": true,
-  "trips": 8
+  "trips": 8,
+  "aliases": []
  },
  {
   "id": "orc4",
@@ -205,7 +238,8 @@
   "code": "ORC4",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "kds",
@@ -213,7 +247,10 @@
   "code": "KDS",
   "contractType": "",
   "active": true,
-  "trips": 2
+  "trips": 2,
+  "aliases": [
+   "K&D"
+  ]
  },
  {
   "id": "orc5",
@@ -221,7 +258,8 @@
   "code": "ORC5",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "sas2",
@@ -229,7 +267,8 @@
   "code": "SAS2",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "orc6",
@@ -237,7 +276,8 @@
   "code": "ORC6",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "mbp",
@@ -245,7 +285,8 @@
   "code": "MBP",
   "contractType": "3",
   "active": true,
-  "trips": 46
+  "trips": 46,
+  "aliases": []
  },
  {
   "id": "orc7",
@@ -253,7 +294,8 @@
   "code": "ORC7",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "vps",
@@ -261,7 +303,8 @@
   "code": "VPS",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "orc8",
@@ -269,7 +312,8 @@
   "code": "ORC8",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "mek",
@@ -277,7 +321,8 @@
   "code": "MEK",
   "contractType": "10",
   "active": true,
-  "trips": 2
+  "trips": 2,
+  "aliases": []
  },
  {
   "id": "map",
@@ -285,7 +330,8 @@
   "code": "MAP",
   "contractType": "30",
   "active": true,
-  "trips": 83
+  "trips": 83,
+  "aliases": []
  },
  {
   "id": "sds",
@@ -293,7 +339,8 @@
   "code": "SDS",
   "contractType": "8",
   "active": true,
-  "trips": 6
+  "trips": 6,
+  "aliases": []
  },
  {
   "id": "dem",
@@ -301,7 +348,8 @@
   "code": "DEM",
   "contractType": "",
   "active": true,
-  "trips": 3
+  "trips": 3,
+  "aliases": []
  },
  {
   "id": "tlcp3",
@@ -309,7 +357,8 @@
   "code": "TLCP3",
   "contractType": "35",
   "active": true,
-  "trips": 2
+  "trips": 2,
+  "aliases": []
  },
  {
   "id": "emc",
@@ -317,7 +366,8 @@
   "code": "EMC",
   "contractType": "10",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "inl",
@@ -325,7 +375,8 @@
   "code": "INL",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "mkc",
@@ -333,7 +384,8 @@
   "code": "MKC",
   "contractType": "",
   "active": true,
-  "trips": 2
+  "trips": 2,
+  "aliases": []
  },
  {
   "id": "tlcp4",
@@ -341,7 +393,8 @@
   "code": "TLCP4",
   "contractType": "30",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "sbo",
@@ -349,7 +402,8 @@
   "code": "SBO",
   "contractType": "40",
   "active": true,
-  "trips": 4
+  "trips": 4,
+  "aliases": []
  },
  {
   "id": "opt",
@@ -357,7 +411,8 @@
   "code": "OPT",
   "contractType": "15",
   "active": true,
-  "trips": 2
+  "trips": 2,
+  "aliases": []
  },
  {
   "id": "tlcp5",
@@ -365,7 +420,8 @@
   "code": "TLCP5",
   "contractType": "20X2",
   "active": true,
-  "trips": 6
+  "trips": 6,
+  "aliases": []
  },
  {
   "id": "fpf",
@@ -373,7 +429,8 @@
   "code": "FPF",
   "contractType": "30",
   "active": true,
-  "trips": 51
+  "trips": 51,
+  "aliases": []
  },
  {
   "id": "bel",
@@ -381,7 +438,8 @@
   "code": "BEL",
   "contractType": "30",
   "active": true,
-  "trips": 16
+  "trips": 16,
+  "aliases": []
  },
  {
   "id": "snl",
@@ -389,7 +447,8 @@
   "code": "SNL",
   "contractType": "45",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "cas",
@@ -397,7 +456,8 @@
   "code": "CAS",
   "contractType": "45",
   "active": true,
-  "trips": 18
+  "trips": 18,
+  "aliases": []
  },
  {
   "id": "sev",
@@ -405,7 +465,8 @@
   "code": "SEV",
   "contractType": "30",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "sar",
@@ -413,7 +474,8 @@
   "code": "SAR",
   "contractType": "45",
   "active": true,
-  "trips": 2
+  "trips": 2,
+  "aliases": []
  },
  {
   "id": "moh",
@@ -421,7 +483,8 @@
   "code": "MOH",
   "contractType": "P330 x3",
   "active": true,
-  "trips": 3
+  "trips": 3,
+  "aliases": []
  },
  {
   "id": "sfn",
@@ -429,7 +492,8 @@
   "code": "SFN",
   "contractType": "30",
   "active": true,
-  "trips": 3
+  "trips": 3,
+  "aliases": []
  },
  {
   "id": "mds",
@@ -437,7 +501,8 @@
   "code": "MDS",
   "contractType": "",
   "active": true,
-  "trips": 1
+  "trips": 1,
+  "aliases": []
  },
  {
   "id": "crs",
@@ -445,6 +510,16 @@
   "code": "CRS",
   "contractType": "CRESEADA",
   "active": true,
-  "trips": 7
+  "trips": 7,
+  "aliases": []
+ },
+ {
+  "id": "ihs",
+  "name": "I'HS",
+  "code": "IHS",
+  "contractType": "",
+  "active": true,
+  "trips": 0,
+  "aliases": []
  }
 ]

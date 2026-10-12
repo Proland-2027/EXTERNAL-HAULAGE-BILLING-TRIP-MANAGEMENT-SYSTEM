@@ -24,18 +24,18 @@
       U.select([['', 'All statuses'], ['Active', 'Active'], ['Expired', 'Expired'], ['Future', 'Future']], f.status || '', { onChange: (e) => { f.status = e.target.value; view.draw(); } }),
       manage ? h('button', { class: 'btn accent', onClick: () => edit(ctx, null) }, '+ New rate') : null,
       manage ? h('button', { class: 'btn', onClick: () => importRates(ctx) }, 'Import Excel') : null,
-      h('button', { class: 'btn', onClick: () => HB.exporter.xlsx([{ name: 'Price List', rows: [['Client', 'Loading From', 'Loading To', 'Vehicle Type', 'Contract Type', 'Agreed Price (₦)', 'Effective Date', 'Expiry Date', 'Status', 'Remarks'], ...rates.map((r) => [r.client, r.loadingFrom, r.loadingTo, r.vehicleType, r.contractType, r.price, r.effectiveDate, r.expiryDate, r.status, r.remarks])] }], `Client_Price_List_${today}.xlsx`) }, 'Export Excel'),
+      h('button', { class: 'btn', onClick: () => HB.exporter.xlsx([{ name: 'Price List', rows: [['Client', 'Loading From', 'Loading To', 'Vehicle Type', 'Contract Type', 'Agreed Price (₦)', 'Price Basis', 'Effective Date', 'Expiry Date', 'Status', 'Remarks'], ...rates.map((r) => [r.client, r.loadingFrom, r.loadingTo, r.vehicleType, r.contractType, r.price, r.priceBasis === 'inclusive' ? 'Incl VAT' : 'Excl VAT', r.effectiveDate, r.expiryDate, r.status, r.remarks])] }], `Client_Price_List_${today}.xlsx`) }, 'Export Excel'),
       h('span', { class: 'muted small grow', style: { textAlign: 'right' }, text: `${rates.length} rate${rates.length === 1 ? '' : 's'}` })));
-    wrap.append(h('div', { class: 'notice info small' }, h('strong', {}, 'Lookup rule: '), 'a trip takes the rate whose client, loading origin, destination and vehicle type match and which is in force on the dispatch date. A rate with the trip\'s contract type beats a rate with none; a different contract type never matches. Latest effective date wins. Still tied → the trip shows "Multiple rates" and the user picks one.'));
-    const rows = rates.map((r) => h('tr', {}, h('td', { text: r.client }), h('td', { text: r.loadingFrom }), h('td', { text: r.loadingTo }), h('td', { text: r.vehicleType || 'Any' }), h('td', { text: r.contractType || '—' }), h('td', { class: 'money', text: U.money(r.price) }),
+    wrap.append(h('div', { class: 'notice info small' }, h('strong', {}, 'Lookup rule: '), 'a trip takes the rate whose client (name, code or alias), loading origin and destination match exactly, by zone (Settings → Location zones, e.g. GBAGADA → Lagos) or as a member of a zone list such as "VI-Lekki-AJAH", and which is in force on the dispatch date. A rate whose contract type / tonnage equals the trip\'s ("45" = "45T") wins; then exact locations beat zone matches; then the latest effective date. Still tied with different prices → the trip shows "Multiple rates" and the user picks one. Agreed prices are shown on the trip\'s VAT basis.'));
+    const rows = rates.map((r) => h('tr', {}, h('td', { text: r.client }), h('td', { text: r.loadingFrom }), h('td', { text: r.loadingTo }), h('td', { text: r.vehicleType || 'Any' }), h('td', { text: r.contractType || '—' }), h('td', { class: 'money', text: U.money(r.price) }), h('td', { text: r.priceBasis === 'inclusive' ? 'Incl. VAT' : 'Excl. VAT' }),
       h('td', { text: U.date(r.effectiveDate) }), h('td', { text: r.expiryDate ? U.date(r.expiryDate) : 'Open' }), h('td', {}, U.pill(r.status, r.status === 'Active' ? 'good' : r.status === 'Expired' ? 'neutral' : 'info')), h('td', { class: 'num', text: usage.get(r.id) || 0 }), h('td', { text: r.remarks || '' }),
       h('td', {}, manage ? h('span', { class: 'row' }, h('button', { class: 'btn sm', onClick: () => edit(ctx, r.id) }, 'Edit'), h('button', { class: 'btn sm', onClick: () => edit(ctx, r.id, true) }, 'New version'), h('button', { class: 'btn sm danger', onClick: async () => { if (await U.confirm({ title: 'Delete rate', message: `Delete the ${r.client} ${r.loadingFrom} → ${r.loadingTo} rate? Trips keep their manually entered selling prices.`, okLabel: 'Delete', danger: true })) { await store.deleteDoc('rates', r.id, `${r.client} ${r.loadingFrom}→${r.loadingTo}`); view.draw(); } } }, 'Delete')) : '')));
-    wrap.append(h('div', { class: 'table-frame' }, rates.length ? h('table', { class: 'data' }, h('thead', {}, h('tr', {}, ['Client', 'Loading From', 'Loading To', 'Vehicle Type', 'Contract Type', 'Agreed Price (₦)', 'Effective', 'Expiry', 'Status', 'Trips using', 'Remarks', ''].map((x) => h('th', { text: x })))), h('tbody', {}, rows)) : h('div', { class: 'empty' }, h('strong', { text: 'No agreed rates yet.' }), h('span', { text: manage ? 'Add a rate or import a price list from Excel.' : 'An administrator can add rates.' }))));
+    wrap.append(h('div', { class: 'table-frame' }, rates.length ? h('table', { class: 'data' }, h('thead', {}, h('tr', {}, ['Client', 'Loading From', 'Loading To', 'Vehicle Type', 'Contract / Tonnage', 'Agreed Price (₦)', 'Basis', 'Effective', 'Expiry', 'Status', 'Trips using', 'Remarks', ''].map((x) => h('th', { text: x })))), h('tbody', {}, rows)) : h('div', { class: 'empty' }, h('strong', { text: 'No agreed rates yet.' }), h('span', { text: manage ? 'Add a rate or import a price list from Excel.' : 'An administrator can add rates.' }))));
   };
 
   function edit(ctx, id, asNewVersion) {
     const { store } = ctx; const r = id ? store.state.rates.find((x) => x.id === id) : null;
-    const t = Object.assign({ client: view.filters.client || '', loadingFrom: '', loadingTo: '', vehicleType: '', contractType: '', price: null, effectiveDate: U.todayISO(), expiryDate: '', remarks: '' }, r || {});
+    const t = Object.assign({ client: view.filters.client || '', loadingFrom: '', loadingTo: '', vehicleType: '', contractType: '', price: null, priceBasis: 'exclusive', effectiveDate: U.todayISO(), expiryDate: '', remarks: '' }, r || {});
     if (asNewVersion) { t.id = undefined; t.remarks = ''; t.effectiveDate = U.todayISO(); t.expiryDate = ''; }
     const inp = {};
     const F = (k, label, control, opts) => { inp[k] = control.tagName === 'SPAN' ? control.querySelector('input') : control; return U.field(label, control, opts); };
@@ -45,8 +45,9 @@
       F('vehicleType', 'Vehicle Type', U.select([['', 'Any vehicle type'], ...vehicleTypes.map((v) => [v, v])], t.vehicleType)),
       F('loadingFrom', 'Loading Origin', U.datalistInput('dl-rf', store.locationNames(), t.loadingFrom)),
       F('loadingTo', 'Delivery Destination', U.datalistInput('dl-rt', store.locationNames(), t.loadingTo)),
-      F('contractType', 'Contract Type (optional)', h('input', { type: 'text', value: t.contractType || '' }), { help: 'Leave blank to apply to every contract type.' }),
+      F('contractType', 'Contract type / tonnage (optional)', h('input', { type: 'text', value: t.contractType || '', placeholder: 'e.g. 45T, 30T-LCL' }), { help: 'Leave blank to apply to every contract type. "45T" matches trips with contract "45".' }),
       F('price', 'Agreed Price (₦)', h('input', { type: 'number', step: '0.01', min: '0', value: t.price ?? '' })),
+      F('priceBasis', 'Price basis', U.select([['exclusive', 'Excluding VAT'], ['inclusive', 'Including VAT']], t.priceBasis || 'exclusive')),
       F('effectiveDate', 'Effective Date', h('input', { type: 'date', value: t.effectiveDate || '' })),
       F('expiryDate', 'Expiry Date (optional)', h('input', { type: 'date', value: t.expiryDate || '' })),
       F('remarks', 'Remarks', h('input', { type: 'text', value: t.remarks || '' }), { span2: true }));
@@ -62,18 +63,30 @@
   }
 
   function importRates(ctx) {
-    const { store } = ctx; const file = h('input', { type: 'file', accept: '.xlsx,.xls,.csv' }); const res = h('div');
-    const m = U.modal({ title: 'Import price list', body: h('div', { class: 'stack' }, h('p', { class: 'small muted', text: 'Columns: Client, Loading From, Loading To, Vehicle Type, Contract Type, Agreed Price, Effective Date, Expiry Date, Remarks (header names are matched loosely).' }), U.field('File', file), res) });
+    const { store } = ctx; const file = h('input', { type: 'file', accept: '.xlsx,.xls,.csv' }); const eff = h('input', { type: 'date', value: U.todayISO() }); const res = h('div');
+    const m = U.modal({ title: 'Import price list', size: 'wide', body: h('div', { class: 'stack' }, h('p', { class: 'small muted', text: 'Accepts the JMG price-list layout (Contract Name, Truck Size, Divison, Truck Tonnage, Client, Loading Point, Destination, State, Region, PLIST / PLIST Exl VAT / PLIST INL VAT / Approved Client Price, Status) or this app\'s own export. Every sheet is read; a header row may repeat inside a sheet. Rows marked "Price Not Approved" are skipped.' }), h('div', { class: 'form-grid' }, U.field('File', file), U.field('Effective date for rows without one', eff)), res) });
     m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Close')]);
     file.addEventListener('change', async () => {
       try {
-        const wb = await HB.exporter.readWorkbook(file.files[0]); const s = wb.sheets[0]; const hdr = s.headers.map(E.norm);
-        const col = (names) => hdr.findIndex((x) => names.includes(x));
-        const ci = { client: col(['client', 'client name']), from: col(['loading from', 'origin', 'loading origin', 'from']), to: col(['loading to', 'destination', 'delivery destination', 'to']), vt: col(['vehicle type', 'type of vehicle']), ct: col(['contract type']), price: col(['agreed price', 'agreed price (₦)', 'price', 'rate', 'agreed client price (₦)']), eff: col(['effective date', 'effective']), exp: col(['expiry date', 'expiry']), rem: col(['remarks', 'notes']) };
-        if (ci.client < 0 || ci.from < 0 || ci.to < 0 || ci.price < 0) throw new Error('Client, Loading From, Loading To and Agreed Price columns are required.');
-        const g = (r, i) => (i >= 0 ? r[i] : '');
-        const items = s.rows.map((r) => ({ client: E.clean(g(r, ci.client)), loadingFrom: E.clean(g(r, ci.from)), loadingTo: E.clean(g(r, ci.to)), vehicleType: E.clean(g(r, ci.vt)), contractType: E.clean(g(r, ci.ct)), price: E.num(g(r, ci.price)), effectiveDate: E.excelDateToISO(g(r, ci.eff)) || U.todayISO(), expiryDate: E.excelDateToISO(g(r, ci.exp)), remarks: E.clean(g(r, ci.rem)) })).filter((x) => x.client && x.loadingFrom && x.loadingTo && x.price !== null);
-        U.clear(res); res.append(h('div', { class: 'notice info', text: `${items.length} valid rate rows found.` }), h('button', { class: 'btn primary', onClick: async () => { for (const it of items) await store.saveDoc('rates', it, { silent: true }); await store.writeAudit(store.auditEntry({ action: 'import', entity: 'rates', entityId: 'bulk', label: `${items.length} rates imported from ${file.files[0].name}`, changes: [] })); U.toast(`Imported ${items.length} rates.`, 'good'); m.close(); view.draw(); } }, `Import ${items.length} rates`));
+        const wb = await HB.exporter.readWorkbook(file.files[0]); const items = []; const skipped = [];
+        for (const sh of wb.sheets) {
+          let map = null, headerText = '';
+          for (const row of [sh.headers, ...sh.rows]) {
+            const cells = row.map((v) => (v === null || v === undefined ? '' : String(v)));
+            const hm = E.mapRateHeaders(cells); if (hm.client !== undefined && hm.loadingFrom !== undefined && hm.loadingTo !== undefined) { map = hm; headerText = cells.join(' '); continue; }
+            if (!map) continue;
+            const r = E.rowToRate(row, map, { effectiveDate: eff.value, headerText }); if (!r || !(r.price > 0)) continue;
+            if (r.approved === false) { skipped.push(r); continue; } delete r.approved; delete r.priceRevised;
+            r.remarks = `${sh.name} sheet · ${r.remarks}`.replace(/ · $/, '');
+            const known = store.state.clients.find((c) => E.clientKey(c.name, store.state.clients) === E.clientKey(r.client, store.state.clients)); if (known) r.client = known.name;
+            items.push(r);
+          }
+        }
+        const unknownClients = [...new Set(items.filter((r) => !store.state.clients.some((c) => E.norm(c.name) === E.norm(r.client))).map((r) => r.client))];
+        U.clear(res);
+        res.append(h('div', { class: 'row' }, h('span', { class: 'chip', text: `${items.length} rates found` }), h('span', { class: 'chip', text: `${skipped.length} not approved (skipped)` }), unknownClients.length ? h('span', { class: 'chip', text: `New client names: ${unknownClients.join(', ')}` }) : null),
+          h('div', { class: 'table-frame short' }, h('table', { class: 'data' }, h('thead', {}, h('tr', {}, ['Client', 'From', 'To', 'Tonnage', 'Price', 'Basis', 'Effective', 'Remarks'].map((x) => h('th', { text: x })))), h('tbody', {}, items.slice(0, 60).map((r) => h('tr', {}, h('td', { text: r.client }), h('td', { text: r.loadingFrom }), h('td', { text: r.loadingTo }), h('td', { text: r.contractType }), h('td', { class: 'money', text: U.money(r.price) }), h('td', { text: r.priceBasis }), h('td', { text: r.effectiveDate }), h('td', { text: r.remarks })))))),
+          h('button', { class: 'btn primary', disabled: !items.length ? true : null, onClick: async () => { for (const it of items) await store.saveDoc('rates', it, { silent: true }); await store.writeAudit(store.auditEntry({ action: 'import', entity: 'rates', entityId: 'bulk', label: `${items.length} rates imported from ${file.files[0].name}`, changes: [] })); U.toast(`Imported ${items.length} rates.`, 'good'); m.close(); view.draw(); } }, `Import ${items.length} rates`));
       } catch (e) { U.clear(res); res.append(h('div', { class: 'notice bad', text: e.message })); }
     });
   }

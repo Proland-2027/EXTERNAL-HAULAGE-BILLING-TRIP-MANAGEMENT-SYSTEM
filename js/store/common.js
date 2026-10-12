@@ -11,19 +11,19 @@
     { username: 'finance', name: 'Chidi Nwosu', role: 'finance', password: 'Finance@2026' },
     { username: 'manager', name: 'Ibrahim Lawal', role: 'management', password: 'Manager@2026' },
   ];
-  const DEFAULT_SETTINGS = { company: 'JMG Haulage Services', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', currency: 'NGN' };
+  const DEFAULT_SETTINGS = { company: 'JMG Limited', companyShort: 'JMG', address: '', phone: '', email: '', website: '', tin: '', rcNumber: '', logo: '', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', currency: 'NGN' };
 
   class BaseStore {
     constructor() {
       this.mode = 'base'; this.live = false; this.user = null; this.listeners = new Set();
-      this.state = { settings: Object.assign({}, DEFAULT_SETTINGS), clients: [], assets: [], rates: [], trips: new Map(), invoices: [], payments: [], users: [], locations: [], audit: [] };
+      this.state = { settings: Object.assign({}, DEFAULT_SETTINGS), clients: [], assets: [], rates: [], trips: new Map(), invoices: [], payments: [], users: [], locations: [], zones: {}, audit: [] };
       this._computed = null;
     }
     subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
     emit(evt) { this._computed = null; for (const fn of this.listeners) { try { fn(evt || {}); } catch (e) { console.error(e); } } }
 
     // ---------- derived data
-    ctx() { return { settings: this.state.settings, assets: this.state.assets, rates: this.state.rates }; }
+    ctx() { return { settings: this.state.settings, assets: this.state.assets, rates: this.state.rates, zones: this.state.zones, clients: this.state.clients }; }
     trips() {
       if (!this._computed) { const ctx = this.ctx(); this._computed = [...this.state.trips.values()].filter((t) => !t._del).map((t) => E.computeTrip(t, ctx)); }
       return this._computed;
@@ -88,6 +88,9 @@
       trip.sellingPrice = E.num(trip.sellingPrice); trip.advance = E.num(trip.advance);
       const asset = E.assetFor(trip.plate, this.state.assets);
       if (asset) { trip.assetCode = asset.assetCode; trip.vehicleType = asset.vehicleType; trip.vehicleCategory = asset.vehicleCategory; trip.costCenter = asset.costCenter; }
+      // Truck Batch is snapshotted on the trip so history stays accurate if the vehicle is reclassified later.
+      if (!current || current.plate !== trip.plate || current.dateDispatched !== trip.dateDispatched || !trip.truckBatch) trip.truckBatch = E.batchOn(asset, trip.dateDispatched);
+      if (!trip.vatTreatment) trip.vatTreatment = 'exclusive';
       const errors = E.validateTrip(trip, this.ctx()); if (errors.length && !opts.force) { const err = new Error(errors.join(' ')); err.code = 'invalid'; err.errors = errors; throw err; }
       this.stamp(trip, !current);
       const changes = this.diff(current, trip);
@@ -123,11 +126,12 @@
       return next;
     }
     async saveLocations(list) { await this.writeDoc('meta', 'locations', { list }); }
+    async saveZones(map) { await this.writeDoc('meta', 'zones', { map }); await this.writeAudit(this.auditEntry({ action: 'update', entity: 'settings', entityId: 'zones', label: 'Location zones', changes: [{ field: 'zones', from: '', to: Object.keys(map).length + ' entries' }] })); }
 
     // apply a document coming from storage into state
     applyDoc(collection, id, data) {
       if (collection === 'settings') { this.state.settings = Object.assign({}, DEFAULT_SETTINGS, data || {}); return; }
-      if (collection === 'meta') { if (id === 'locations') this.state.locations = (data && data.list) || []; return; }
+      if (collection === 'meta') { if (id === 'locations') this.state.locations = (data && data.list) || []; if (id === 'zones') this.state.zones = (data && data.map) || {}; return; }
       if (collection === 'tripchunks') { for (const [tid, t] of Object.entries((data && data.trips) || {})) { if (t && t._del) this.state.trips.delete(tid); else if (t) this.state.trips.set(tid, t); } return; }
       if (collection === 'trips') { if (!data || data._del) this.state.trips.delete(id); else this.state.trips.set(id, data); return; }
       if (!this.state[collection]) return;

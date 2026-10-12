@@ -23,8 +23,11 @@
 | — | *new* | **Agreed Client Price (₦)** | computed | from `rates` on the dispatch date |
 | P | Selling Price (₦) | `sellingPrice` | number, **manual only** | never auto-filled |
 | — | *new* | Price Variance (₦) / (%) | computed | selling − agreed; ÷ agreed × 100 |
-| Q | VAT (₦) | computed | `round(sellingPrice × vatRate, 2)` | vatRate from settings (7.5 %) |
-| R | Billing After VAT (₦) | computed | `sellingPrice + vat` | |
+| — | *new* | `vatTreatment` | enum exclusive / inclusive | set by the invoice price type |
+| — | *new* | `truckBatch` | New Batch / Old Batch / 3rd Party | snapshot of the vehicle's batch on the dispatch date |
+| — | *new* | Net Sales excl. VAT | computed | exclusive: selling price; inclusive: `round(price ÷ 1.075, 2)` |
+| Q | VAT (₦) | computed | exclusive: `round(sellingPrice × vatRate, 2)`; inclusive: `price − net` | vatRate from settings (7.5 %) |
+| R | Billing After VAT (₦) | computed | exclusive: `sellingPrice + vat`; inclusive: `sellingPrice` | |
 | S | Quote Number | `quoteNo` | text | |
 | T | SO Number | `soNo` | text | |
 | U | Manual Invoice Number | `manualInvoiceNo` | text | override |
@@ -62,11 +65,21 @@
 
 ## New module: `rates` (Agreed Client Price List)
 
-`client`, `loadingFrom`, `loadingTo`, `vehicleType`, `contractType` (optional), `price`, `effectiveDate`, `expiryDate` (optional), `status` (computed Active/Expired/Future), `remarks`.
+`client`, `loadingFrom`, `loadingTo`, `vehicleType`, `contractType` (tonnage, optional), `price`, `priceBasis` (exclusive / inclusive), `effectiveDate`, `expiryDate` (optional), `status` (computed Active/Expired/Future), `remarks`, `source`.
+
+June Price List columns → rate: Client → `client` (via alias to the master name), Loading Point → `loadingFrom`, Destination → `loadingTo`, Divison HAULAGE → `vehicleType` HAULAGE (other divisions → any), Truck Tonnage → `contractType`, PLIST / PLIST Exl VAT / Approved Client Price / PL / Plsit / Plist BF Vat → `price` (exclusive), PLIST INL VAT / PL With VAT / PLIST VAT INCL → `price` (inclusive, when no exclusive column), Price AUGUST → second rate effective 2026-08-01, Contract Name / Truck Size / State / Region / Product / Status → `remarks`. Effective date 2026-06-01 (June list).
+
+## `assets` additions
+
+`truckBatch` (New Batch / Old Batch / 3rd Party) and `batchHistory[{batch, effectiveDate}]`.
+
+## `meta/zones`
+
+`map`: trip location (normalised) → price-list zone, e.g. `gbagada → Lagos`, `phc → Port Harcourt`.
 
 ## New module: `invoices`
 
-`number`, `client`, `invoiceDate`, `dueDate`, `includesVat`, `tripIds[]`, `subtotal`, `vat`, `total`, `status` (Draft / Sent / Paid / Void), `manualNumber` (true when overridden), `notes`.
+`number`, `client`, `invoiceDate`, `dueDate`, `priceType` (exclusive / inclusive), `vatRate`, `tripIds[]`, `lines[]` (per-trip snapshot: date, route, plate, trip no., waybill, ref, selling price, net, vat, gross), `subtotal`, `vat`, `total`, `company` (name/address/TIN snapshot), `status` (Draft / Sent / Paid / Void), `manualNumber` (true when overridden), `notes`.
 
 ## New module: `payments`
 
