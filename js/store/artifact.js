@@ -15,7 +15,9 @@
     }
     async init(progress) {
       progress && progress('Loading shared records…');
-      const names = ['settings', 'meta', 'clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'tripchunks'];
+      const names = ['settings', 'meta', 'clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'tripchunks'];
+      // The route register (524 workbook routes) ships as a static file; routes edited in the app are saved as documents and override it by id.
+      try { const r = await fetch('data/workbook/routes.json'); if (r.ok) this.state.routes = await r.json(); } catch (e) { /* offline */ }
       const snaps = await Promise.all(names.map((n) => this.db.collection(n).limit(1000).get()));
       names.forEach((n, i) => { for (const d of snaps[i].docs) { this.known.add(n + '/' + d.id); this.applyDoc(n, d.id, d.data()); } });
       if (this.viewer) { try { this.viewerId = await this.viewer.id(); this.canWrite = await this.viewer.can('data.write'); } catch (e) { /* ignore */ } }

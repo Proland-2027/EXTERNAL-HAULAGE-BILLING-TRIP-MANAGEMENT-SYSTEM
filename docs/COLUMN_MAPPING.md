@@ -84,3 +84,19 @@ June Price List columns → rate: Client → `client` (via alias to the master n
 ## New module: `payments`
 
 `invoiceId` (optional), `tripIds[]`, `client`, `date`, `amount`, `method`, `reference`, `recordedBy`.
+
+## Fleet planning fields (Truck Planning Management workbook)
+
+| Collection | Field | Source column / rule |
+|---|---|---|
+| `fleet` | `plate, assetCode, bodyType, tonnage, driver, homeStation` | FMR *Truck / reg, Body type, Tonnage, Driver, Home station* (joined to the Asset List by plate) |
+| `fleet` | `status, statusAt, statusBy, statusHistory[]` | FMR *Status, Date of this status*; every update stamps user and time |
+| `fleet` | `routeId, client, loadingFrom, destination, loadingDate, etaDelivery, actualDelivery, etaOffloadDone, etaReturn, workshopRelease, daysDown, currentLocation, tripId, remarks` | FMR *Route it is running, Date loaded, Where it will drop, Workshop release date, Days down* + tracking estimates added by the brief |
+| computed | `group, phase, tat, backOnGround, committedUntil, freeFrom, daysUntilFree, confidence, warnings[], deliveryCheck, doubleBooked, trackingOverdue, returnUnconfirmed, category` | FMR columns N..AA (`truckStatus`) |
+| `routes` | `id, contractName, size, division, tonnage, client, loadingPoint, destination, state, region, kmOneWay, totalKm, days, offloading, totalDays, diesel, roadExpenses, contingency, additional, price` | Routes sheet columns A..T |
+| `requests` | `id, requestedAt, client, reference, routeId, loadingFrom, destination, vehicleType, tonnage, trucks, loadingDate, deliveryDate, priority, contact, instructions, remarks, status` | Requests sheet + brief fields; `counts` and live status are computed |
+| `allocations` | `id, requestId, client, plate, assetCode, truckBatch, routeId, loadingFrom, destination, vehicleType, tonnage, plannedLoadingDate, plannedDeploymentDate, reachesClient, backOnGround, status, tripId, tripIdAt, tripIdBy, tripLogId, plannedBy, reassignedFrom, cancelReason` | Committed trips sheet + allocation record fields of the brief |
+| `trips` (new) | `allocationId, requestId, journeyPlanId (Trip ID), tripIdSource, waybillEnteredAt, waybillReceivedAt, waybillReceivedBy, waybillDocId, waybillDocName, waybillVerifiedAt, waybillVerifiedBy, internalClient` | Brief: waybill-later workflow, Power Apps Trip ID, internal client flag |
+| computed on trips | `waybillStatus, invoiceStatus (automatic), invoiceIssuedAt, invoiceSentAt, paymentLabel` | `waybillStatus()`, `invoiceAutoStatus()` from the invoice record, `paymentLabel()` |
+| `invoices` (new) | `issuedAt, issuedBy, sentAt, sentBy, sentChannel, sentTo, voidedAt` | Draft → Issued → Sent → Paid / Void |
+| `meta/planning` | `setup{…}, statuses[], repo[], bodyRuns{}` | Setup sheet |

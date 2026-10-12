@@ -521,5 +521,25 @@
   "active": true,
   "trips": 0,
   "aliases": []
+ },
+ {
+  "id": "baj",
+  "name": "BAJAJ",
+  "code": "BAJ",
+  "contractType": "",
+  "active": true,
+  "trips": 0,
+  "aliases": [],
+  "source": "planning-workbook"
+ },
+ {
+  "id": "apvc",
+  "name": "ATLANTIC PVC",
+  "code": "APVC",
+  "contractType": "",
+  "active": true,
+  "trips": 0,
+  "aliases": [],
+  "source": "planning-workbook"
  }
 ]

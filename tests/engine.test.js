@@ -113,7 +113,7 @@ test('import mapping and duplicate key', () => {
   assert.equal(t.dateDelivered, '2025-09-11'); assert.equal(t.client, 'Jamara'); assert.equal(t.sellingPrice, 680000); assert.equal(t.invoiceStatus, 'Invoice Sent'); assert.equal(t.paymentStatus, 'Advance');
   assert.equal(E.dupKey(t), E.dupKey({ ...t, note: 'x' }));
   assert.equal(E.normalizeInvoiceStatus('Closed', 'Paid'), 'Invoice Sent');
-  assert.equal(E.normalizeInvoiceStatus('', 'Not Paid'), 'Invoice Not Sent');
+  assert.equal(E.normalizeInvoiceStatus('', 'Not Paid'), 'Not Invoiced');
 });
 
 test('VAT-inclusive pricing extracts VAT; exclusive adds it (brief example ₦2,000,000)', () => {

@@ -1,7 +1,10 @@
 /* Dashboard and the report sheets (Client Summary, Statement, Monthly Sales Summary, Sales by Vehicle, Price Variance). */
 (function () {
   'use strict';
-  const U = HB.U, E = HB.engine, h = U.h;
+  const U = HB.U, E = HB.engine, P = HB.planning, h = U.h;
+  const INV_KIND = { 'Not Invoiced': 'bad', 'Draft Invoice': 'info', 'Invoice Issued': 'warn', 'Invoice Sent': 'good', 'Partially Invoiced': 'warn', 'Invoice Voided': 'neutral', 'Internal Client': 'neutral' };
+  const WB_KIND = { 'Awaiting Waybill': 'bad', 'Waybill Number Entered': 'warn', 'Waybill Received': 'info', 'Waybill Verification Pending': 'warn', 'Waybill Verified': 'good' };
+  const section = (n, title, sub, right) => h('div', { class: 'section-head' }, h('span', { class: 'n', text: n }), h('h2', { text: title }), sub ? h('span', { class: 'small muted', text: sub }) : null, h('span', { class: 'grow' }), right || null);
   HB.views = HB.views || {};
 
   function filterBar(ctx, f, redraw) {
@@ -19,16 +22,38 @@
       h('button', { class: 'btn', onClick: () => { for (const k of Object.keys(f)) delete f[k]; redraw(); } }, 'Clear'),
       h('span', { class: 'muted small', text: `${U.int(E.filterTrips(trips, f).length)} trips in scope` }));
   }
-  const tile = (label, value, sub, kind) => h('div', { class: 'tile ' + (kind || '') }, h('span', { class: 'label', text: label }), h('span', { class: 'value', text: value }), sub ? h('span', { class: 'sub', text: sub }) : null);
+  const tile = (label, value, sub, kind, onClick) => h('div', { class: 'tile ' + (kind || '') + (onClick ? ' clickable' : ''), onClick }, h('span', { class: 'label', text: label }), h('span', { class: 'value', text: value }), sub ? h('span', { class: 'sub', text: sub }) : null);
 
   // ------------------------------------------------------------ dashboard
-  const dash = { title: 'Dashboard', filters: { from: '2026-01-01' }, basis: 'net' };
+  const dash = { title: 'Management Dashboard', filters: { from: '2026-01-01' }, basis: 'net' };
   dash.render = function (root, ctx) { dash.ctx = ctx; dash.root = root; root.append(h('div', { class: 'stack', id: 'dash' })); dash.draw(); };
   dash.onStoreChange = () => { if (dash.root && dash.root.isConnected) dash.draw(); };
   dash.draw = function () {
     const ctx = dash.ctx, store = ctx.store, wrap = dash.root.querySelector('#dash'); if (!wrap) return; U.clear(wrap);
     const f = dash.filters; const trips = E.filterTrips(store.trips(), f); const d = E.dashboard(trips);
     wrap.append(filterBar(ctx, f, dash.draw));
+    // ---- 1 · Fleet Operations, 2 · Fleet Planning, 3 · Billing & Documentation (from the planning module)
+    const pctx = store.planningCtx(); const k = P.fleetKpis(pctx); const b = P.billingKpis(Object.assign({}, pctx, { trips }));
+    const setup = store.planningSetup(); const rw = P.runway(pctx, 14);
+    wrap.append(section('1', 'Fleet Operations', 'live from the Fleet Movement Report', h('button', { class: 'btn sm', onClick: () => ctx.nav('fleet') }, 'Open FMR')));
+    wrap.append(h('div', { class: 'tiles' },
+      tile('Total fleet', U.int(k.totalFleet), null, '', () => ctx.nav('fleet')), tile('Available trucks', U.int(k.available), `${U.int(k.availableUnplanned)} available and unplanned`, 'good', () => ctx.nav('fleet')), tile('Trucks on trip', U.int(k.onTrip), `${U.int(k.backToday)} back today · ${U.int(k.backTomorrow)} tomorrow`, 'info'),
+      tile('In workshop / breakdown', U.int(k.inWorkshop + k.breakdown), null, k.inWorkshop + k.breakdown ? 'bad' : ''), tile('Tracking update overdue', U.int(k.trackingOverdue), `no update for > ${setup.trackingOverdueHours} h`, k.trackingOverdue ? 'bad' : 'good', () => ctx.nav('fleet')), tile('Status unconfirmed', U.int(k.unconfirmed), 'needs tracking verification', k.unconfirmed ? 'warn' : 'good'),
+      tile('Double booked', U.int(k.doubleBooked), null, k.doubleBooked ? 'bad' : 'good'), tile('Delivery to confirm', U.int(k.deliveryChecks), 'outbound longer than the run', k.deliveryChecks ? 'warn' : 'good')));
+    wrap.append(section('2', 'Fleet Planning', 'client requests and allocations', h('button', { class: 'btn sm', onClick: () => ctx.nav('planning') }, 'Open planning')));
+    wrap.append(h('div', { class: 'tiles' },
+      tile('Open client requests', U.int(k.openRequests), `${U.int(k.trucksRequested)} trucks requested`, 'warn', () => ctx.nav('planning')), tile('Trucks allocated', U.int(k.trucksAllocated), 'on open requests', 'info'), tile('Trucks still required', U.int(k.outstandingTrucks), 'requested − valid allocations', k.outstandingTrucks ? 'bad' : 'good', () => ctx.nav('planning')),
+      tile('Delayed deployments', U.int(k.delayedDeployments), 'planned loading date passed', k.delayedDeployments ? 'bad' : 'good'), tile('Coming free this week', U.int(rw.weeks[0].comingFree), `${U.int(rw.weeks[1].comingFree)} next week`, 'good', () => ctx.nav('fleetdash')),
+      tile('Allocated, not yet in Trip Log', U.int(b.allocatedNotInTripLog), null, b.allocatedNotInTripLog ? 'warn' : 'good', () => ctx.nav('planning', { tab: 'allocations' })), tile('Allocated, awaiting Trip ID', U.int(b.allocatedAwaitingTripId), 'Power Apps Trip ID pending', b.allocatedAwaitingTripId ? 'warn' : 'good', () => ctx.nav('planning', { tab: 'allocations' }))));
+    wrap.append(section('3', 'Billing & Documentation', 'waybills and the trip-to-invoice pipeline (filtered trips)', h('button', { class: 'btn sm', onClick: () => ctx.nav('invoices') }, 'Open invoices')));
+    wrap.append(h('div', { class: 'tiles' },
+      tile('Trips awaiting waybill', U.int(b.tripsAwaitingWaybill), 'no waybill number yet', b.tripsAwaitingWaybill ? 'bad' : 'good', () => { HB.views.reports.tab = 'waybills'; ctx.nav('reports'); }), tile('Waybill verification pending', U.int(b.waybillVerificationPending), 'received, not yet verified by billing', b.waybillVerificationPending ? 'warn' : 'good', () => { HB.views.reports.tab = 'waybills'; ctx.nav('reports'); }),
+      tile('Completed trips not invoiced', U.int(b.completedNotInvoiced), `${U.int(b.notInvoiced)} not invoiced in total`, b.completedNotInvoiced ? 'bad' : 'good', () => { HB.views.trips.filters = { invoiceStatus: 'Not Invoiced' }; ctx.nav('trips'); }), tile('Draft invoices', U.int(b.draftInvoices), null, b.draftInvoices ? 'warn' : ''),
+      tile('Invoices issued but not sent', U.int(b.issuedNotSent), null, b.issuedNotSent ? 'warn' : 'good', () => { HB.views.invoices.filters = { status: 'Issued' }; ctx.nav('invoices'); }), tile('Invoices sent, awaiting payment', U.int(b.sentAwaitingPayment), null, b.sentAwaitingPayment ? 'warn' : 'good', () => { HB.views.invoices.filters = { status: 'Sent' }; ctx.nav('invoices'); })));
+    wrap.append(h('div', { class: 'grid-2' },
+      h('div', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', { text: 'Trips by waybill status' })), HB.charts.hbars(E.WAYBILL_STATUSES.map((s) => ({ label: s, value: trips.filter((t) => t.waybillStatus === s).length })), {})),
+      h('div', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', { text: 'Trips by invoice status (automatic)' })), HB.charts.hbars(E.INVOICE_STATUSES.map((s) => ({ label: s, value: trips.filter((t) => t.invoiceStatus === s).length })).filter((x) => x.value), {}))));
+    wrap.append(section('4', 'Financial Performance', 'sales, payments, receivables and truck batches', h('button', { class: 'btn sm', onClick: () => ctx.nav('reports') }, 'Open reports')));
     const perf = E.batchPerformance(trips, dash.basis);
     const basisLabel = dash.basis === 'gross' ? 'Gross invoiced (incl. VAT)' : 'Net sales (excl. VAT)';
     wrap.append(h('div', { class: 'row between' }, h('span', { class: 'muted small', text: `Reporting basis: ${basisLabel}. Net sales = selling price excluding VAT; gross = billing after VAT as invoiced. Payments and receivables are always gross.` }), h('span', { class: 'row' }, h('span', { class: 'label', text: 'Basis' }), U.select([['net', 'Net sales excl. VAT'], ['gross', 'Gross invoiced incl. VAT']], dash.basis, { onChange: (e) => { dash.basis = e.target.value; dash.draw(); } }))));
@@ -67,7 +92,7 @@
   const rep = { title: 'Reports', tab: 'client', filters: {}, basis: 'gross' };
   rep.render = function (root, ctx) { rep.ctx = ctx; rep.root = root; root.append(h('div', { class: 'stack', id: 'rep' })); rep.draw(); };
   rep.onStoreChange = () => { if (rep.root && rep.root.isConnected) rep.draw(); };
-  const TABS = [['client', 'Client Summary'], ['statement', 'Statement (all clients)'], ['monthly', 'Monthly Sales Summary'], ['vehicle', 'Sales by Vehicle'], ['variance', 'Price Variance'], ['unpaid', 'Unpaid trips']];
+  const TABS = [['client', 'Client Summary'], ['statement', 'Statement (all clients)'], ['monthly', 'Monthly Sales Summary'], ['vehicle', 'Sales by Vehicle'], ['variance', 'Price Variance'], ['unpaid', 'Unpaid trips'], ['waybills', 'Outstanding waybills'], ['pipeline', 'Trip-to-billing pipeline']];
   rep.draw = function () {
     const ctx = rep.ctx, store = ctx.store, wrap = rep.root.querySelector('#rep'); if (!wrap) return; U.clear(wrap);
     const f = rep.filters; const trips = E.filterTrips(store.trips(), f);
@@ -97,6 +122,20 @@
       wrap.append(h('div', { class: 'tiles' }, tile('Trips priced below agreed rate', U.int(below.length), U.signedMoney(E.sum(below, 'variance')), 'bad'), tile('Trips priced above agreed rate', U.int(above.length), U.signedMoney(E.sum(above, 'variance')), 'good'), tile('At agreed rate', U.int(rows.filter((t) => t.direction === 'equal').length)), tile('No agreed rate found', U.int(noRate), 'Add rates in the Client Price List')));
       wrap.append(h('div', { class: 'row between' }, h('p', { class: 'muted small', text: 'Selling Price minus Agreed Client Price for every trip with a matching rate. Negative = billed below the agreed rate.' }), exportBtn('Price Variance', [['Date', 'Client', 'Loading From', 'Loading To', 'Vehicle Type', 'Plate', 'Agreed Client Price (₦)', 'Selling Price (₦)', 'Variance (₦)', 'Variance (%)', 'Entered by', 'Invoice'], ...rows.map((t) => [t.dateDispatched, t.client, t.loadingFrom, t.loadingTo, t.vehicleType, t.plate, t.agreedPrice, t.sellingPrice, t.variance, t.variancePct, t.updatedBy, t.invoiceNo || t.manualInvoiceNo])])));
       wrap.append(table(['Date', 'Client', 'Route', 'Vehicle', { t: 'Agreed (₦)' }, { t: 'Selling (₦)' }, { t: 'Variance (₦)' }, { t: 'Variance %' }, 'Last edited by', ''], rows.map((t) => h('tr', {}, h('td', { text: U.date(t.dateDispatched) }), h('td', { text: t.client }), h('td', { text: `${t.loadingFrom} → ${t.loadingTo}` }), h('td', { text: `${t.plate} · ${t.vehicleType}` }), M(t.agreedPrice), M(t.sellingPrice), h('td', { class: 'money var-' + t.direction, text: U.signedMoney(t.variance) }), h('td', { class: 'money var-' + t.direction, text: U.pct(t.variancePct) }), h('td', { text: t.updatedBy || '' }), h('td', {}, h('button', { class: 'btn sm', onClick: () => { ctx.nav('trips'); setTimeout(() => HB.views.trips.openDetail(ctx, t.id), 50); } }, 'Open'))))));
+    } else if (rep.tab === 'waybills') {
+      const rows = U.sortBy(trips.filter((t) => t.waybillStatus !== 'Waybill Verified' && t.waybillStatus !== 'Waybill Received'), 'dateDispatched');
+      wrap.append(h('div', { class: 'tiles' }, ...E.WAYBILL_STATUSES.map((s) => tile(s, U.int(trips.filter((t) => t.waybillStatus === s).length), null, WB_KIND[s] === 'good' ? 'good' : WB_KIND[s] === 'bad' ? 'bad' : ''))));
+      wrap.append(h('div', { class: 'row between' }, h('p', { class: 'muted small', text: 'Trips whose waybill is still outstanding: no number, number only, or physical copy received but not yet verified by billing. Invoicing can proceed; the status shows what documentation is missing.' }), exportBtn('Outstanding Waybills', [['Date', 'Client', 'Route', 'Plate', 'Trip ID', 'Waybill No.', 'Entered', 'Received', 'Received by', 'Waybill Status', 'Invoice Status'], ...rows.map((t) => [t.dateDispatched, t.client, `${t.loadingFrom} → ${t.loadingTo}`, t.plate, t.journeyPlanId, t.waybill, t.waybillEnteredAt, t.waybillReceivedAt, t.waybillReceivedBy, t.waybillStatus, t.invoiceStatus])])));
+      wrap.append(table(['Date', 'Client', 'Route', 'Plate', 'Trip ID', 'Waybill No.', 'Received', 'Waybill Status', 'Invoice Status', ''], rows.map((t) => h('tr', {}, h('td', { text: U.date(t.dateDispatched) }), h('td', { text: t.client }), h('td', { text: `${t.loadingFrom} → ${t.loadingTo}` }), h('td', { text: t.plate }), h('td', { text: t.journeyPlanId || (t.allocationId ? 'Pending' : '') }), h('td', { text: t.waybill || '—' }), h('td', { text: U.date(t.waybillReceivedAt) }), h('td', {}, U.pill(t.waybillStatus, WB_KIND[t.waybillStatus])), h('td', {}, U.pill(t.invoiceStatus, INV_KIND[t.invoiceStatus])), h('td', {}, h('button', { class: 'btn sm', onClick: () => { ctx.nav('trips'); setTimeout(() => HB.views.trips.openDetail(ctx, t.id), 50); } }, 'Open'))))));
+    } else if (rep.tab === 'pipeline') {
+      const allocs = HB.views.planning.allocationRows(store); const stages = P.CHAIN_STAGES.map((s) => ({ label: s, value: allocs.filter((a) => a.stage === s).length }));
+      const steps = [['Not Invoiced', 'bad'], ['Draft Invoice', 'info'], ['Invoice Issued', 'warn'], ['Invoice Sent', 'good'], ['Invoice Voided', 'neutral'], ['Internal Client', 'neutral']];
+      wrap.append(h('div', { class: 'tiles' }, ...steps.map(([s, kd]) => tile(s, U.int(trips.filter((t) => t.invoiceStatus === s).length), U.moneyShort(E.sum(trips.filter((t) => t.invoiceStatus === s), 'billing')), kd))));
+      wrap.append(h('div', { class: 'grid-2' }, h('div', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', { text: 'Allocation chain stages' }), h('span', { class: 'small muted', text: 'Allocated → Linked to Trip Log → Trip ID → Invoiced → Sent → Paid' })), HB.charts.hbars(stages, {})),
+        h('div', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', { text: 'Payment position of invoiced trips' })), HB.charts.hbars(['Unpaid', 'Part Paid', 'Paid'].map((p) => ({ label: p, value: trips.filter((t) => t.invoiceStatus === 'Invoice Sent' && t.paymentLabel === p).length })), {}))));
+      const rows = U.sortBy(trips.filter((t) => t.invoiceStatus !== 'Internal Client'), (t) => t.updatedAt || '', 'desc').slice(0, 300);
+      wrap.append(h('div', { class: 'row between' }, h('p', { class: 'muted small', text: 'Stage, owner and timestamp of every trip on its way from dispatch to payment (latest 300 in scope).' }), exportBtn('Trip Pipeline', [['Date', 'Client', 'Plate', 'Request', 'Allocation', 'Trip ID', 'Waybill Status', 'Invoice Status', 'Invoice No.', 'Issued', 'Sent', 'Payment', 'Balance (₦)', 'Last updated', 'By'], ...rows.map((t) => [t.dateDispatched, t.client, t.plate, t.requestId, t.allocationId, t.journeyPlanId, t.waybillStatus, t.invoiceStatus, t.invoiceNo || t.manualInvoiceNo, t.invoiceIssuedAt, t.invoiceSentAt, t.paymentLabel, t.balance, t.updatedAt, t.updatedBy])])));
+      wrap.append(table(['Date', 'Client', 'Plate', 'Request / Allocation', 'Trip ID', 'Waybill', 'Invoice status', 'Invoice', 'Issued', 'Sent', 'Payment', { t: 'Balance (₦)' }, 'Updated'], rows.map((t) => h('tr', {}, h('td', { text: U.date(t.dateDispatched) }), h('td', { text: t.client }), h('td', { text: t.plate }), h('td', { class: 'small', text: [t.requestId, t.allocationId].filter(Boolean).join(' · ') }), h('td', { text: t.journeyPlanId || (t.allocationId ? 'Pending' : '') }), h('td', {}, U.pill(t.waybillStatus, WB_KIND[t.waybillStatus])), h('td', {}, U.pill(t.invoiceStatus, INV_KIND[t.invoiceStatus])), h('td', { text: t.invoiceNo || t.manualInvoiceNo || '' }), h('td', { text: U.date(t.invoiceIssuedAt) }), h('td', { text: U.date(t.invoiceSentAt) }), h('td', {}, U.pill(t.paymentLabel, t.paymentLabel === 'Paid' ? 'good' : t.paymentLabel === 'Part Paid' ? 'info' : 'bad')), M(t.balance), h('td', { class: 'small', text: `${U.dateTime(t.updatedAt)} · ${t.updatedBy || ''}` })))));
     } else {
       const rows = U.sortBy(trips.filter((t) => t.paymentStatus !== 'Paid' && t.invoiceStatus !== 'Internal Client'), 'dateDispatched');
       wrap.append(h('div', { class: 'row between' }, h('p', { class: 'muted small', text: 'Every trip not yet fully paid (the workbook\'s "Eligible" helper), with its invoice status.' }), exportBtn('Unpaid Trips', HB.exporter.tripsToRows(rows))));

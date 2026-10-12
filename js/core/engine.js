@@ -10,35 +10,47 @@
   'use strict';
 
   // ---------------------------------------------------------------- constants
-  const INVOICE_STATUSES = ['Invoice Not Sent', 'Invoice Sent', 'Internal Client'];
+  // Invoice status is derived from the invoice record, never chosen by hand (Draft → Issued → Sent; Void). Legacy workbook
+  // values are mapped on read: 'Invoice Not Sent' → 'Not Invoiced'.
+  const INVOICE_STATUSES = ['Not Invoiced', 'Draft Invoice', 'Invoice Issued', 'Invoice Sent', 'Partially Invoiced', 'Invoice Voided', 'Internal Client'];
+  const LEGACY_INVOICE_STATUS = { 'Invoice Not Sent': 'Not Invoiced', 'Not Sent': 'Not Invoiced' };
+  const WAYBILL_STATUSES = ['Awaiting Waybill', 'Waybill Number Entered', 'Waybill Received', 'Waybill Verification Pending', 'Waybill Verified'];
+  const PAYMENT_LABELS = { 'Not Paid': 'Unpaid', Advance: 'Part Paid', Paid: 'Paid' };
+  const DEFAULT_TRIP_ID_PATTERN = '^[A-Za-z]{2,6}-?\\d{3,8}$';
   const PAYMENT_STATUSES = ['Not Paid', 'Advance', 'Paid'];
   const RETURN_WAYBILL = ['', 'Received', 'Not Received'];
   const TRIP_STATUSES = ['Invoice Not Sent', 'Awaiting Payment', 'Part Paid - Balance Due', 'Closed', 'Internal Client'];
-  const INVOICE_DOC_STATUSES = ['Draft', 'Sent', 'Paid', 'Void'];
+  const INVOICE_DOC_STATUSES = ['Draft', 'Issued', 'Sent', 'Paid', 'Void'];
   const VAT_TREATMENTS = ['exclusive', 'inclusive'];
   const VAT_TREATMENT_LABELS = { exclusive: 'Price Excluding VAT', inclusive: 'Price Including VAT' };
   const TRUCK_BATCHES = ['New Batch', 'Old Batch'];
-  const ROLES = ['admin', 'operations', 'billing', 'finance', 'management'];
-  const ROLE_LABELS = { admin: 'Administrator', operations: 'Operations Team', billing: 'Billing Team', finance: 'Finance Team', management: 'Management' };
+  const ROLES = ['admin', 'operations', 'tracking', 'planning', 'billing', 'finance', 'management'];
+  const ROLE_LABELS = { admin: 'Administrator', operations: 'Operations Team', tracking: 'Tracking Officer', planning: 'Fleet Planner', billing: 'Billing Team', finance: 'Finance Team', management: 'Management' };
 
   // Field groups on a trip. Each role may edit the groups listed in ROLE_FIELDS.
   const FIELD_GROUPS = {
-    operations: ['dateDispatched', 'dateDelivered', 'plate', 'contractType', 'client', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'returnWaybill', 'note', 'agreedRateId'],
-    billing: ['sellingPrice', 'vatTreatment', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceStatus', 'invoiceNo', 'invoiceId', 'agreedRateId'],
-    finance: ['paymentStatus', 'advance', 'invoiceStatus', 'note'],
+    operations: ['dateDispatched', 'dateDelivered', 'plate', 'contractType', 'client', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'returnWaybill', 'note', 'agreedRateId',
+      'allocationId', 'requestId', 'waybillEnteredAt', 'waybillReceivedAt', 'waybillReceivedBy', 'waybillDocId', 'waybillDocName', 'tripIdSource'],
+    // invoiceStatus / invoiceId / invoiceNo are written by the invoice workflow only (no manual selection in the UI).
+    billing: ['sellingPrice', 'vatTreatment', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceStatus', 'invoiceNo', 'invoiceId', 'agreedRateId', 'internalClient', 'waybillVerifiedAt', 'waybillVerifiedBy', 'waybillReceivedAt', 'waybillReceivedBy', 'waybillDocId', 'waybillDocName'],
+    finance: ['paymentStatus', 'advance', 'note'],
   };
   const ROLE_FIELDS = {
-    admin: [...FIELD_GROUPS.operations, ...FIELD_GROUPS.billing, ...FIELD_GROUPS.finance],
+    admin: [...new Set([...FIELD_GROUPS.operations, ...FIELD_GROUPS.billing, ...FIELD_GROUPS.finance])],
     operations: FIELD_GROUPS.operations,
+    tracking: [],
+    planning: FIELD_GROUPS.operations,
     billing: FIELD_GROUPS.billing,
     finance: FIELD_GROUPS.finance,
     management: [],
   };
   // Coarse actions.
   const ROLE_ACTIONS = {
-    admin: ['trip.create', 'trip.edit', 'trip.delete', 'trip.import', 'rate.manage', 'invoice.manage', 'payment.manage', 'client.manage', 'asset.manage', 'user.manage', 'settings.manage', 'report.view', 'variance.review', 'audit.view', 'export'],
-    operations: ['trip.create', 'trip.edit', 'trip.import', 'report.view', 'export'],
-    billing: ['trip.edit', 'invoice.manage', 'report.view', 'export', 'rate.view'],
+    admin: ['trip.create', 'trip.edit', 'trip.delete', 'trip.import', 'rate.manage', 'invoice.manage', 'payment.manage', 'client.manage', 'asset.manage', 'user.manage', 'settings.manage', 'report.view', 'variance.review', 'audit.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'waybill.verify', 'tripid.assign'],
+    operations: ['trip.create', 'trip.edit', 'trip.import', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign'],
+    tracking: ['fmr.update', 'report.view', 'export'],
+    planning: ['trip.create', 'trip.edit', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign'],
+    billing: ['trip.edit', 'invoice.manage', 'report.view', 'export', 'rate.view', 'waybill.verify'],
     finance: ['trip.edit', 'payment.manage', 'report.view', 'export'],
     management: ['report.view', 'variance.review', 'export', 'audit.view', 'rate.view'],
   };
@@ -56,10 +68,13 @@
     { key: 'client', label: 'Client Name', type: 'client', excel: 'I' },
     { key: 'loadingFrom', label: 'Loading From', type: 'location', excel: 'J' },
     { key: 'loadingTo', label: 'Loading To', type: 'location', excel: 'K' },
-    { key: 'journeyPlanId', label: 'Journey Plan ID', type: 'text', excel: 'L' },
+    { key: 'journeyPlanId', label: 'Trip ID (Power Apps / Journey Plan)', type: 'text', excel: 'L' },
+    { key: 'requestId', label: 'Request ID', type: 'text' },
+    { key: 'allocationId', label: 'Allocation ID', type: 'text' },
     { key: 'waybill', label: 'Client Waybill Number', type: 'text', excel: 'M' },
     { key: 'returnWaybill', label: 'Return Waybill Received', type: 'enum', options: RETURN_WAYBILL, excel: 'N' },
-    { key: 'invoiceStatus', label: 'Invoice Status', type: 'enum', options: INVOICE_STATUSES, excel: 'O' },
+    { key: 'waybillStatus', label: 'Waybill Status', type: 'computed-status' },
+    { key: 'invoiceStatus', label: 'Invoice Status (automatic)', type: 'computed-status', excel: 'O' },
     { key: 'agreedPrice', label: 'Agreed Client Price (₦)', type: 'computed-money' },
     { key: 'sellingPrice', label: 'Selling Price (₦)', type: 'money', excel: 'P' },
     { key: 'variance', label: 'Price Variance (₦)', type: 'computed-money' },
@@ -197,13 +212,46 @@
   }
 
   // ------------------------------------------------------------- trip math
+  const normalizeStoredInvoiceStatus = (v) => (LEGACY_INVOICE_STATUS[v] || v || 'Not Invoiced');
+  /** Workbook "Trip Status" column (payment-centric): closure only on full settlement. */
   function tripStatus(t) {
-    if (t.invoiceStatus === 'Internal Client') return 'Internal Client';
+    const inv = normalizeStoredInvoiceStatus(t.invoiceStatus);
+    if (inv === 'Internal Client' || t.internalClient) return 'Internal Client';
     if (t.paymentStatus === 'Paid') return 'Closed';
     if (t.paymentStatus === 'Advance' && num(t.advance) > 0) return 'Part Paid - Balance Due';
-    if (t.invoiceStatus === 'Invoice Sent') return 'Awaiting Payment';
+    if (inv === 'Invoice Sent') return 'Awaiting Payment';
     return 'Invoice Not Sent';
   }
+  /**
+   * Automated invoice status: derived from the invoice record the trip sits on (no manual selection).
+   * Draft → Draft Invoice; issued (issuedAt) → Invoice Issued; sent (sentAt) → Invoice Sent; Void → Invoice Voided.
+   * Internal Client is a billing flag on the trip. Trips billed before the app existed keep the workbook's 'Invoice Sent'.
+   */
+  function invoiceAutoStatus(trip, invoice) {
+    if (trip.internalClient || trip.invoiceStatus === 'Internal Client') return 'Internal Client';
+    if (invoice) {
+      if (invoice.status === 'Void') return 'Invoice Voided';
+      if (invoice.sentAt || invoice.status === 'Sent' || invoice.status === 'Paid') return 'Invoice Sent';
+      if (invoice.issuedAt || invoice.status === 'Issued') return 'Invoice Issued';
+      return 'Draft Invoice';
+    }
+    const legacy = normalizeStoredInvoiceStatus(trip.invoiceStatus);
+    if (!trip.invoiceId && legacy === 'Invoice Sent') return 'Invoice Sent';
+    if (trip.invoiceId && ['Invoice Sent', 'Invoice Issued', 'Draft Invoice'].includes(legacy)) return legacy; // invoice list not loaded
+    return 'Not Invoiced';
+  }
+  /** Automated waybill status from the waybill fields (number, physical receipt, verification). */
+  function waybillStatus(trip, opts) {
+    const verify = !opts || opts.waybillVerification !== false;
+    if (trip.waybillVerifiedAt) return 'Waybill Verified';
+    if (trip.waybillReceivedAt || trip.returnWaybill === 'Received') return verify ? 'Waybill Verification Pending' : 'Waybill Received';
+    if (clean(trip.waybill)) return 'Waybill Number Entered';
+    return 'Awaiting Waybill';
+  }
+  const paymentLabel = (paymentStatus) => PAYMENT_LABELS[paymentStatus] || 'Unpaid';
+  /** Power Apps Trip IDs are entered, never generated: validate the format and reject duplicates. */
+  function tripIdValid(id, pattern) { const v = clean(id); if (!v) return true; try { return new RegExp(pattern || DEFAULT_TRIP_ID_PATTERN, 'i').test(v); } catch (e) { return true; } }
+  function findDuplicateTripId(id, trips, excludeId) { const k = norm(id); if (!k) return null; return (trips || []).find((t) => t.id !== excludeId && !t._del && norm(t.journeyPlanId) === k) || null; }
 
   /** Returns a new object: the trip plus every computed column. Selling price is never touched. */
   function computeTrip(trip, ctx) {
@@ -224,6 +272,13 @@
     t.balance = !t.client || t.billing === null ? null : t.billing - t.amountPaid; // Z
     t.total = t.billing;                                           // AA
     t.month = monthKey(t.dateDispatched);                          // AB
+    // automated statuses (invoice status comes from the invoice record when the list is supplied)
+    const inv = t.invoiceId && ctx.invoices ? (ctx.invoices.find ? ctx.invoices.find((i) => i.id === t.invoiceId) : ctx.invoices.get(t.invoiceId)) : null;
+    t.invoiceStatus = invoiceAutoStatus(t, inv || null);
+    t.invoiceIssuedAt = inv ? inv.issuedAt || '' : t.invoiceIssuedAt || '';
+    t.invoiceSentAt = inv ? inv.sentAt || '' : t.invoiceSentAt || '';
+    t.waybillStatus = waybillStatus(t, ctx.planning && ctx.planning.setup);
+    t.paymentLabel = paymentLabel(t.paymentStatus);
     t.tripStatus = tripStatus(t);
     const lk = lookupAgreedRate(t, ctx.rates, ctx.zones, ctx.clients);
     t.agreedStatus = lk.status;
@@ -245,7 +300,11 @@
     if (t.sellingPrice !== null && t.sellingPrice !== undefined && t.sellingPrice !== '' && num(t.sellingPrice) === null) errors.push('Selling Price must be a number.');
     if (num(t.sellingPrice) !== null && num(t.sellingPrice) < 0) errors.push('Selling Price cannot be negative.');
     if (t.paymentStatus && !PAYMENT_STATUSES.includes(t.paymentStatus)) errors.push('Payment Status is invalid.');
-    if (t.invoiceStatus && !INVOICE_STATUSES.includes(t.invoiceStatus)) errors.push('Invoice Status is invalid.');
+    if (t.invoiceStatus && !INVOICE_STATUSES.includes(t.invoiceStatus) && !LEGACY_INVOICE_STATUS[t.invoiceStatus]) errors.push('Invoice Status is invalid.');
+    const pattern = ctx && ctx.planning && ctx.planning.setup && ctx.planning.setup.tripIdPattern;
+    if (clean(t.journeyPlanId) && !tripIdValid(t.journeyPlanId, pattern)) errors.push(`Trip ID "${clean(t.journeyPlanId)}" does not match the Power Apps format.`);
+    if (ctx && ctx.trips && clean(t.journeyPlanId)) { const dup = findDuplicateTripId(t.journeyPlanId, ctx.trips, t.id); if (dup) errors.push(`Trip ID ${clean(t.journeyPlanId)} is already on the trip of ${dup.client} dispatched ${dup.dateDispatched}.`); }
+    if (t.waybillReceivedAt && t.waybillEnteredAt && t.waybillReceivedAt.slice(0, 10) < (t.dateDispatched || '')) errors.push('Waybill received date cannot be before the dispatch date.');
     if (t.vatTreatment && !VAT_TREATMENTS.includes(t.vatTreatment)) errors.push('VAT treatment is invalid.');
     if (t.paymentStatus === 'Advance' && !(num(t.advance) > 0)) errors.push('Advance amount is required when Payment Status is Advance.');
     if (ctx && ctx.assets && ctx.assets.length && t.plate && !assetFor(t.plate, ctx.assets)) errors.push(`Plate ${t.plate} is not in the Asset List.`);
@@ -282,7 +341,7 @@
     const from = fromMonth ? `${fromMonth}-01` : '0000-00-00';
     const to = toMonth ? endOfMonth(toMonth) : '9999-12-31';
     return (trips || []).filter((t) => norm(t.client) === norm(client) && t.dateDispatched >= from && t.dateDispatched <= to
-      && t.paymentStatus !== 'Paid' && (opts.includeInvoiced || !t.invoiceId) && t.invoiceStatus !== 'Internal Client');
+      && t.paymentStatus !== 'Paid' && (opts.includeInvoiced || !t.invoiceId) && t.invoiceStatus !== 'Internal Client' && !t.internalClient);
   }
   /** Invoice totals. priceType 'inclusive' extracts VAT from each selling price; 'exclusive' adds it (default). */
   function invoiceTotals(trips, vatRate, priceType) {
@@ -291,11 +350,13 @@
     for (const t of trips) { const sp = vatSplit(t.sellingPrice, rate, priceType || t.vatTreatment || 'exclusive'); if (sp.net === null) continue; subtotal += sp.net; vat += sp.vat; total += sp.gross; }
     return { subtotal: round2(subtotal), vat: round2(vat), total: round2(total), count: trips.length };
   }
+  /** Invoice document status: Draft → Issued → Sent → Paid (every trip settled); Void is terminal. */
   function invoiceDocStatus(inv, trips) {
     if (inv.status === 'Void') return 'Void';
     const mine = trips.filter((t) => t.invoiceId === inv.id);
     if (mine.length && mine.every((t) => t.paymentStatus === 'Paid')) return 'Paid';
-    return inv.status === 'Sent' || inv.sentAt ? 'Sent' : 'Draft';
+    if (inv.status === 'Sent' || inv.sentAt) return 'Sent';
+    return inv.status === 'Issued' || inv.issuedAt ? 'Issued' : 'Draft';
   }
   function findDuplicateInvoiceNumber(number, invoices, excludeId) {
     const key = norm(number);
@@ -315,7 +376,9 @@
       && (!f.vehicleCategory || t.vehicleCategory === f.vehicleCategory)
       && (!f.costCenter || t.costCenter === f.costCenter)
       && (!f.paymentStatus || t.paymentStatus === f.paymentStatus)
-      && (!f.invoiceStatus || t.invoiceStatus === f.invoiceStatus)
+      && (!f.invoiceStatus || t.invoiceStatus === f.invoiceStatus || LEGACY_INVOICE_STATUS[f.invoiceStatus] === t.invoiceStatus)
+      && (!f.waybillStatus || t.waybillStatus === f.waybillStatus)
+      && (!f.requestId || t.requestId === f.requestId)
       && (!f.tripStatus || t.tripStatus === f.tripStatus)
       && (!f.plate || norm(t.plate) === norm(f.plate))
       && (!f.truckBatch || t.truckBatch === f.truckBatch)
@@ -325,7 +388,7 @@
   }
   function tripMatches(t, q) {
     const s = norm(q); if (!s) return true;
-    return ['client', 'plate', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceNo', 'assetCode', 'contractType', 'note'].some((k) => norm(t[k]).includes(s));
+    return ['client', 'plate', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceNo', 'assetCode', 'contractType', 'note', 'requestId', 'allocationId'].some((k) => norm(t[k]).includes(s));
   }
 
   /** Client Summary / Statement sheets. */
@@ -416,9 +479,9 @@
     const r = norm(raw);
     if (r === 'internal client' || r === 'internal') return 'Internal Client';
     if (r.startsWith('invoice sent') || r === 'closed' || r === 'sent') return 'Invoice Sent';
-    if (r === 'invoice not sent' || r === 'not sent') return 'Invoice Not Sent';
-    if (!r) return paymentStatus === 'Paid' || paymentStatus === 'Advance' ? 'Invoice Sent' : 'Invoice Not Sent';
-    return 'Invoice Not Sent';
+    if (r === 'invoice not sent' || r === 'not sent' || r === 'not invoiced') return 'Not Invoiced';
+    if (!r) return paymentStatus === 'Paid' || paymentStatus === 'Advance' ? 'Invoice Sent' : 'Not Invoiced';
+    return 'Not Invoiced';
   }
   function normalizePaymentStatus(raw) { const r = norm(raw); if (r === 'paid') return 'Paid'; if (r.startsWith('advance') || r === 'special payment') return 'Advance'; return 'Not Paid'; }
   function normalizeReturnWaybill(raw) { const r = norm(raw); if (r === 'received' || r === 'yes') return 'Received'; if (r === 'not received' || r === 'no') return 'Not Received'; return ''; }
@@ -470,7 +533,8 @@
   function dupKey(t) { return [t.dateDispatched, norm(t.plate), norm(t.client), norm(t.waybill), norm(t.journeyPlanId), num(t.sellingPrice)].join('|'); }
 
   return {
-    INVOICE_STATUSES, PAYMENT_STATUSES, RETURN_WAYBILL, TRIP_STATUSES, INVOICE_DOC_STATUSES, VAT_TREATMENTS, VAT_TREATMENT_LABELS, TRUCK_BATCHES, ROLES, ROLE_LABELS, ROLE_FIELDS, ROLE_ACTIONS, TRIP_FIELDS, MONTHS,
+    INVOICE_STATUSES, LEGACY_INVOICE_STATUS, WAYBILL_STATUSES, PAYMENT_LABELS, DEFAULT_TRIP_ID_PATTERN, PAYMENT_STATUSES, RETURN_WAYBILL, TRIP_STATUSES, INVOICE_DOC_STATUSES, VAT_TREATMENTS, VAT_TREATMENT_LABELS, TRUCK_BATCHES, ROLES, ROLE_LABELS, ROLE_FIELDS, ROLE_ACTIONS, TRIP_FIELDS, MONTHS,
+    invoiceAutoStatus, waybillStatus, paymentLabel, tripIdValid, findDuplicateTripId, normalizeStoredInvoiceStatus,
     round2, isNum, num, norm, clean, monthKey, monthLabel, todayISO, addDays, endOfMonth,
     assetFor, vatRateOf, rateStatus, lookupAgreedRate, clientKey, variance, tripStatus, computeTrip, validateTrip,
     normContract, locKey, locTokens, zoneOf, locMatch, vatSplit, batchOn, convertBasis, batchPerformance, RATE_HEADERS, mapRateHeaders, rowToRate,

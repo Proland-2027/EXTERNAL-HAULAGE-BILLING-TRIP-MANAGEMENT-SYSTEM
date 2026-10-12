@@ -96,3 +96,42 @@ Recomputing the formulas over all 3,708 rows reproduces the cached values exactl
 8. **Client list** holds trailing spaces / Unicode marks (e.g. `Jamara `, `SDS ENVIRON … \xa0`). Names are trimmed on import; the Settings list is the master.
 9. **Broken external link** for bank details (`[1]Settings!$B$10`). Bank details are configured in Settings in the web app.
 10. **Asset rows typed by hand** (rows 2–1984 have typed Asset Code / Type / Cost Center) — values agree with the Asset List, so the web app always derives them from the asset master.
+
+---
+
+# Phase 3 — Truck Planning Management workbook (`Truck_Planning_Managment_Rev1.xlsx`)
+
+The planning workbook was analysed the same way as the billing sheet and its logic ported to `js/core/planning.js` (pure functions shared by the browser, the server and `tests/planning.test.js`). The original file is kept as `data/workbook/Truck_Planning_Management_Rev1_original.xlsx`; `tools/extract_workbook.py` produces `planning_extract.json` and `tools/build_planning_seed.js` turns it into the seed collections.
+
+## Worksheets and how each one is used
+
+| Sheet | Content | In the application |
+|---|---|---|
+| **Setup** | Diesel price, fallback turnaround (7 days), buffer added to every return (0), idle flag (3 days), default repositioning (3 days), same-place repositioning (0), runway start/window (92 days); status list with its availability **group**; body type → contract sizes it can run; size → tonnage table | Settings → *Fleet planning* (`meta/planning`): every number is editable; statuses, groups and phases are configurable; repositioning rules and body/contract table are editable text |
+| **Routes** (524 rows) | Rate ID, contract name, truck size, division, tonnage, client, loading point, destination, state, region, KM, **Days**, **Offloading**, **Total days**, diesel, road expenses, contingency, approved price; derived `Days out = ROUNDUP(Days/2)`, `Days back = Days − out`, cost, margin, per truck-day | Route register (`routes`). `routeTiming()` reproduces out/offload/back/turnaround; `routeCost()` the cost and margin columns |
+| **Repositioning** (197 rules) | From drop point → to loading bay = days | `repoDays(from, to)`; symmetric lookup, same place = 0, unknown pair = default |
+| **Fleet (FMR)** (50 trucks) | Truck, body, tonnage, driver, home station, **Status**, date of status, route, date loaded, drop point, workshop release, days down; derived group, TAT/out/offload/back, **Back on ground**, **Committed until**, **Free to allocate from**, days until free, confidence, warning, delivery check, double booked | Fleet Movement Report (`fleet`). `truckStatus()` ports columns N..AA; the 12 assets not on the sheet are added with no status and show as *Unavailable or Status Unconfirmed* |
+| **Requests** (28) | Request ID (client code + sequence), route, client, trucks, date, priority, status, notes | Client transport requests (`requests`); IDs follow the same `CODE-NNN` scheme (`nextRequestId`) |
+| **Committed trips** (12) | Truck, request, route, client, load date, reaches client, back on ground, stage | Allocations (`allocations`), IDs `ALC-YYMMDD-NN`; dates from `allocationDates()` |
+| **Allocation planner** | For one request: every truck ranked by *can load* date, reposition days, fits, booked, days late | `planForRequest()` with the same ranking (earliest loading, then wrong size, then booked) plus the warning notes |
+| **Runway** | Day-by-day F/P/T/D grid per truck for the window, trucks coming free per day/week | `runway()`; Fleet Planning Dashboard (daily and weekly) |
+
+## Rules carried over (and where they were tightened)
+
+* **Back on ground per group/phase** — Free: today. Down: workshop release + buffer, else status date + days down (never before today). On trip: inbound = status date + days back; offloading = + (offload − 1) + back; at destination = + offload + back; loading/loaded/outbound = load date + out + offload + back. Explicit tracking estimates (estimated return, offload complete, delivery) override the formula.
+* **Free to allocate from** = max(back on ground, committed until). *Committed until* is the latest back-on-ground of the truck's active allocations.
+* **ETA passed is not "available"** (brief requirement; the workbook left it to the planner). When the estimated return is in the past and the tracking record has not been updated since, the truck is flagged *Past its estimated return and completion is unconfirmed* and falls in *Unavailable or Status Unconfirmed* until a tracking officer verifies it (one click: *Confirm back*).
+* **Tracking Update Overdue** — no status update for more than the configured hours (48 by default).
+* **Delivery check** — outbound longer than the one-way run: *Tracking officer to confirm delivery*.
+* **Double booked** — two active allocations whose loading…back windows overlap; the planner refuses to allocate a truck over a window already promised (`bookingConflicts`, also enforced on the server).
+* **Availability categories**: Available and Unplanned · Available but Already Allocated · Expected to Become Available (free within *returnSoonDays*) · Currently on Trip · In Workshop / Breakdown · Unavailable or Status Unconfirmed.
+* **Trucks Still Required** = trucks requested − allocations that are not cancelled. Requested, allocated, deployed and outstanding are always shown separately. Request status derives from the allocations (New → Under Planning → Partially / Fully Allocated → In Progress → Completed); Cancelled is manual.
+
+## Decisions and ambiguities
+
+1. **Snapshot dates.** The FMR statuses were all dated 2026-10-02 while loading dates ran from 2026-09-24. For the demo the seed re-dates the whole snapshot to the import date (every operational date moved by the same offset, recorded in `meta/planning.dateShiftDays`), otherwise every truck would open as "tracking overdue". A production import keeps the dates as entered.
+2. **Committed trips already in the past** are imported as *Completed*; three demo allocations were planned with the engine on the first open requests so the planner and *Select from Fleet Planning* have live data (remark "Seeded demo allocation").
+3. **Workbook statuses** (`On standby / held`, `Loading at bay`, `Laden`, `At client destination`, `Offloading at client`, `Inbound (returning)`, `Transit breakdown (offsite)`) are mapped to the configurable list; the aliases stay recognised on import.
+4. **Clients only in the planning workbook** (BAJAJ, ATLANTIC PVC) were added to the client master; `JAT` → JUBAILI AGROTEC, `ABBA SALEH` → ABBA ABASS, `VANDERA` → VENDARA etc. are handled with the alias table in `tools/build_planning_seed.js`.
+5. **Power Apps Trip ID.** No Power Apps environment, Dataverse connection or API credentials were available, so the Trip ID is entered manually (validated against a configurable pattern, unique across the Trip Log, never generated by the app) and a server endpoint accepts it from Power Automate (see docs/DEPLOYMENT.md). Trips created from an allocation show *Trip ID pending* until it arrives.
+6. **Invoice status** is derived from the invoice record (Draft → Issued → Sent → Voided), so the workbook's `Invoice Not Sent` becomes *Not Invoiced*; 'Invoice Sent' rows billed before the app keep their status. Payment status stays separate (Unpaid / Part Paid / Paid); a trip closes financially only on full settlement.

@@ -10,19 +10,24 @@ const hashPassword = (password, salt) => crypto.pbkdf2Sync(password, salt, 10000
 const DEMO_USERS = [
   { username: 'admin', name: 'Adaeze Okonkwo', role: 'admin', password: 'Admin@2026' }, { username: 'ops', name: 'Musa Bello', role: 'operations', password: 'Ops@2026' },
   { username: 'billing', name: 'Funke Adeyemi', role: 'billing', password: 'Billing@2026' }, { username: 'finance', name: 'Chidi Nwosu', role: 'finance', password: 'Finance@2026' }, { username: 'manager', name: 'Ibrahim Lawal', role: 'management', password: 'Manager@2026' },
+  { username: 'tracking', name: 'Ngozi Eze', role: 'tracking', password: 'Tracking@2026' }, { username: 'planner', name: 'Tunde Bakare', role: 'planning', password: 'Planner@2026' },
 ];
+const only = process.argv[3] ? process.argv[3].split(',') : null; // e.g. "fleet,routes,requests,allocations,planning,users" for an incremental seed
+const want = (c) => !only || only.includes(c);
 fs.rmSync(out, { recursive: true, force: true });
 const manifest = [];
+for (const c of ['fleet', 'routes', 'requests', 'allocations']) if (want(c) && fs.existsSync(path.join(ROOT, 'data', 'workbook', c + '.json'))) for (const d of read(c + '.json')) manifest.push(write(c, d.id, Object.assign({ version: 1 }, d)));
+if (want('planning') && fs.existsSync(path.join(ROOT, 'data', 'workbook', 'planning.json'))) manifest.push(write('meta', 'planning', Object.assign({ version: 1 }, read('planning.json'), { id: 'planning' })));
 const chunks = new Map();
-for (const t of read('trips.json')) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; if (!chunks.has(m)) chunks.set(m, {}); const c = { ...t }; delete c.history; chunks.get(m)[t.id] = c; }
+if (want('trips')) for (const t of read('trips.json')) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; if (!chunks.has(m)) chunks.set(m, {}); const c = { ...t }; delete c.history; chunks.get(m)[t.id] = c; }
 for (const [m, trips] of chunks) manifest.push(write('tripchunks', m, { month: m, trips }));
-for (const a of read('assets.json')) { const tb = a.vehicleCategory === 'New Batch' ? 'New Batch' : a.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; manifest.push(write('assets', a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), { id: a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), version: 1, ...a, truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] })); }
-for (const c of read('clients.json')) manifest.push(write('clients', c.id, { version: 1, ...c }));
-manifest.push(write('meta', 'locations', { list: read('locations.json') }));
-manifest.push(write('meta', 'zones', { map: read('zones.json') }));
-manifest.push(write('settings', 'main', { company: 'JMG Limited', companyShort: 'JMG', address: '', phone: '', email: '', website: '', tin: '', rcNumber: '', logo: '', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', version: 1 }));
-for (const r of (fs.existsSync(path.join(ROOT, 'data', 'workbook', 'rates.json')) ? read('rates.json') : sampleRates())) manifest.push(write('rates', r.id, r));
-for (const u of DEMO_USERS) { const salt = crypto.randomBytes(16).toString('hex'); manifest.push(write('users', u.username, { id: u.username, username: u.username, name: u.name, role: u.role, salt, hash: hashPassword(u.password, salt), active: true, createdAt: new Date().toISOString(), version: 1 })); }
+if (want('assets')) for (const a of read('assets.json')) { const tb = a.vehicleCategory === 'New Batch' ? 'New Batch' : a.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; manifest.push(write('assets', a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), { id: a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'), version: 1, ...a, truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] })); }
+if (want('clients')) for (const c of read('clients.json')) manifest.push(write('clients', c.id, { version: 1, ...c }));
+if (want('meta')) manifest.push(write('meta', 'locations', { list: read('locations.json') }));
+if (want('meta')) manifest.push(write('meta', 'zones', { map: read('zones.json') }));
+if (want('settings')) manifest.push(write('settings', 'main', { company: 'JMG Limited', companyShort: 'JMG', address: '', phone: '', email: '', website: '', tin: '', rcNumber: '', logo: '', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', version: 1 }));
+if (want('rates')) for (const r of (fs.existsSync(path.join(ROOT, 'data', 'workbook', 'rates.json')) ? read('rates.json') : sampleRates())) manifest.push(write('rates', r.id, r));
+for (const u of (only ? DEMO_USERS.filter((u) => only.includes('users:' + u.username) || only.includes('users')) : DEMO_USERS)) { const salt = crypto.randomBytes(16).toString('hex'); manifest.push(write('users', u.username, { id: u.username, username: u.username, name: u.name, role: u.role, salt, hash: hashPassword(u.password, salt), active: true, createdAt: new Date().toISOString(), version: 1 })); }
 fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));
 const big = manifest.filter((m) => m.bytes > 200 * 1024);
 console.log(`${manifest.length} documents → ${out}; largest ${Math.max(...manifest.map((m) => m.bytes))} bytes; over 200KiB: ${big.map((b) => b.doc_id).join(', ') || 'none'}`);

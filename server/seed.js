@@ -17,7 +17,10 @@ const DEMO_USERS = [
   { username: 'billing', name: 'Funke Adeyemi', role: 'billing', password: 'Billing@2026' },
   { username: 'finance', name: 'Chidi Nwosu', role: 'finance', password: 'Finance@2026' },
   { username: 'manager', name: 'Ibrahim Lawal', role: 'management', password: 'Manager@2026' },
+  { username: 'tracking', name: 'Ngozi Eze', role: 'tracking', password: 'Tracking@2026' },
+  { username: 'planner', name: 'Tunde Bakare', role: 'planning', password: 'Planner@2026' },
 ];
+const exists = (n) => fs2.existsSync(path.join(ROOT, 'data', 'workbook', n));
 
 db.exec('BEGIN');
 try {
@@ -32,8 +35,12 @@ try {
   if (!store.list('rates').length) { const real = fs2.existsSync(path.join(ROOT, 'data', 'workbook', 'rates.json')) ? read('rates.json') : sampleRates(); for (const r of real) store.putDoc('rates', r); }
   if (!store.doc('meta', 'zones') && fs2.existsSync(path.join(ROOT, 'data', 'workbook', 'zones.json'))) store.putDoc('meta', { id: 'zones', map: read('zones.json'), version: 1 });
   if (!store.list('users').length) for (const u of DEMO_USERS) store.putDoc('users', makeUser(u));
+  for (const u of DEMO_USERS) if (!store.doc('users', u.username)) store.putDoc('users', makeUser(u)); // accounts added in later releases
+  // fleet planning (Truck Planning Management workbook)
+  for (const c of ['fleet', 'routes', 'requests', 'allocations']) if (!store.list(c).length && exists(c + '.json')) for (const d of read(c + '.json')) store.putDoc(c, Object.assign({ version: 1 }, d));
+  if (!store.doc('meta', 'planning') && exists('planning.json')) store.putDoc('meta', Object.assign({ version: 1 }, read('planning.json'), { id: 'planning' }));
   store.audit({ id: 'a-seed-' + Date.now().toString(36), ts: new Date().toISOString(), user: 'system', userName: 'Seed script', role: '', action: 'import', entity: 'workbook', entityId: 'Haulage_Billing_Sheet_September_R2', label: 'Workbook data loaded', changes: [] });
   db.exec('COMMIT');
 } catch (e) { db.exec('ROLLBACK'); throw e; }
-console.log(`assets ${store.list('assets').length}, clients ${store.list('clients').length}, rates ${store.list('rates').length}, users ${store.list('users').length}`);
+console.log(`assets ${store.list('assets').length}, clients ${store.list('clients').length}, rates ${store.list('rates').length}, users ${store.list('users').length}, fleet ${store.list('fleet').length}, routes ${store.list('routes').length}, requests ${store.list('requests').length}, allocations ${store.list('allocations').length}`);
 console.log('Demo accounts: ' + DEMO_USERS.map((u) => `${u.username}/${u.password}`).join('  '));

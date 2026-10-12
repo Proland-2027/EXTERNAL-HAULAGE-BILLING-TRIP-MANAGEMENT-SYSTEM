@@ -1,29 +1,34 @@
 /* Base store: in-memory state, computed trips, auditing and conflict checks. Adapters implement the primitive I/O. */
 (function () {
   'use strict';
-  const E = HB.engine, U = HB.U;
+  const E = HB.engine, P = HB.planning, U = HB.U; const clean = E.clean;
 
-  const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users'];
+  const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs'];
   const DEMO_USERS = [
     { username: 'admin', name: 'Adaeze Okonkwo', role: 'admin', password: 'Admin@2026' },
     { username: 'ops', name: 'Musa Bello', role: 'operations', password: 'Ops@2026' },
     { username: 'billing', name: 'Funke Adeyemi', role: 'billing', password: 'Billing@2026' },
     { username: 'finance', name: 'Chidi Nwosu', role: 'finance', password: 'Finance@2026' },
     { username: 'manager', name: 'Ibrahim Lawal', role: 'management', password: 'Manager@2026' },
+    { username: 'tracking', name: 'Ngozi Eze', role: 'tracking', password: 'Tracking@2026' },
+    { username: 'planner', name: 'Tunde Bakare', role: 'planning', password: 'Planner@2026' },
   ];
   const DEFAULT_SETTINGS = { company: 'JMG Limited', companyShort: 'JMG', address: '', phone: '', email: '', website: '', tin: '', rcNumber: '', logo: '', vatRate: 0.075, paymentTermsDays: 7, bankName: '', accountName: '', accountNumber: '', invoiceNote: 'Thank you for your business.', currency: 'NGN' };
 
   class BaseStore {
     constructor() {
       this.mode = 'base'; this.live = false; this.user = null; this.listeners = new Set();
-      this.state = { settings: Object.assign({}, DEFAULT_SETTINGS), clients: [], assets: [], rates: [], trips: new Map(), invoices: [], payments: [], users: [], locations: [], zones: {}, audit: [] };
+      this.state = { settings: Object.assign({}, DEFAULT_SETTINGS), clients: [], assets: [], rates: [], trips: new Map(), invoices: [], payments: [], users: [], locations: [], zones: {}, audit: [], fleet: [], routes: [], requests: [], allocations: [], waybilldocs: [], planning: {} };
       this._computed = null;
     }
     subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
     emit(evt) { this._computed = null; for (const fn of this.listeners) { try { fn(evt || {}); } catch (e) { console.error(e); } } }
 
     // ---------- derived data
-    ctx() { return { settings: this.state.settings, assets: this.state.assets, rates: this.state.rates, zones: this.state.zones, clients: this.state.clients }; }
+    ctx() { return { settings: this.state.settings, assets: this.state.assets, rates: this.state.rates, zones: this.state.zones, clients: this.state.clients, invoices: this.state.invoices, planning: this.state.planning }; }
+    /** Context for the fleet-planning engine (FMR, planner, runway, KPIs). */
+    planningCtx() { return { planning: this.state.planning, routes: this.state.routes, fleet: this.state.fleet, requests: this.state.requests, allocations: this.state.allocations, trips: this.trips(), invoices: this.state.invoices, setup: P ? P.setupOf(this.state.planning) : {}, today: U.todayISO(), now: U.nowISO() }; }
+    planningSetup() { return P ? P.setupOf(this.state.planning) : {}; }
     trips() {
       if (!this._computed) { const ctx = this.ctx(); this._computed = [...this.state.trips.values()].filter((t) => !t._del).map((t) => E.computeTrip(t, ctx)); }
       return this._computed;
@@ -91,14 +96,27 @@
       // Truck Batch is snapshotted on the trip so history stays accurate if the vehicle is reclassified later.
       if (!current || current.plate !== trip.plate || current.dateDispatched !== trip.dateDispatched || !trip.truckBatch) trip.truckBatch = E.batchOn(asset, trip.dateDispatched);
       if (!trip.vatTreatment) trip.vatTreatment = 'exclusive';
-      const errors = E.validateTrip(trip, this.ctx()); if (errors.length && !opts.force) { const err = new Error(errors.join(' ')); err.code = 'invalid'; err.errors = errors; throw err; }
+      if (trip.journeyPlanId) trip.journeyPlanId = E.clean(trip.journeyPlanId).toUpperCase();
+      if (clean(trip.waybill) && !trip.waybillEnteredAt) trip.waybillEnteredAt = U.nowISO();
+      if (!clean(trip.waybill)) trip.waybillEnteredAt = '';
+      // Trip IDs come from Power Apps: validate the format and reject duplicates across the Trip Log
+      const errors = E.validateTrip(trip, Object.assign(this.ctx(), { trips: [...this.state.trips.values()] })); if (errors.length && !opts.force) { const err = new Error(errors.join(' ')); err.code = 'invalid'; err.errors = errors; throw err; }
       this.stamp(trip, !current);
       const changes = this.diff(current, trip);
       const entry = this.auditEntry({ action: current ? 'update' : 'create', entity: 'trip', entityId: trip.id, label: `${trip.client} · ${trip.plate} · ${trip.dateDispatched}`, changes });
       trip.history = [...(current && current.history || []), { ts: entry.ts, user: entry.userName, changes }].slice(-40);
       await this.writeTrip(trip, current);
       await this.writeAudit(entry);
+      // keep the allocation chain in step: a trip created from an allocation marks it Deployed and carries the Trip ID back
+      if (trip.allocationId && this.state.allocations && !this.serverLinksAllocations) { const a = this.state.allocations.find((x) => x.id === trip.allocationId); if (a && (a.tripLogId !== trip.id || (trip.journeyPlanId && a.tripId !== trip.journeyPlanId))) { const patch = { id: a.id, tripLogId: trip.id }; if (a.status === 'Planned') patch.status = 'Deployed'; if (trip.journeyPlanId && a.tripId !== trip.journeyPlanId) { patch.tripId = trip.journeyPlanId; patch.tripIdAt = U.nowISO(); patch.tripIdBy = this.user ? this.user.username : 'system'; } try { await this.saveDoc('allocations', patch, { expectedVersion: a.version, label: `${a.id} linked to trip` }); } catch (e) { console.warn('allocation link failed', e); } } }
       return trip;
+    }
+    /** Planning settings (statuses, repositioning rules, thresholds) live in meta/planning. */
+    async savePlanning(patch) {
+      const before = this.state.planning || {}; const next = Object.assign({}, before, patch, { id: 'planning' }); this.stamp(next, !before.version);
+      await this.writeDoc('meta', 'planning', next);
+      await this.writeAudit(this.auditEntry({ action: 'update', entity: 'settings', entityId: 'planning', label: 'Fleet planning settings', changes: this.diff(before, next) }));
+      return next;
     }
     async deleteTrip(id) {
       const current = this.state.trips.get(id); if (!current) return;
@@ -131,7 +149,7 @@
     // apply a document coming from storage into state
     applyDoc(collection, id, data) {
       if (collection === 'settings') { this.state.settings = Object.assign({}, DEFAULT_SETTINGS, data || {}); return; }
-      if (collection === 'meta') { if (id === 'locations') this.state.locations = (data && data.list) || []; if (id === 'zones') this.state.zones = (data && data.map) || {}; return; }
+      if (collection === 'meta') { if (id === 'locations') this.state.locations = (data && data.list) || []; if (id === 'zones') this.state.zones = (data && data.map) || {}; if (id === 'planning') this.state.planning = data || {}; return; }
       if (collection === 'tripchunks') { for (const [tid, t] of Object.entries((data && data.trips) || {})) { if (t && t._del) this.state.trips.delete(tid); else if (t) this.state.trips.set(tid, t); } return; }
       if (collection === 'trips') { if (!data || data._del) this.state.trips.delete(id); else this.state.trips.set(id, data); return; }
       if (!this.state[collection]) return;

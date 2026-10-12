@@ -1,7 +1,7 @@
 /* Trip Log: spreadsheet-style grid with inline editing, filters, detail form, import and export. */
 (function () {
   'use strict';
-  const U = HB.U, E = HB.engine, h = U.h;
+  const U = HB.U, E = HB.engine, P = HB.planning, h = U.h;
   HB.views = HB.views || {};
 
   const COLS = [
@@ -17,10 +17,12 @@
     { key: 'contractType', label: 'Contract', w: 80, edit: 'text' },
     { key: 'loadingFrom', label: 'Loading From', w: 120, edit: 'location' },
     { key: 'loadingTo', label: 'Loading To', w: 120, edit: 'location' },
-    { key: 'journeyPlanId', label: 'Journey Plan', w: 100, edit: 'text' },
+    { key: 'journeyPlanId', label: 'Trip ID (Power Apps)', w: 120, edit: 'text', tripId: true },
+    { key: 'allocationId', label: 'Allocation', w: 120, alloc: true },
     { key: 'waybill', label: 'Waybill No.', w: 130, edit: 'text' },
+    { key: 'waybillStatus', label: 'Waybill Status', w: 160, wbstatus: true },
     { key: 'returnWaybill', label: 'Return WB', w: 100, edit: 'enum', options: E.RETURN_WAYBILL },
-    { key: 'invoiceStatus', label: 'Invoice Status', w: 130, edit: 'enum', options: E.INVOICE_STATUSES },
+    { key: 'invoiceStatus', label: 'Invoice Status (auto)', w: 140, invstatus: true },
     { key: 'agreedPrice', label: 'Agreed Client Price (₦)', w: 150, money: true, agreed: true },
     { key: 'sellingPrice', label: 'Selling Price (₦)', w: 140, money: true, edit: 'money' },
     { key: 'variance', label: 'Variance (₦)', w: 130, money: true, variance: true },
@@ -41,6 +43,8 @@
     { key: 'note', label: 'Notes', w: 160, edit: 'text' },
   ];
   const PAGE = 100;
+  const INV_KIND = { 'Not Invoiced': 'bad', 'Draft Invoice': 'info', 'Invoice Issued': 'warn', 'Invoice Sent': 'good', 'Partially Invoiced': 'warn', 'Invoice Voided': 'neutral', 'Internal Client': 'neutral' };
+  const WB_KIND = { 'Awaiting Waybill': 'bad', 'Waybill Number Entered': 'warn', 'Waybill Received': 'info', 'Waybill Verification Pending': 'warn', 'Waybill Verified': 'good' };
   const view = { title: 'Trip Log', filters: U.storage.get('hb_trip_filters', {}), sort: { key: 'dateDispatched', dir: 'desc' }, page: 0, pending: new Map(), showFilters: false };
 
   view.render = function (root, ctx) {
@@ -59,6 +63,10 @@
     if (c.variance) { if (t.direction === 'na') return ''; return h('span', { class: 'var-' + t.direction, text: c.pct ? U.pct(v) : U.signedMoney(v) }); }
     if (c.money) return U.money(v);
     if (c.status) return U.pill(v, U.statusKind(v));
+    if (c.invstatus) return U.pill(v, INV_KIND[v] || 'neutral');
+    if (c.wbstatus) return U.pill(v, WB_KIND[v] || 'neutral');
+    if (c.tripId) return v ? String(v) : (t.allocationId ? h('span', { class: 'pill warn', text: 'Pending' }) : '');
+    if (c.alloc) return v ? h('a', { href: '#planning', class: 'num', onClick: (e) => { e.preventDefault(); HB.views.planning.openAllocation(view.ctx, v); } }, v) : '';
     if (c.batch) return v ? U.pill(v, v === 'New Batch' ? 'info' : v === 'Old Batch' ? 'neutral' : 'warn') : '';
     if (c.vatLabel) return v === 'inclusive' ? 'Incl. VAT' : 'Excl. VAT';
     if (c.key === 'dateDispatched' || c.key === 'dateDelivered') return U.date(v);
@@ -87,6 +95,7 @@
     const toolbar = h('div', { class: 'toolbar' }, search,
       h('button', { class: 'btn' + (view.showFilters || activeFilters ? ' primary' : ''), onClick: () => { view.showFilters = !view.showFilters; view.draw(); } }, `Filters${activeFilters ? ' (' + activeFilters + ')' : ''}`),
       ctx.can('trip.create') ? h('button', { class: 'btn accent', onClick: () => openDetail(ctx, null) }, '+ New trip') : null,
+      ctx.can('trip.create') ? h('button', { class: 'btn', id: 'btn-from-planning', onClick: () => selectFromPlanning(ctx) }, (() => { const n = store.state.allocations.filter((a) => !a.tripLogId && ['Planned', 'Deployed', 'Loaded'].includes(a.status)).length; return n ? `Select from Fleet Planning (${n})` : 'Select from Fleet Planning'; })()) : null,
       ctx.can('trip.import') ? h('button', { class: 'btn', onClick: () => importDialog(ctx) }, 'Import Excel') : null,
       ctx.can('export') ? h('button', { class: 'btn', onClick: () => HB.exporter.xlsx([{ name: 'Trip Log', rows: HB.exporter.tripsToRows(rows) }], `Trip_Log_${U.todayISO()}.xlsx`) }, 'Export Excel') : null,
       h('span', { class: 'muted small grow', style: { textAlign: 'right' }, text: `${U.int(rows.length)} of ${U.int(store.trips().length)} trips` }));
@@ -153,6 +162,7 @@
       U.field('VAT basis', U.select([['', 'All'], ['exclusive', 'Price Excluding VAT'], ['inclusive', 'Price Including VAT']], f.vatTreatment || '', { onChange: set('vatTreatment') })),
       U.field('Payment status', U.select(opt(E.PAYMENT_STATUSES), f.paymentStatus || '', { onChange: set('paymentStatus') })),
       U.field('Invoice status', U.select(opt(E.INVOICE_STATUSES), f.invoiceStatus || '', { onChange: set('invoiceStatus') })),
+      U.field('Waybill status', U.select(opt(E.WAYBILL_STATUSES), f.waybillStatus || '', { onChange: set('waybillStatus') })),
       U.field('Trip status', U.select(opt(E.TRIP_STATUSES), f.tripStatus || '', { onChange: set('tripStatus') })),
       U.field('Price vs agreed', U.select([['', 'All'], ['below', 'Below agreed rate'], ['above', 'Above agreed rate'], ['none', 'No agreed rate']], f.variance || '', { onChange: set('variance') })),
       h('button', { class: 'btn', onClick: () => { view.filters = {}; persist(); view.draw(); } }, 'Clear filters'));
@@ -220,22 +230,28 @@
   // ---------------------------------------------------------------- detail form
   function openDetail(ctx, id) {
     const { store } = ctx; const raw = id ? store.raw(id) : null; const computed = id ? store.trip(id) : null;
-    const t = Object.assign({ dateDispatched: U.todayISO(), dateDelivered: '', plate: '', client: '', loadingFrom: '', loadingTo: '', journeyPlanId: '', waybill: '', returnWaybill: '', invoiceStatus: 'Invoice Not Sent', sellingPrice: null, vatTreatment: 'exclusive', quoteNo: '', soNo: '', manualInvoiceNo: '', paymentStatus: 'Not Paid', advance: null, contractType: '', note: '' }, raw || {});
+    const t = Object.assign({ dateDispatched: U.todayISO(), dateDelivered: '', plate: '', client: '', loadingFrom: '', loadingTo: '', journeyPlanId: '', waybill: '', returnWaybill: '', invoiceStatus: 'Not Invoiced', sellingPrice: null, vatTreatment: 'exclusive', quoteNo: '', soNo: '', manualInvoiceNo: '', paymentStatus: 'Not Paid', advance: null, contractType: '', note: '', waybillReceivedAt: '', waybillReceivedBy: '', waybillDocId: '', waybillDocName: '', internalClient: false }, raw || {});
+    const readInput = (inp) => (inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? (inp.value === '' ? null : Number(inp.value)) : inp.value);
     if (!id && !ctx.can('trip.create')) return U.toast('Your role cannot create trips.', 'bad');
     const inputs = {};
     const fld = (key, label, control, opts) => { inputs[key] = control.tagName === 'SPAN' ? control.querySelector('input') : control; const locked = !ctx.canField(key) && !(id === null && ctx.can('trip.create') && E.ROLE_FIELDS.operations.includes(key)); if (locked) { inputs[key].disabled = true; } return U.field(label, control, Object.assign({ locked }, opts || {})); };
     const preview = h('div', { class: 'card stack', style: { gap: '6px' } });
     const recompute = () => {
-      const draft = Object.assign({}, t); for (const k of Object.keys(inputs)) draft[k] = inputs[k].type === 'number' ? (inputs[k].value === '' ? null : Number(inputs[k].value)) : inputs[k].value;
+      const draft = Object.assign({}, t); for (const k of Object.keys(inputs)) draft[k] = readInput(inputs[k]);
       const c = E.computeTrip(draft, store.ctx()); U.clear(preview);
       const line = (k, v, cls) => h('div', { class: 'row between' }, h('span', { class: 'muted small', text: k }), h('span', { class: 'num ' + (cls || ''), text: v }));
-      preview.append(h('div', { class: 'label', text: 'Calculated (from Selling Price)' }),
+      U.append(preview, [h('div', { class: 'label', text: 'Calculated (from Selling Price)' }),
         line('Agreed Client Price', c.agreedStatus === 'multiple' ? 'Multiple rates — choose below' : c.agreedPrice === null ? 'No Agreed Rate Found' : U.money(c.agreedPrice)),
         line('Price variance', c.direction === 'na' ? '—' : `${U.signedMoney(c.variance)} (${U.pct(c.variancePct)})`, 'var-' + c.direction),
         line('Net sales excl. VAT', U.money(c.netSales, { blank: '—' })), line(`VAT (${(E.vatRateOf(store.state.settings) * 100).toFixed(1)}%)`, U.money(c.vat, { blank: '—' })), line('Billing after VAT', U.money(c.billing, { blank: '—' })), line('Amount paid', U.money(c.amountPaid, { blank: '—' })), line('Balance', U.money(c.balance, { blank: '—' })),
         h('div', { class: 'row between' }, h('span', { class: 'muted small', text: 'Trip status' }), U.pill(c.tripStatus, U.statusKind(c.tripStatus))),
+        h('div', { class: 'row between' }, h('span', { class: 'muted small', text: 'Invoice status (automatic)' }), h('span', { class: 'row' }, U.pill(c.invoiceStatus, INV_KIND[c.invoiceStatus] || 'neutral'), c.invoiceNo ? h('span', { class: 'tiny muted', text: c.invoiceNo }) : null)),
+        c.invoiceIssuedAt || c.invoiceSentAt ? line('Issued / sent', [c.invoiceIssuedAt ? 'issued ' + U.date(c.invoiceIssuedAt) : '', c.invoiceSentAt ? 'sent ' + U.date(c.invoiceSentAt) : ''].filter(Boolean).join(' · ')) : null,
+        h('div', { class: 'row between' }, h('span', { class: 'muted small', text: 'Payment' }), U.pill(c.paymentLabel, c.paymentLabel === 'Paid' ? 'good' : c.paymentLabel === 'Part Paid' ? 'info' : 'bad')),
+        h('div', { class: 'row between' }, h('span', { class: 'muted small', text: 'Waybill status (automatic)' }), U.pill(c.waybillStatus, WB_KIND[c.waybillStatus] || 'neutral')),
+        (() => { const v = E.clean(draft.journeyPlanId); if (v && !E.tripIdValid(v, store.planningSetup().tripIdPattern)) return h('div', { class: 'notice bad', text: 'Trip ID is not in the Power Apps format. It must be copied from Power Apps, never invented here.' }); if (v) { const dup = E.findDuplicateTripId(v, [...store.state.trips.values()], id); if (dup) return h('div', { class: 'notice bad', text: `Trip ID ${v} is already on another trip (${dup.client}, ${U.date(dup.dateDispatched)}).` }); } return null; })(),
         c.vehicleType ? line('Vehicle', `${c.assetCode} · ${c.vehicleType} · ${c.vehicleCategory} · ${c.costCenter}`) : null,
-        c.truckBatch ? h('div', { class: 'row between' }, h('span', { class: 'muted small', text: 'Truck Batch' }), U.pill(c.truckBatch, c.truckBatch === 'New Batch' ? 'info' : 'neutral')) : null);
+        c.truckBatch ? h('div', { class: 'row between' }, h('span', { class: 'muted small', text: 'Truck Batch' }), U.pill(c.truckBatch, c.truckBatch === 'New Batch' ? 'info' : 'neutral')) : null]);
       if (c.agreedCandidates && c.agreedCandidates.length > 1 && ctx.canField('agreedRateId')) {
         const sel = U.select([['', 'Automatic (priority rule)'], ...c.agreedCandidates.map((r) => [r.id, `${U.money(r.price)} · ${r.contractType || 'any contract'} · from ${U.date(r.effectiveDate)}`])], draft.agreedRateId || '', { onChange: (e) => { t.agreedRateId = e.target.value; recompute(); } });
         preview.append(U.field('Agreed rate to apply', sel));
@@ -250,10 +266,11 @@
       fld('contractType', 'Contract Type', h('input', { type: 'text', value: t.contractType || '', onInput })),
       fld('loadingFrom', 'Loading From', U.datalistInput('dl-loc-f1', store.locationNames(), t.loadingFrom, { onInput })),
       fld('loadingTo', 'Loading To', U.datalistInput('dl-loc-f2', store.locationNames(), t.loadingTo, { onInput })),
-      fld('journeyPlanId', 'Journey Plan ID', h('input', { type: 'text', value: t.journeyPlanId || '' })),
-      fld('waybill', 'Client Waybill Number', h('input', { type: 'text', value: t.waybill || '' })),
-      fld('returnWaybill', 'Return Waybill Received', U.select(E.RETURN_WAYBILL.map((o) => [o, o || '—']), t.returnWaybill)),
-      fld('invoiceStatus', 'Invoice Status', U.select(E.INVOICE_STATUSES, t.invoiceStatus, { onChange: onInput })),
+      fld('journeyPlanId', 'Trip ID (from Power Apps)', h('input', { type: 'text', value: t.journeyPlanId || '', placeholder: t.allocationId ? 'Pending from Power Apps' : '', onInput }), { help: t.tripIdSource === 'powerapps' ? 'Received from Power Apps.' : 'Enter the ID issued by Power Apps. Left blank = Trip ID pending; the app never generates one.' }),
+      fld('waybill', 'Client Waybill Number', h('input', { type: 'text', value: t.waybill || '', onInput }), { help: t.waybillEnteredAt ? `Entered ${U.dateTime(t.waybillEnteredAt)}` : 'Can be added later; the status stays "Awaiting Waybill" until then.' }),
+      fld('waybillReceivedAt', 'Physical waybill received on', h('input', { type: 'date', value: (t.waybillReceivedAt || '').slice(0, 10), onInput }), { help: t.waybillReceivedBy ? `Received by ${t.waybillReceivedBy}` : 'Date the paper copy came back.' }),
+      fld('returnWaybill', 'Return Waybill Received', U.select(E.RETURN_WAYBILL.map((o) => [o, o || '—']), t.returnWaybill, { onChange: onInput })),
+      fld('internalClient', 'Internal client trip (not billed)', h('input', { type: 'checkbox', checked: t.internalClient ? true : null, onChange: onInput, style: { width: 'auto', justifySelf: 'start' } })),
       fld('sellingPrice', 'Selling Price (₦) — manual entry', h('input', { type: 'number', step: '0.01', min: '0', value: t.sellingPrice ?? '', onInput }), { help: 'Never auto-filled from the agreed rate.' }),
       fld('vatTreatment', 'VAT Treatment', U.select(E.VAT_TREATMENTS.map((v) => [v, E.VAT_TREATMENT_LABELS[v]]), t.vatTreatment || 'exclusive', { onChange: onInput }), { help: 'Set by the invoice price type; "Including VAT" extracts VAT from the selling price.' }),
       fld('quoteNo', 'Quote Number', h('input', { type: 'text', value: t.quoteNo || '' })),
@@ -263,22 +280,80 @@
       fld('advance', 'Advance (₦)', h('input', { type: 'number', step: '0.01', min: '0', value: t.advance ?? '', onInput })),
       fld('note', 'Notes', h('input', { type: 'text', value: t.note || '' }), { span2: true }));
     recompute();
+    const wbDoc = waybillDocBlock(ctx, raw, computed, () => { m.close(); openDetail(ctx, id); });
     const history = h('div', { class: 'history' });
     if (raw && raw.history && raw.history.length) { history.append(h('div', { class: 'label', text: 'Change history' })); for (const hst of [...raw.history].reverse().slice(0, 15)) history.append(h('div', { class: 'h-item' }, h('div', { class: 'h-meta', text: `${U.dateTime(hst.ts)} · ${hst.user}` }), ...(hst.changes || []).slice(0, 8).map((c) => h('div', { class: 'diff' }, `${c.field}: `, h('span', { class: 'from' }, String(c.from ?? '')), h('span', { class: 'to' }, String(c.to ?? '')))))); }
     else if (raw) history.append(h('div', { class: 'muted small', text: `Imported from the workbook (row ${raw.xlRow || '?'}) · created ${U.dateTime(raw.createdAt)}` }));
-    const m = U.modal({ title: id ? `Trip · ${computed.client} · ${U.date(computed.dateDispatched)}` : 'New trip', size: 'wide', body: h('div', { class: 'grid-2' }, h('div', { class: 'stack' }, form, history), preview) });
+    const links = raw && (raw.allocationId || raw.requestId) ? h('div', { class: 'notice info' }, 'Created from Fleet Planning: ', raw.requestId ? h('a', { href: '#planning', onClick: (e) => { e.preventDefault(); m.close(); HB.views.planning.openRequest(ctx, raw.requestId); } }, `request ${raw.requestId}`) : null, raw.requestId && raw.allocationId ? ' · ' : '', raw.allocationId ? h('a', { href: '#planning', onClick: (e) => { e.preventDefault(); m.close(); HB.views.planning.openAllocation(ctx, raw.allocationId); } }, `allocation ${raw.allocationId}`) : null) : null;
+    const m = U.modal({ title: id ? `Trip · ${computed.client} · ${U.date(computed.dateDispatched)}` : 'New trip', size: 'wide', body: h('div', { class: 'grid-2' }, h('div', { class: 'stack' }, links, form, wbDoc, history), preview) });
     const actions = [];
     if (id && ctx.can('trip.delete')) actions.push(h('button', { class: 'btn danger left', onClick: async () => { if (await U.confirm({ title: 'Delete trip', message: 'Delete this trip permanently? The audit trail keeps a record.', okLabel: 'Delete', danger: true })) { await store.deleteTrip(id); m.close(); view.draw(true); U.toast('Trip deleted.'); } } }, 'Delete'));
     actions.push(h('button', { class: 'btn', onClick: () => m.close() }, 'Cancel'));
     if (Object.values(inputs).some((i) => !i.disabled)) actions.push(h('button', { class: 'btn primary', onClick: async () => {
       const patch = { id: id || undefined };
-      for (const [k, inp] of Object.entries(inputs)) if (!inp.disabled) patch[k] = inp.type === 'number' ? (inp.value === '' ? null : Number(inp.value)) : E.clean(inp.value);
+      for (const [k, inp] of Object.entries(inputs)) if (!inp.disabled) patch[k] = inp.type === 'checkbox' ? inp.checked : inp.type === 'number' ? (inp.value === '' ? null : Number(inp.value)) : E.clean(inp.value);
+      if (patch.waybillReceivedAt && !(raw && raw.waybillReceivedAt)) patch.waybillReceivedBy = store.user.username; if (patch.waybillReceivedAt === '') patch.waybillReceivedBy = '';
       if (t.agreedRateId !== undefined) patch.agreedRateId = t.agreedRateId;
       try { const saved = await store.saveTrip(patch, { expectedVersion: raw ? raw.version : undefined }); m.close(); view.pending.delete(saved.id); view.draw(true); U.toast(id ? 'Trip saved.' : 'Trip created.', 'good'); }
       catch (e) { if (e.code === 'conflict') { U.toast('This trip was changed by someone else. Review the latest values and save again.', 'bad'); m.close(); openDetail(ctx, id); } else U.toast(e.message, 'bad'); }
     } }, id ? 'Save changes' : 'Create trip'));
     m.setActions(actions);
   }
+  // ---------------------------------------------------------------- waybill document & verification
+  function waybillDocBlock(ctx, raw, computed, reload) {
+    if (!raw) return null; const { store } = ctx;
+    const doc = raw.waybillDocId ? store.state.waybilldocs.find((d) => d.id === raw.waybillDocId) : null;
+    const canAttach = ctx.canField('waybillDocId'); const canVerify = ctx.can('waybill.verify');
+    const file = h('input', { type: 'file', accept: 'image/*,.pdf' });
+    file.addEventListener('change', async () => {
+      const f = file.files[0]; if (!f) return;
+      try {
+        let data, type = f.type;
+        if (/^image\//.test(f.type)) { data = await new Promise((res, rej) => { const img = new Image(); const url = URL.createObjectURL(f); img.onload = () => { const scale = Math.min(1, 1400 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.8)); }; img.onerror = () => rej(new Error('Could not read the image.')); img.src = url; }); type = 'image/jpeg'; }
+        else { if (f.size > 500 * 1024) throw new Error('PDF is larger than 500 KB. Scan at a lower resolution or attach a photo instead.'); data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Could not read the file.')); r.readAsDataURL(f); }); }
+        if (data.length > 700000) throw new Error('File is too large after compression (limit ~500 KB).');
+        const d = { id: U.id('wb'), tripId: raw.id, name: f.name, type, size: data.length, data, uploadedBy: store.user.username, uploadedAt: U.nowISO() };
+        await store.saveDoc('waybilldocs', d, { label: `Waybill document ${f.name} for trip ${raw.id}`, silent: true });
+        await store.saveTrip({ id: raw.id, waybillDocId: d.id, waybillDocName: f.name, waybillReceivedAt: raw.waybillReceivedAt || U.todayISO(), waybillReceivedBy: raw.waybillReceivedBy || store.user.username }, { expectedVersion: raw.version });
+        U.toast('Waybill document attached.', 'good'); reload();
+      } catch (e) { U.toast(e.message, 'bad'); }
+    });
+    const open = async () => { const d = doc || store.state.waybilldocs.find((x) => x.id === raw.waybillDocId); if (!d) return U.toast('Document not loaded.', 'bad'); const bin = atob(d.data.split(',')[1]); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); await U.download(new Blob([arr], { type: d.type }), d.name || 'waybill'); };
+    return h('div', { class: 'card stack', style: { gap: '6px' } }, h('div', { class: 'row between' }, h('div', { class: 'label', text: 'Waybill documentation' }), U.pill(computed.waybillStatus, WB_KIND[computed.waybillStatus])),
+      h('div', { class: 'small', text: [raw.waybill ? `No. ${raw.waybill}` : 'No waybill number yet', raw.waybillEnteredAt ? `entered ${U.dateTime(raw.waybillEnteredAt)}` : '', raw.waybillReceivedAt ? `physical copy received ${U.date(raw.waybillReceivedAt)} by ${raw.waybillReceivedBy || '—'}` : 'physical copy not yet received', raw.waybillVerifiedAt ? `verified ${U.dateTime(raw.waybillVerifiedAt)} by ${raw.waybillVerifiedBy}` : ''].filter(Boolean).join(' · ') }),
+      h('div', { class: 'row' }, raw.waybillDocId ? h('button', { class: 'btn sm', onClick: open }, `Open ${raw.waybillDocName || 'document'}`) : h('span', { class: 'small muted', text: 'No scan or photo attached.' }), canAttach ? file : null,
+        canVerify && raw.waybillReceivedAt && !raw.waybillVerifiedAt ? h('button', { class: 'btn sm primary', onClick: async () => { try { await store.saveTrip({ id: raw.id, waybillVerifiedAt: U.nowISO(), waybillVerifiedBy: store.user.username }, { expectedVersion: raw.version }); U.toast('Waybill verified.', 'good'); reload(); } catch (e) { U.toast(e.message, 'bad'); } } }, 'Verify waybill') : null,
+        canVerify && raw.waybillVerifiedAt ? h('button', { class: 'btn sm', onClick: async () => { try { await store.saveTrip({ id: raw.id, waybillVerifiedAt: '', waybillVerifiedBy: '' }, { expectedVersion: raw.version }); reload(); } catch (e) { U.toast(e.message, 'bad'); } } }, 'Undo verification') : null));
+  }
+
+  // ---------------------------------------------------------------- create trips from fleet allocations
+  function selectFromPlanning(ctx, preselect) {
+    const { store } = ctx; if (!ctx.can('trip.create')) return U.toast('Your role cannot create trips.', 'bad');
+    const rows = HB.views.planning.allocationRows(store).filter((a) => !a.trip && !a.tripLogId && ['Planned', 'Deployed', 'Loaded'].includes(a.status));
+    const picked = new Set(preselect || []); const dates = new Map(rows.map((a) => [a.id, a.plannedDeploymentDate || a.plannedLoadingDate || U.todayISO()]));
+    const body = h('div', { class: 'stack' }); const m = U.modal({ title: 'Select from Fleet Planning', size: 'wide', body });
+    const draw = () => {
+      U.clear(body);
+      body.append(h('p', { class: 'small muted', text: 'Allocations not yet in the Trip Log. Tick the ones that have been deployed: each creates one trip with the truck, client, route, dates, Request ID and Allocation ID filled in. The Trip ID comes from Power Apps (shown as Pending until it is entered); billing completes the selling price later.' }));
+      if (!rows.length) { body.append(h('div', { class: 'empty', text: 'Every live allocation is already in the Trip Log.' })); m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Close')]); return; }
+      const byReq = new Map(); for (const a of rows) { if (!byReq.has(a.requestId)) byReq.set(a.requestId, []); byReq.get(a.requestId).push(a); }
+      const list = h('div', { class: 'check-list' });
+      for (const [req, as] of byReq) { list.append(h('label', { style: { background: 'var(--surface-2)', fontWeight: 600 } }, h('input', { type: 'checkbox', checked: as.every((a) => picked.has(a.id)) ? true : null, onChange: (e) => { for (const a of as) { if (e.target.checked) picked.add(a.id); else picked.delete(a.id); } draw(); } }), h('span', { text: `Request ${req || '—'} · ${as[0].client} · ${as[0].loadingFrom} → ${as[0].destination}` }), h('span', { class: 'small muted', text: `${as.length} truck${as.length > 1 ? 's' : ''}` })));
+        for (const a of as) list.append(h('label', {}, h('input', { type: 'checkbox', checked: picked.has(a.id) ? true : null, onChange: (e) => { if (e.target.checked) picked.add(a.id); else picked.delete(a.id); draw(); } }), h('span', { class: 'grow' }, `${a.id} · ${a.plate}${a.truckBatch ? ' (' + a.truckBatch + ')' : ''} · planned loading ${U.date(a.plannedLoadingDate)} · `, a.tripId ? h('span', { class: 'num', text: 'Trip ID ' + a.tripId }) : h('span', { class: 'pill warn', text: 'Trip ID pending' }), ' ', U.pill(a.status, a.status === 'Planned' ? 'warn' : 'info')), h('span', { class: 'row small' }, 'Dispatched ', h('input', { type: 'date', value: dates.get(a.id), onChange: (e) => dates.set(a.id, e.target.value), onClick: (e) => e.stopPropagation() })))); }
+      body.append(list);
+      m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Cancel'), h('button', { class: 'btn primary', disabled: picked.size ? null : true, onClick: async () => {
+        let n = 0; const errors = [];
+        for (const a of rows.filter((x) => picked.has(x.id))) {
+          try { await store.saveTrip({ dateDispatched: dates.get(a.id), dateDelivered: '', plate: a.plate, client: a.client, contractType: a.tonnage || '', loadingFrom: a.loadingFrom, loadingTo: a.destination, journeyPlanId: a.tripId || '', waybill: '', returnWaybill: '', invoiceStatus: 'Not Invoiced', sellingPrice: null, vatTreatment: 'exclusive', paymentStatus: 'Not Paid', advance: null, note: '', allocationId: a.id, requestId: a.requestId || '', truckBatch: a.truckBatch || '', source: 'fleet-planning' }); n++; }
+          catch (e) { errors.push(`${a.id}: ${e.message}`); }
+        }
+        m.close(); view.draw(); if (n) U.toast(`${n} trip${n > 1 ? 's' : ''} created from Fleet Planning. Trip IDs show as Pending until entered from Power Apps.`, 'good'); if (errors.length) U.toast(errors.join(' | '), 'bad');
+      } }, `Create ${picked.size || ''} trip${picked.size === 1 ? '' : 's'}`)]);
+    };
+    draw();
+  }
+  view.selectFromPlanning = selectFromPlanning;
+
   function pickRate(ctx, t) {
     const { store } = ctx; if (!ctx.canField('agreedRateId')) return U.toast('Your role cannot choose the agreed rate.', 'bad');
     const list = h('div', { class: 'radio-list' }, t.agreedCandidates.map((r) => h('label', {}, h('input', { type: 'radio', name: 'rate', value: r.id, checked: t.agreedRateId === r.id ? true : null }), h('span', { class: 'grow' }, `${U.money(r.price)} · ${r.contractType || 'any contract type'} · effective ${U.date(r.effectiveDate)}${r.expiryDate ? ' to ' + U.date(r.expiryDate) : ''}`, r.remarks ? h('div', { class: 'small muted', text: r.remarks }) : null))));

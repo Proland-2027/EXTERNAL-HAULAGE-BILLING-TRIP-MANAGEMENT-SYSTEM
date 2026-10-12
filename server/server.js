@@ -15,13 +15,16 @@ const path = require('path');
 const crypto = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
 const E = require('../js/core/engine.js');
+const P = require('../js/core/planning.js');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = Number(process.env.PORT || 8080);
 const DB_PATH = process.env.DB || path.join(ROOT, 'data', 'haulage.db');
 const SECURE_COOKIE = process.env.SECURE_COOKIE === '1';
-const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'settings', 'meta'];
-const COLLECTION_ACTION = { clients: 'client.manage', assets: 'asset.manage', rates: 'rate.manage', invoices: 'invoice.manage', payments: 'payment.manage', users: 'user.manage', settings: 'settings.manage', meta: 'settings.manage' };
+const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'settings', 'meta', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs'];
+const COLLECTION_ACTION = { clients: 'client.manage', assets: 'asset.manage', rates: 'rate.manage', invoices: 'invoice.manage', payments: 'payment.manage', users: 'user.manage', settings: 'settings.manage', meta: 'settings.manage', fleet: 'fmr.update', routes: 'planning.manage', requests: 'request.manage', allocations: 'planning.manage', waybilldocs: 'trip.edit' };
+// Power Apps integration: an API key lets Power Automate post Trip IDs (see docs/DEPLOYMENT.md). Empty = endpoint disabled.
+const POWERAPPS_API_KEY = process.env.POWERAPPS_API_KEY || '';
 
 // ------------------------------------------------------------------ database
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
@@ -121,8 +124,8 @@ const routes = {
   'POST /api/logout': (req, res) => { const t = cookieToken(req); if (t) q.delSession.run(t); res.setHeader('Set-Cookie', 'hb_session=; Path=/; HttpOnly; Max-Age=0'); return { ok: true }; },
   'GET /api/me': (req) => ({ user: currentUser(req) }),
   'GET /api/bootstrap': (req) => {
-    const user = requireUser(req); const out = { user, settings: store.settings(), trips: store.trips(), seq: q.maxSeq.get().seq, locations: ((store.doc('meta', 'locations') || {}).list) || [], zones: ((store.doc('meta', 'zones') || {}).map) || {} };
-    for (const c of ['clients', 'assets', 'rates', 'invoices', 'payments']) out[c] = store.list(c);
+    const user = requireUser(req); const out = { user, settings: store.settings(), trips: store.trips(), seq: q.maxSeq.get().seq, locations: ((store.doc('meta', 'locations') || {}).list) || [], zones: ((store.doc('meta', 'zones') || {}).map) || {}, planning: store.doc('meta', 'planning') || {} };
+    for (const c of ['clients', 'assets', 'rates', 'invoices', 'payments', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs']) out[c] = store.list(c);
     out.users = store.list('users').map((u) => (E.can(user.role, 'user.manage') ? Object.assign({}, u, { hash: undefined, salt: undefined }) : publicUser(u)));
     return out;
   },
@@ -140,11 +143,12 @@ const routes = {
     const incoming = Object.assign({}, body || {}, { id: params.id });
     // field-level permission: a role may only change the fields it owns
     const allowed = new Set(E.ROLE_FIELDS[user.role] || []);
-    const protectedKeys = ['dateDispatched', 'dateDelivered', 'plate', 'contractType', 'client', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'returnWaybill', 'invoiceStatus', 'sellingPrice', 'vatTreatment', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceNo', 'invoiceId', 'paymentStatus', 'advance', 'note', 'agreedRateId', 'amountPaidOverride'];
+    const protectedKeys = ['dateDispatched', 'dateDelivered', 'plate', 'contractType', 'client', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'returnWaybill', 'invoiceStatus', 'sellingPrice', 'vatTreatment', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceNo', 'invoiceId', 'paymentStatus', 'advance', 'note', 'agreedRateId', 'amountPaidOverride',
+      'allocationId', 'requestId', 'waybillEnteredAt', 'waybillReceivedAt', 'waybillReceivedBy', 'waybillDocId', 'waybillDocName', 'waybillVerifiedAt', 'waybillVerifiedBy', 'internalClient', 'tripIdSource'];
     const next = Object.assign({}, current || {}, { id: params.id });
     for (const k of protectedKeys) {
       if (incoming[k] === undefined) continue; // absent keys are left unchanged (partial updates allowed)
-      const defaults = { invoiceStatus: 'Invoice Not Sent', paymentStatus: 'Not Paid', returnWaybill: '', vatTreatment: 'exclusive' };
+      const defaults = { invoiceStatus: 'Not Invoiced', paymentStatus: 'Not Paid', returnWaybill: '', vatTreatment: 'exclusive', internalClient: false };
       const before = current ? current[k] : defaults[k], after = incoming[k];
       const changed = JSON.stringify(before === undefined || before === null ? '' : before) !== JSON.stringify(after === undefined || after === null ? '' : after);
       if (changed && !allowed.has(k) && user.role !== 'admin') throw new HttpError(403, `Your role cannot change "${k}".`, { code: 'forbidden' });
@@ -155,12 +159,41 @@ const routes = {
     const asset = E.assetFor(next.plate, store.list('assets')); if (asset) { next.assetCode = asset.assetCode; next.vehicleType = asset.vehicleType; next.vehicleCategory = asset.vehicleCategory; next.costCenter = asset.costCenter; }
     if (!current || current.plate !== next.plate || current.dateDispatched !== next.dateDispatched || !next.truckBatch) next.truckBatch = E.batchOn(asset, next.dateDispatched);
     if (!next.vatTreatment) next.vatTreatment = 'exclusive';
-    const errors = E.validateTrip(next, { assets: store.list('assets') }); if (errors.length) throw new HttpError(400, errors.join(' '), { code: 'invalid', errors });
+    if (next.journeyPlanId) next.journeyPlanId = E.clean(next.journeyPlanId).toUpperCase();
+    if (E.clean(next.waybill) && !next.waybillEnteredAt) next.waybillEnteredAt = nowISO(); if (!E.clean(next.waybill)) next.waybillEnteredAt = '';
+    const errors = E.validateTrip(next, { assets: store.list('assets'), trips: next.journeyPlanId ? store.trips() : [], planning: store.doc('meta', 'planning') || {} }); if (errors.length) throw new HttpError(400, errors.join(' '), { code: 'invalid', errors });
     const ts = nowISO(); if (!current) { next.createdAt = ts; next.createdBy = user.username; } next.updatedAt = ts; next.updatedBy = user.username; next.version = Number(current ? current.version : 0) + 1;
     const changes = diff(current, next); next.history = [...(current && current.history || []), { ts, user: user.name, changes }].slice(-40);
     const label = `${next.client} · ${next.plate} · ${next.dateDispatched}`;
-    db.exec('BEGIN'); try { store.putTrip(next); store.audit(auditEntry(user, current ? 'update' : 'create', 'trip', next.id, label, changes)); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
+    db.exec('BEGIN'); try {
+      store.putTrip(next); store.audit(auditEntry(user, current ? 'update' : 'create', 'trip', next.id, label, changes));
+      // allocation chain: the trip created from an allocation marks it Deployed and carries the Trip ID back
+      if (next.allocationId) { const a = store.doc('allocations', next.allocationId); if (a && (a.tripLogId !== next.id || (next.journeyPlanId && a.tripId !== next.journeyPlanId))) { const na = Object.assign({}, a, { tripLogId: next.id, status: a.status === 'Planned' ? 'Deployed' : a.status, updatedAt: ts, updatedBy: user.username, version: Number(a.version || 1) + 1 }); if (next.journeyPlanId && a.tripId !== next.journeyPlanId) { na.tripId = next.journeyPlanId; na.tripIdAt = ts; na.tripIdBy = user.username; } store.putDoc('allocations', na); store.audit(auditEntry(user, 'update', 'allocations', na.id, `${na.id} linked to trip`, diff(a, na))); } }
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
     return next;
+  },
+  /**
+   * Power Apps → Trip ID. Power Automate (or any client holding the API key) posts
+   *   { "allocationId": "ALC-261013-01", "tripId": "TRP-00123" }  or  { "tripLogId": "...", "tripId": "..." }
+   * The Trip ID is validated against the configured pattern and must be unique; the app never generates one itself.
+   */
+  'POST /api/integrations/powerapps/trip-id': (req, res, body) => {
+    if (!POWERAPPS_API_KEY) throw new HttpError(404, 'Power Apps integration is not enabled on this server (set POWERAPPS_API_KEY).');
+    if ((req.headers['x-api-key'] || '') !== POWERAPPS_API_KEY) throw new HttpError(401, 'Invalid API key', { code: 'auth' });
+    const tripId = E.clean(body && body.tripId).toUpperCase(); const planning = store.doc('meta', 'planning') || {};
+    if (!tripId || !E.tripIdValid(tripId, P.setupOf(planning).tripIdPattern)) throw new HttpError(400, 'Trip ID missing or not in the expected format', { code: 'invalid' });
+    const dup = E.findDuplicateTripId(tripId, store.trips(), null); if (dup) throw new HttpError(409, `Trip ID ${tripId} is already on trip ${dup.id}`, { code: 'duplicate', tripLogId: dup.id });
+    const sys = { username: 'powerapps', name: 'Power Apps', role: 'integration' }; const ts = nowISO();
+    let alloc = body && body.allocationId ? store.doc('allocations', String(body.allocationId)) : null; let trip = body && body.tripLogId ? store.trip(String(body.tripLogId)) : null;
+    if (!alloc && !trip) throw new HttpError(404, 'allocationId or tripLogId not found');
+    if (alloc && !trip && alloc.tripLogId) trip = store.trip(alloc.tripLogId);
+    db.exec('BEGIN'); try {
+      if (alloc) { const na = Object.assign({}, alloc, { tripId, tripIdAt: ts, tripIdBy: 'powerapps', updatedAt: ts, updatedBy: 'powerapps', version: Number(alloc.version || 1) + 1 }); store.putDoc('allocations', na); store.audit(auditEntry(sys, 'update', 'allocations', na.id, `Trip ID ${tripId} received from Power Apps`, diff(alloc, na))); }
+      if (trip) { const nt = Object.assign({}, trip, { journeyPlanId: tripId, tripIdSource: 'powerapps', updatedAt: ts, updatedBy: 'powerapps', version: Number(trip.version || 1) + 1 }); nt.history = [...(trip.history || []), { ts, user: 'Power Apps', changes: diff(trip, nt) }].slice(-40); store.putTrip(nt); store.audit(auditEntry(sys, 'update', 'trip', nt.id, `Trip ID ${tripId} received from Power Apps`, diff(trip, nt))); }
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
+    return { ok: true, tripId, allocationId: alloc ? alloc.id : null, tripLogId: trip ? trip.id : null };
   },
   'DELETE /api/trips/:id': (req, res, body, url, params) => { const user = requireUser(req); requireAction(user, 'trip.delete'); const cur = store.trip(params.id); if (!cur) throw new HttpError(404, 'Trip not found'); db.exec('BEGIN'); try { store.delTrip(params.id); store.audit(auditEntry(user, 'delete', 'trip', params.id, `${cur.client} · ${cur.plate} · ${cur.dateDispatched}`, [])); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } return { ok: true }; },
   'POST /api/trips/bulk': (req, res, body) => {
@@ -175,12 +208,16 @@ const routes = {
   'PUT /api/:collection/:id': (req, res, body, url, params) => {
     const user = requireUser(req); const c = params.collection; if (!COLLECTIONS.includes(c)) throw new HttpError(404, 'Unknown collection');
     requireAction(user, COLLECTION_ACTION[c]);
-    const current = store.doc(c, params.id); const incoming = Object.assign({}, body || {}, { id: params.id });
+    const current = store.doc(c, params.id); const incoming = Object.assign({}, body || {}, { id: params.id }); const ts0 = nowISO();
     if (current && incoming.version !== undefined && Number(incoming.version) !== Number(current.version) + 1 && Number(incoming.version) !== Number(current.version)) throw new HttpError(409, 'This record was changed by someone else.', { code: 'conflict', current });
     const next = Object.assign({}, current || {}, incoming);
     if (c === 'users') { if (current) { next.hash = current.hash; next.salt = current.salt; } else { if (!incoming.hash || !incoming.salt) throw new HttpError(400, 'New users need a password'); } if (current && current.username === user.username && next.active === false) throw new HttpError(400, 'You cannot disable your own account.'); }
-    const ts = nowISO(); if (!current) { next.createdAt = next.createdAt || ts; next.createdBy = user.username; } next.updatedAt = ts; next.updatedBy = user.username; next.version = Number(current ? current.version : 0) + 1;
-    db.exec('BEGIN'); try { store.putDoc(c, next); if (c !== 'meta') store.audit(auditEntry(user, current ? 'update' : 'create', c, next.id, next.name || next.number || next.plate || next.id, diff(current, next))); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
+    if (c === 'allocations' && next.status !== 'Cancelled' && next.plannedLoadingDate && next.backOnGround) { const clash = P.bookingConflicts(next.plate, next.plannedLoadingDate, next.backOnGround, store.list('allocations'), next.id); if (clash.length && !incoming.allowDoubleBooking) throw new HttpError(409, `${next.plate} is already allocated to ${clash[0].client} (${clash[0].id}) over these days.`, { code: 'double_booking', conflicts: clash.map((x) => x.id) }); }
+    if (c === 'allocations' && next.tripId) { next.tripId = E.clean(next.tripId).toUpperCase(); const planning = store.doc('meta', 'planning') || {}; if (!E.tripIdValid(next.tripId, P.setupOf(planning).tripIdPattern)) throw new HttpError(400, 'Trip ID is not in the Power Apps format.', { code: 'invalid' }); const other = store.list('allocations').find((a) => a.id !== next.id && a.tripId && a.tripId.toUpperCase() === next.tripId); const dupTrip = E.findDuplicateTripId(next.tripId, store.trips(), next.tripLogId || null); if (other || dupTrip) throw new HttpError(409, `Trip ID ${next.tripId} is already in use.`, { code: 'duplicate' }); }
+    if (c === 'fleet' && current && incoming.status !== undefined && incoming.status !== current.status) { next.statusAt = incoming.statusAt || ts0; next.statusBy = user.username; }
+    if (c === 'waybilldocs' && typeof next.data === 'string' && next.data.length > 700000) throw new HttpError(413, 'Waybill file too large (limit ~500 KB).');
+    const ts = ts0; if (!current) { next.createdAt = next.createdAt || ts; next.createdBy = user.username; } next.updatedAt = ts; next.updatedBy = user.username; next.version = Number(current ? current.version : 0) + 1;
+    db.exec('BEGIN'); try { store.putDoc(c, next); if (c !== 'meta' || params.id === 'planning') store.audit(auditEntry(user, current ? 'update' : 'create', c, next.id, next.name || next.number || next.plate || next.id, diff(current, next))); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
     return c === 'users' ? Object.assign({}, next, { hash: undefined, salt: undefined }) : next;
   },
   'DELETE /api/:collection/:id': (req, res, body, url, params) => { const user = requireUser(req); const c = params.collection; if (!COLLECTIONS.includes(c)) throw new HttpError(404, 'Unknown collection'); requireAction(user, COLLECTION_ACTION[c]); const cur = store.doc(c, params.id); db.exec('BEGIN'); try { store.delDoc(c, params.id); store.audit(auditEntry(user, 'delete', c, params.id, cur ? cur.name || cur.number || cur.plate || params.id : params.id, [])); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } return { ok: true }; },

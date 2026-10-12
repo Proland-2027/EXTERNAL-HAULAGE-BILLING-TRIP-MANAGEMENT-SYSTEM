@@ -4,7 +4,7 @@
   const U = HB.U;
 
   class ApiStore extends HB.BaseStore {
-    constructor(base) { super(); this.mode = 'server'; this.base = base || ''; this.seq = 0; this.timer = null; }
+    constructor(base) { super(); this.mode = 'server'; this.base = base || ''; this.seq = 0; this.timer = null; this.serverLinksAllocations = true; } // the server links allocations to trips itself
     async req(method, path, body, headers) {
       const res = await fetch(this.base + path, { method, headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {}), body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin' });
       let data = null; try { data = await res.json(); } catch (e) { data = null; }
@@ -19,7 +19,7 @@
       const d = await this.req('GET', '/api/bootstrap');
       this.state.settings = Object.assign({}, HB.DEFAULT_SETTINGS, d.settings || {});
       for (const c of HB.COLLECTIONS) this.state[c] = d[c] || [];
-      this.state.locations = d.locations || []; this.state.zones = d.zones || {}; this.state.trips = new Map((d.trips || []).map((t) => [t.id, t])); this.seq = d.seq || 0;
+      this.state.locations = d.locations || []; this.state.zones = d.zones || {}; this.state.planning = d.planning || {}; this.state.trips = new Map((d.trips || []).map((t) => [t.id, t])); this.seq = d.seq || 0;
       this.live = true; this.emit({ type: 'bootstrap' }); this.startPolling();
     }
     startPolling() { this.stopPolling(); this.timer = setInterval(() => this.poll().catch(() => {}), 4000); }
@@ -32,7 +32,7 @@
     }
     async writeTrip(trip, current) {
       const saved = await this.req('PUT', '/api/trips/' + encodeURIComponent(trip.id), trip, { 'If-Match': String(current ? current.version : 0) });
-      this.state.trips.set(saved.id, saved); this.emit({ type: 'trip', id: saved.id });
+      this.state.trips.set(saved.id, saved); if (saved.allocationId) await this.poll().catch(() => {}); this.emit({ type: 'trip', id: saved.id });
     }
     async removeTrip(id) { await this.req('DELETE', '/api/trips/' + encodeURIComponent(id)); this.state.trips.delete(id); this.emit({ type: 'trip', id }); }
     async writeDoc(collection, id, data) { const saved = await this.req('PUT', `/api/${collection}/${encodeURIComponent(id)}`, data); this.applyDoc(collection, id, saved); this.emit({ type: collection, id }); }

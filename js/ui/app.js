@@ -3,7 +3,8 @@
   'use strict';
   const U = HB.U, E = HB.engine, h = U.h;
   const NAV = [
-    { group: 'Operations' }, { key: 'dashboard', label: 'Dashboard', icon: '▦' }, { key: 'trips', label: 'Trip Log', icon: '☰' },
+    { group: 'Operations' }, { key: 'dashboard', label: 'Management Dashboard', icon: '▦' }, { key: 'trips', label: 'Trip Log', icon: '☰' },
+    { group: 'Fleet' }, { key: 'fleet', label: 'Fleet Movement (FMR)', icon: '⛟' }, { key: 'planning', label: 'Requests & Allocation', icon: '⇄' }, { key: 'fleetdash', label: 'Fleet Planning Dashboard', icon: '◈' },
     { group: 'Billing' }, { key: 'rates', label: 'Client Price List', icon: '₦' }, { key: 'invoices', label: 'Invoices', icon: '▤' }, { key: 'payments', label: 'Payments & Statements', icon: '◧' },
     { group: 'Insight' }, { key: 'reports', label: 'Reports', icon: '▥' }, { key: 'audit', label: 'Audit Trail', icon: '◷', need: 'audit.view' },
     { group: 'Setup' }, { key: 'clients', label: 'Clients', icon: '◉' }, { key: 'assets', label: 'Asset List', icon: '▣' }, { key: 'users', label: 'Users & Roles', icon: '◎', need: 'user.manage' }, { key: 'settings', label: 'Settings', icon: '⚙' },

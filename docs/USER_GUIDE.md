@@ -12,6 +12,10 @@ Demo accounts (change the passwords in **Users & Roles** before real use):
 | Billing Team | `billing` | `Billing@2026` | Enter **Selling Price**, quote/SO numbers, invoice status; generate and send invoices |
 | Finance Team | `finance` | `Finance@2026` | Payment status, advances, record payments, statements, outstanding balances |
 | Management | `manager` | `Manager@2026` | Dashboards, reports, price-variance review, audit trail (read-only) |
+| Tracking Officer | `tracking` | `Tracking@2026` | Update truck statuses on the Fleet Movement Report; read everything else |
+| Fleet Planner | `planner` | `Planner@2026` | Log client requests, allocate / reassign / cancel trucks, create trips from allocations, enter Trip IDs |
+
+Operations has the planner's rights too; Billing additionally verifies waybills and issues / sends invoices.
 
 Fields a role may not edit are greyed out in the Trip Log and in the trip form.
 
@@ -51,6 +55,36 @@ Each vehicle in the Asset List carries a **Truck Batch** (New Batch / Old Batch;
 | Invoice Status = Invoice Sent and not paid | **Awaiting Payment** |
 | Otherwise | **Invoice Not Sent** |
 
+## Fleet Movement Report (FMR)
+
+*Fleet → Fleet Movement (FMR)*. One row per truck with its operational status, the time and officer of the last update, the route it is running, and the calculated **Back on ground**, **Committed until** (allocations), **Free from**, confidence and **availability category**. Tiles at the top count available / on trip / workshop / tracking-overdue / unconfirmed / double-booked trucks; click a tile to filter.
+
+* **Update** opens the truck: choose the status (the list and its groups are configurable in Settings → Fleet planning), the date/time of the status (stamped automatically when the status changes), client, route, loading date, destination, estimated delivery / offloading / return, workshop release or days down, driver, Power Apps Trip ID and remarks. The right-hand panel shows the recalculated dates and every warning before you save.
+* **Warnings** appear automatically: *Tracking Update Overdue* (no update within the configured hours), missing dates, outbound longer than the run (*confirm delivery*), past its estimated return with no update since (*needs tracking verification*; the truck is **not** counted as available until *Confirm back* is clicked), double bookings, idle trucks, body type / tonnage not set.
+* **By availability** groups the fleet into the six categories; *Available and Unplanned* is what the planner can promise today.
+* **Add truck to FMR** adds a vehicle from the Asset List; *Export Excel* downloads the report as shown.
+
+## Requests & Fleet Allocation
+
+*Fleet → Requests & Allocation*.
+
+* **Client requests**: *New request* takes the client, a route from the register (or typed loading point / destination), truck type and tonnage, number of trucks, requested loading and delivery dates, priority, contact and instructions. The **Request ID** is generated (client code + sequence) and never reused. Each row shows **Requested / Allocated / Deployed / Trucks still required** separately and a status derived from the allocations.
+* **Allocation planner** (*Plan N trucks*): every truck ranked by when it can load — free-from date plus repositioning days from where it drops to the loading bay — with *fits* (body type / tonnage vs the contract), *booked* (already promised over those days), days late and the reasons. Tick the trucks and *Allocate*; a truck promised to another request over the same days cannot be allocated, and trucks that cannot make the date are only allocable after ticking *Allow late loading*. Each allocation gets an **Allocation ID** (ALC-YYMMDD-NN) with planned loading, reaches-client and back-on-ground dates.
+* **Allocations & chain**: every allocation with its truck, batch, dates, status (Planned → Deployed → Loaded → Completed / Cancelled), **Trip ID** (or *Pending*), link to the Trip Log and its **chain stage** (Allocated → Linked to Trip Log → Trip ID Assigned → Invoiced → Invoice Sent → Paid). Open an allocation to assign the Trip ID, create the Trip Log entry, reassign the truck (reason recorded), mark it loaded / completed or cancel it (reason recorded).
+* **Route register**: the Routes sheet with turnaround (days out / offloading / back), approved price, estimated cost and margin; editable by planners.
+
+## Fleet Planning Dashboard
+
+KPIs (total fleet, available, allocated, on trip, returning today/tomorrow, workshop, open requests, trucks requested / allocated / still required, delayed deployments, tracking overdue, coming free this week), charts by category and status, the trucks needing attention, and the **Fleet Availability Runway**: a daily or weekly grid per truck (free / planned / on trip / down / unknown) with trucks coming free per day and per week. Filters: category, status, truck batch, body type, client, warnings only.
+
+## Trip ID, waybills and the trip-to-billing chain
+
+* **Select from Fleet Planning** (Trip Log toolbar) lists the allocations not yet in the Trip Log. Tick the deployed trucks and the trips are created with plate, client, route, dates, Request ID and Allocation ID filled in; the allocation moves to *Deployed*. Billing completes the selling price later.
+* **Trip ID** comes from Power Apps. Enter it on the trip or the allocation (or let Power Automate post it, see docs/DEPLOYMENT.md). It is validated against the configured format and must be unique; the app never generates a replacement. Until then the trip shows *Pending*.
+* **Waybill later**: the trip can be saved without a waybill. Add the number when it arrives (entry date stamped), the date the physical copy was received (and by whom), and attach a photo / PDF. Billing clicks *Verify waybill*. The **Waybill Status** moves automatically: Awaiting Waybill → Waybill Number Entered → Waybill Verification Pending → Waybill Verified (or *Waybill Received* when verification is switched off in Settings).
+* **Invoice Status** is no longer typed: *Not Invoiced* → *Draft Invoice* (generated) → *Invoice Issued* (**Issue invoice**, date and user recorded) → *Invoice Sent* (**Mark as Sent**: channel, recipient, date recorded separately) → *Invoice Voided* / *Internal Client* (tick on the trip). Requests show *Partially Invoiced* when only some of their trips are invoiced.
+* **Payment status** stays separate (Unpaid / Part Paid / Paid); the trip closes financially only when fully settled. The Reports → *Trip-to-billing pipeline* and *Outstanding waybills* tabs list every trip with stage, owner and timestamps.
+
 ## Client Price List
 
 The actual **June Price List** is loaded: 242 lanes for Jamara, Mega Manu (45T long-haul plus 30T/40T/45T local lanes), SASO, Natural Beauty (June and August prices), Vendara, Ilera Agro, K&D, Interstyle, I'HS, JMG, Lacasera (palletised 45T) and JAT (Jubaili Agrotec). Rows marked *Price Not Approved* were not imported; the Lacasera per-case (35cl/60cl) tariff was not imported because it is priced per case, not per trip.
@@ -72,7 +106,9 @@ Administrators add, edit or version rates, import a new price list (the JMG layo
 * **Client statement**: trips, billing, payments received and balance pending for one client, all months or one month, with PDF and Excel downloads.
 * **Outstanding balances**: every client with a balance pending.
 
-## Dashboard and Reports
+## Management Dashboard and Reports
+
+The Management Dashboard has four sections: **1 Fleet Operations** (FMR KPIs), **2 Fleet Planning** (requests, allocations, trucks still required, delayed deployments, allocated-not-in-Trip-Log, awaiting Trip ID), **3 Billing & Documentation** (trips awaiting waybill, verification pending, completed trips not invoiced, drafts, issued-not-sent, sent-awaiting-payment) and **4 Financial Performance** (sales, VAT, payments, receivables, Sales Performance by Truck Batch). Tiles are clickable.
 
 The dashboard shows total trips, sales, VAT, payments received, outstanding balance, trips awaiting payment, trips not yet invoiced and trips priced below the agreed rate, then **Sales Performance by Truck Batch**: total sales, trips, trucks, average sales per truck and per trip, payments received and outstanding receivables for New Batch, Old Batch and Total, with monthly New vs Old sales, percentage contribution and top trucks per batch. A **Basis** selector switches between net sales (excluding VAT) and gross invoiced (including VAT); payments and receivables are always gross. Filters: date range, client, vehicle type, cost center, truck batch, vehicle, contract type, payment status, invoice status.
 
