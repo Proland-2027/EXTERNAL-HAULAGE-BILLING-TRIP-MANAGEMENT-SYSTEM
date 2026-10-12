@@ -1,0 +1,450 @@
+[
+ {
+  "id": "nbl",
+  "name": "NBL",
+  "code": "NBL",
+  "contractType": "",
+  "active": true,
+  "trips": 355
+ },
+ {
+  "id": "jam",
+  "name": "Jamara",
+  "code": "JAM",
+  "contractType": "30",
+  "active": true,
+  "trips": 764
+ },
+ {
+  "id": "mmu",
+  "name": "MEGA MANU",
+  "code": "MMU",
+  "contractType": "45",
+  "active": true,
+  "trips": 396
+ },
+ {
+  "id": "sas",
+  "name": "SASO",
+  "code": "SAS",
+  "contractType": "45",
+  "active": true,
+  "trips": 75
+ },
+ {
+  "id": "orc",
+  "name": "ORCA DECO LIMITED",
+  "code": "ORC",
+  "contractType": "BDG490YL",
+  "active": true,
+  "trips": 358
+ },
+ {
+  "id": "nab",
+  "name": "NATURAL BEAUTY",
+  "code": "NAB",
+  "contractType": "45",
+  "active": true,
+  "trips": 102
+ },
+ {
+  "id": "ab",
+  "name": "AB-INBEV",
+  "code": "AB",
+  "contractType": "",
+  "active": true,
+  "trips": 46
+ },
+ {
+  "id": "ved",
+  "name": "VENDARA",
+  "code": "VED",
+  "contractType": "",
+  "active": true,
+  "trips": 24
+ },
+ {
+  "id": "jat",
+  "name": "JUBAILI AGROTEC",
+  "code": "JAT",
+  "contractType": "45",
+  "active": true,
+  "trips": 129
+ },
+ {
+  "id": "tlcp",
+  "name": "Lacasera",
+  "code": "TLCP",
+  "contractType": "45",
+  "active": true,
+  "trips": 209
+ },
+ {
+  "id": "mam",
+  "name": "MAMUDA BEVERAGES CO. LTD",
+  "code": "MAM",
+  "contractType": "3",
+  "active": true,
+  "trips": 618
+ },
+ {
+  "id": "psm",
+  "name": "PRISM STEEL",
+  "code": "PSM",
+  "contractType": "",
+  "active": true,
+  "trips": 7
+ },
+ {
+  "id": "giv",
+  "name": "GIVANAS",
+  "code": "GIV",
+  "contractType": "45",
+  "active": true,
+  "trips": 105
+ },
+ {
+  "id": "int",
+  "name": "INTERSTYLE",
+  "code": "INT",
+  "contractType": "30",
+  "active": true,
+  "trips": 41
+ },
+ {
+  "id": "abb",
+  "name": "ABBA ABASS",
+  "code": "ABB",
+  "contractType": "ABBA",
+  "active": true,
+  "trips": 36
+ },
+ {
+  "id": "nig",
+  "name": "NIGER BISCUITS",
+  "code": "NIG",
+  "contractType": "NIGER BISCUITS",
+  "active": true,
+  "trips": 19
+ },
+ {
+  "id": "wac",
+  "name": "WALTER & HIFY RESOURCES",
+  "code": "WAC",
+  "contractType": "45",
+  "active": true,
+  "trips": 100
+ },
+ {
+  "id": "mik",
+  "name": "MIKANO INTL LTD",
+  "code": "MIK",
+  "contractType": "",
+  "active": true,
+  "trips": 12
+ },
+ {
+  "id": "orc2",
+  "name": "B2B-ORCA DECO LIMITED(ULOMA)",
+  "code": "ORC2",
+  "contractType": "",
+  "active": true,
+  "trips": 3
+ },
+ {
+  "id": "stp",
+  "name": "STAR PRODUCT INVESTMENT",
+  "code": "STP",
+  "contractType": "",
+  "active": true,
+  "trips": 3
+ },
+ {
+  "id": "mbc",
+  "name": "MAMUDA BEVERAGES CO. LTD/CHIAMO MULTI TRADE",
+  "code": "MBC",
+  "contractType": "",
+  "active": true,
+  "trips": 0
+ },
+ {
+  "id": "ila",
+  "name": "Illera Agro",
+  "code": "ILA",
+  "contractType": "",
+  "active": true,
+  "trips": 2
+ },
+ {
+  "id": "orc3",
+  "name": "B2B-ORCA DECO LIMITED-AGR",
+  "code": "ORC3",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "tlcp2",
+  "name": "JMG",
+  "code": "TLCP2",
+  "contractType": "30",
+  "active": true,
+  "trips": 24
+ },
+ {
+  "id": "leb",
+  "name": "LEBRUNI AGRO LTD",
+  "code": "LEB",
+  "contractType": "LEBRUNI-30T",
+  "active": true,
+  "trips": 8
+ },
+ {
+  "id": "orc4",
+  "name": "B2B-ORCA DECO LIMITED(MR OTEGA)",
+  "code": "ORC4",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "kds",
+  "name": "KD & SONS",
+  "code": "KDS",
+  "contractType": "",
+  "active": true,
+  "trips": 2
+ },
+ {
+  "id": "orc5",
+  "name": "B2B-ORCA DECO LIMITED (BABASOLA)",
+  "code": "ORC5",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "sas2",
+  "name": "SASO-BACKLOAD",
+  "code": "SAS2",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "orc6",
+  "name": "B2B-DIVERSE ORCA",
+  "code": "ORC6",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "mbp",
+  "name": "MB PARFUMARIE LTD",
+  "code": "MBP",
+  "contractType": "3",
+  "active": true,
+  "trips": 46
+ },
+ {
+  "id": "orc7",
+  "name": "B2B-ORCA DECO LIMITED (MR LEKAN)",
+  "code": "ORC7",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "vps",
+  "name": "VOLTIQ",
+  "code": "VPS",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "orc8",
+  "name": "B2B-ORCA DECO LIMITED(MADAM KENNY)",
+  "code": "ORC8",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "mek",
+  "name": "M & E KAISER",
+  "code": "MEK",
+  "contractType": "10",
+  "active": true,
+  "trips": 2
+ },
+ {
+  "id": "map",
+  "name": "MATRIX POWER",
+  "code": "MAP",
+  "contractType": "30",
+  "active": true,
+  "trips": 83
+ },
+ {
+  "id": "sds",
+  "name": "SDS ENVIRON INTERNATIONAL LIMITED",
+  "code": "SDS",
+  "contractType": "8",
+  "active": true,
+  "trips": 6
+ },
+ {
+  "id": "dem",
+  "name": "DEMBAL RETAIL",
+  "code": "DEM",
+  "contractType": "",
+  "active": true,
+  "trips": 3
+ },
+ {
+  "id": "tlcp3",
+  "name": "MEGA LIGHTS",
+  "code": "TLCP3",
+  "contractType": "35",
+  "active": true,
+  "trips": 2
+ },
+ {
+  "id": "emc",
+  "name": "EMC Nigeria Limited",
+  "code": "EMC",
+  "contractType": "10",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "inl",
+  "name": "Infiouest international Ltd/ MIKANO",
+  "code": "INL",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "mkc",
+  "name": "MR KAMIL CHIDIAC",
+  "code": "MKC",
+  "contractType": "",
+  "active": true,
+  "trips": 2
+ },
+ {
+  "id": "tlcp4",
+  "name": "OMOS",
+  "code": "TLCP4",
+  "contractType": "30",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "sbo",
+  "name": "SBO ENERGY LTD",
+  "code": "SBO",
+  "contractType": "40",
+  "active": true,
+  "trips": 4
+ },
+ {
+  "id": "opt",
+  "name": "OPTIFINISHES NIGERIA LIMITED",
+  "code": "OPT",
+  "contractType": "15",
+  "active": true,
+  "trips": 2
+ },
+ {
+  "id": "tlcp5",
+  "name": "IRON PRODUCTS INDUSTRIES LTD",
+  "code": "TLCP5",
+  "contractType": "20X2",
+  "active": true,
+  "trips": 6
+ },
+ {
+  "id": "fpf",
+  "name": "FOUPLUG GLOBAL SERVICES",
+  "code": "FPF",
+  "contractType": "30",
+  "active": true,
+  "trips": 51
+ },
+ {
+  "id": "bel",
+  "name": "Beloxxi",
+  "code": "BEL",
+  "contractType": "30",
+  "active": true,
+  "trips": 16
+ },
+ {
+  "id": "snl",
+  "name": "SEAMA NIGERIA LIMITED",
+  "code": "SNL",
+  "contractType": "45",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "cas",
+  "name": "CASPRO",
+  "code": "CAS",
+  "contractType": "45",
+  "active": true,
+  "trips": 18
+ },
+ {
+  "id": "sev",
+  "name": "SEVAN CONSTRUCTION NIGERIA LIMITED",
+  "code": "SEV",
+  "contractType": "30",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "sar",
+  "name": "SAR",
+  "code": "SAR",
+  "contractType": "45",
+  "active": true,
+  "trips": 2
+ },
+ {
+  "id": "moh",
+  "name": "Mohammed Technical Company",
+  "code": "MOH",
+  "contractType": "P330 x3",
+  "active": true,
+  "trips": 3
+ },
+ {
+  "id": "sfn",
+  "name": "SPECIALITY FATS NIG LTD",
+  "code": "SFN",
+  "contractType": "30",
+  "active": true,
+  "trips": 3
+ },
+ {
+  "id": "mds",
+  "name": "MOTOR DIAGNOSTIC SYSTEM LIMITED (MDSL)",
+  "code": "MDS",
+  "contractType": "",
+  "active": true,
+  "trips": 1
+ },
+ {
+  "id": "crs",
+  "name": "CRESEADA",
+  "code": "CRS",
+  "contractType": "CRESEADA",
+  "active": true,
+  "trips": 7
+ }
+]

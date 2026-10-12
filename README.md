@@ -1,86 +1,54 @@
-# External Haulage Billing & Trip Management System
+# Haulage Billing Desk
 
-A complete, zero-install billing system for haulage operations that run **both an in-house fleet and
-external contractors**:
+Web conversion of the **Haulage Billing Sheet (September R2)** workbook: a multi-user Trip Log with an **Agreed Client Price** list and price-variance tracking, invoicing, payments, client statements, dashboards and reports, with role-based accounts and an audit trail.
 
-* **Trip log** — every load: date, waybill, haulier (internal or contractor), vehicle, route, product,
-  quantity, km and (for the internal fleet) actual diesel litres.
-* **Price lists with MOQ** — one tariff per party per year, e.g. *Billing Price List 2026 (Internal)*
-  and one per contractor. Every line is keyed by route + vehicle class and carries a **Minimum Order
-  Quantity**: loads under the MOQ are billed at the MOQ.
-  * Contractor lines: rate per tonne / litre / pallet / CBM, or a flat rate per trip.
-  * Internal lines: **Fixed cost**, **Variable cost per km**, **Fixed-variable cost** and standard
-    **Diesel litres**, with the diesel price per litre on the price-list header.
-* **Billing format** — one billing per party per month, generated from the unbilled trips and the
-  active price list, with MOQ adjustments, cost-component breakdown, levies, VAT, totals and signature
-  blocks. Printable, exportable to Excel/CSV, with a DRAFT → APPROVED → PAID → VOID lifecycle.
-  See [docs/BILLING_FORMAT.md](docs/BILLING_FORMAT.md).
-* **Monthly comparison report (In-house Analysis)** — for any month: internal vs contractor cost,
-  cost per tonne by route, the in-house saving against contractor rates, the outsourcing premium,
-  the internal fixed / variable / fixed-variable / diesel structure, MOQ top-ups paid, and
-  month-over-month movement. Uses the logged billings when they exist and flags estimates when a
-  billing has not been logged yet.
+**Live demo:** https://claude.ai/artifact/4DDZWqX8UmbSfrnwx6yF5G (shared database; demo accounts in [docs/USER_GUIDE.md](docs/USER_GUIDE.md)).
 
-## Run it
+## What is in the box
 
-No build, no server required: open `index.html` in a modern browser (Chrome, Edge, Firefox, Safari).
-
-Optionally serve it (`npm start`, or `python3 -m http.server 8080`) and open <http://localhost:8080>.
-
-Data lives in the browser's local storage. Use **Data → Export backup** regularly and to move the
-dataset to another computer; **Import backup** restores it. **Reset to demo data** reloads the sample
-dataset (Ghana routes from Tema, two contractors, August–October 2026 trips, logged August and
-September billings).
-
-Excel export uses SheetJS from a CDN; when offline the same data downloads as CSV files.
-
-## Monthly workflow
-
-1. **Trips** → log each completed trip (or import a backup produced elsewhere). Quantity below the
-   price-list MOQ is fine; the billing applies the MOQ.
-2. **Price Lists & MOQ** → make sure each party has an `ACTIVE` list covering the month. Edit rates,
-   MOQ, cost components and the diesel price inline; *Duplicate for next year* creates next year's draft.
-3. **Billing** → pick the party and month, *Preview*, check the MOQ flags and any “no tariff line”
-   errors, then *Save & log billing*. Do this once for each contractor and once for the internal fleet.
-4. **Comparison Report** → choose the month (and optionally a single contractor). Export to Excel or print.
-5. Approve / mark paid billings as they move through finance. Void and regenerate if a trip was wrong.
-
-## How amounts are calculated
-
-| | Formula |
+| Area | Delivered |
 |---|---|
-| Billable quantity | `max(actual qty, MOQ)` — `TRIP` lines are flat and ignore MOQ |
-| Contractor amount | `billable qty × rate per unit` (or the flat trip rate) |
-| Internal trip cost | `Fixed + Variable/km × km + Fixed-variable + Diesel litres × Diesel price` |
-| Internal cost per unit | `trip cost ÷ billable qty` |
-| Levies / VAT | `subtotal × levy %`, then `(subtotal + levies) × VAT %`; internal billing untaxed by default |
-| In-house saving | internal trips re-priced at the contractor tariff − internal cost |
-| Outsourcing premium | contractor billing − the same trips priced at the internal cost model |
+| Workbook analysis | [docs/WORKBOOK_ANALYSIS.md](docs/WORKBOOK_ANALYSIS.md) — every sheet, formula, validation and the ambiguities found; [docs/COLUMN_MAPPING.md](docs/COLUMN_MAPPING.md) — Excel column → database field |
+| Data | 3,708 historical trips, 60 vehicles, 56 clients and 491 locations imported from the workbook; selling prices untouched; original file kept in `data/workbook/` |
+| Trip Log | Spreadsheet-style grid, frozen headings/columns, inline editing with explicit Save, filters, search, sort, Excel import (duplicate detection) and export |
+| Agreed Client Price | Price-list module; automatic lookup by client + origin + destination + vehicle type (+ contract type) on the trip date; documented priority rule; "No Agreed Rate Found"; manual pick when rates tie |
+| Selling Price | Manual entry only; VAT, billing and balances computed from it; variance ₦ and % with green/red/neutral display |
+| Invoices | Workbook Invoice Generator rules; client-code + date numbering with manual override and duplicate protection; Draft → Sent → Paid / Void; PDF download |
+| Payments | Receipts allocated to trips oldest-first (Paid / Advance exactly as the workbook formulas), ledger, client statements (PDF/Excel), outstanding balances |
+| Reports | Dashboard, Client Summary, Statement, Monthly Sales Summary, Sales by Vehicle, Price Variance, Unpaid trips; all from the live database, all exportable |
+| Users | Administrator, Operations, Billing, Finance, Management; field-level permissions; audit trail with old/new values |
+| Back ends | Shared claude.ai database (demo), Node 22 + SQLite server with server-side permissions, or local browser mode |
 
-Tariff line lookup: exact route + vehicle class first, then the route's `ANY` class line. Trips with no
-matching line are flagged on the preview and block saving until the price list is fixed.
+## Run it yourself
+
+```bash
+node server/seed.js          # one-off: load workbook data + demo accounts into data/haulage.db
+node server/server.js        # http://localhost:8080
+npm test                     # engine tests (totals reconcile to the workbook to the cent)
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for HTTPS hosting and backups, and [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for the team guide.
 
 ## Project layout
 
 ```
-index.html          application shell
-css/styles.css      light/dark theme, billing document, print stylesheet
-js/pricing.js       billing engine (MOQ, pricing, billing totals, comparison report) — also runs in Node
-js/seed.js          demo dataset
-js/store.js         localStorage persistence, import/export
-js/export.js        CSV / XLSX download
-js/charts.js        inline SVG charts
-js/app.js           UI
-tests/              engine tests: `npm test` (Node 18+)
-docs/               billing format and data model
+index.html              application shell (published as the demo page)
+css/app.css             theme (light/dark), grid, forms, invoice document
+js/core/engine.js       all business rules — shared by browser, server and tests
+js/core/sample_rates.js illustrative agreed rates (demo only)
+js/store/               storage adapters: common, local, api (server), artifact (shared db)
+js/ui/                  views: trips, rates, invoices, payments, reports (+dashboard), admin, app shell, charts, exporter
+server/server.js        Node + SQLite API with sessions, RBAC, audit and change feed
+server/seed.js          database seeding
+tools/                  workbook extraction (openpyxl) and seed builders
+data/workbook/          original workbook + extracted JSON
+tests/engine.test.js    validation against the workbook's cached values
+docs/                   analysis, mapping, user guide, deployment
 ```
 
-## Assumptions made (adjust in Setup / Price Lists)
+## Known limitations
 
-* Currency GHS, VAT 15 %, levies 6 %, internal billing not taxed.
-* MOQ is per trip and expressed in the line's unit. A monthly volume commitment is not modelled.
-* “Fixed-variable” is treated as a semi-variable cost **per trip** (tolls, maintenance, allowances).
-  If you prefer it per km, enter it as part of *Variable / km* instead.
-* Internal diesel uses actual litres when logged on the trip, otherwise the line's standard litres.
-* Per-unit comparisons assume the same unit (e.g. tonnes) on a route for both parties; a flat `TRIP`
-  line reports cost per trip in those columns.
+* In the shared-database demo, permissions are applied by the application; anyone the artifact owner gives write access to could, in principle, write to the database directly. The Node server enforces every rule server-side and is the recommended production path.
+* The agreed rates shipped with the demo are illustrative placeholders (marked in Remarks); load the real contract rates in **Client Price List**.
+* Excel/PDF generation uses browser libraries loaded from a CDN; when offline, exports fall back to CSV and PDF is unavailable.
+* Invoice PDF layout is a clean standard document; company logo/letterhead can be added in `js/ui/exporter.js`.

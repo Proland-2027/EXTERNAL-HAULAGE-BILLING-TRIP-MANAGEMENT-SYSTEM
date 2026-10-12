@@ -1,0 +1,482 @@
+[
+ {
+  "plate": "T-1678LA",
+  "assetCode": "MVEH-000287",
+  "vehicleType": "Closed Body Logistics",
+  "costCenter": "CC047",
+  "vehicleCategory": "CANTER",
+  "active": true
+ },
+ {
+  "plate": "T15333LA",
+  "assetCode": "MVEH-000335",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T13780LA",
+  "assetCode": "MVEH-000352",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T8117LA",
+  "assetCode": "MVEH-000340",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T15334LA",
+  "assetCode": "MVEH-000359",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T-5524LA",
+  "assetCode": "MVEH-000320",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T-5525LA",
+  "assetCode": "MVEH-000319",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T-2422LA",
+  "assetCode": "MVEH-000282",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T20357LA",
+  "assetCode": "MVEH-000306",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T20358LA",
+  "assetCode": "MVEH-000334",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T-2409LA",
+  "assetCode": "MVEH-000285",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T9943LA",
+  "assetCode": "MVEH-000327",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T8115LA",
+  "assetCode": "MVEH-000338",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T8119LA",
+  "assetCode": "MVEH-000344",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T10265LA",
+  "assetCode": "MVEH-000329",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T20356LA",
+  "assetCode": "MVEH-000333",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T8116LA",
+  "assetCode": "MVEH-000331",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T8114LA",
+  "assetCode": "MVEH-000342",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T-2412LA",
+  "assetCode": "MVEH-000276",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2417LA",
+  "assetCode": "MVEH-000145",
+  "vehicleType": "Closed Body Logistics",
+  "costCenter": "CC047",
+  "vehicleCategory": "CANTER",
+  "active": true
+ },
+ {
+  "plate": "T-2420LA",
+  "assetCode": "MVEH-000283",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2411LA",
+  "assetCode": "MVEH-000104",
+  "vehicleType": "Hiabs Logistics",
+  "costCenter": "CC039",
+  "vehicleCategory": "Hiab",
+  "active": true
+ },
+ {
+  "plate": "T-2405LA",
+  "assetCode": "MVEH-000105",
+  "vehicleType": "Hiabs Logistics",
+  "costCenter": "CC039",
+  "vehicleCategory": "Hiab",
+  "active": true
+ },
+ {
+  "plate": "T-5526LA",
+  "assetCode": "MVEH-000318",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T8118LA",
+  "assetCode": "MVEH-000336",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "Old Batch",
+  "active": true
+ },
+ {
+  "plate": "T-2490LA",
+  "assetCode": "MVEH-000269",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2486LA",
+  "assetCode": "MVEH-000267",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2485LA",
+  "assetCode": "MVEH-000273",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2404LA",
+  "assetCode": "MVEH-000266",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2489LA",
+  "assetCode": "MVEH-000131",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2419LA",
+  "assetCode": "MVEH-000142",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2418LA",
+  "assetCode": "MVEH-000130",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-2407LA",
+  "assetCode": "MVEH-000271",
+  "vehicleType": "Flat Trucks Logistics",
+  "costCenter": "CC046",
+  "vehicleCategory": "Flat Truck",
+  "active": true
+ },
+ {
+  "plate": "T-1589LA",
+  "assetCode": "MVEH-000289",
+  "vehicleType": "Closed Body Logistics",
+  "costCenter": "CC047",
+  "vehicleCategory": "CANTER",
+  "active": true
+ },
+ {
+  "plate": "KRD640YF",
+  "assetCode": "MVEH-000363",
+  "vehicleType": "Closed Body Logistics",
+  "costCenter": "CC047",
+  "vehicleCategory": "CANTER",
+  "active": true
+ },
+ {
+  "plate": "T-5548LA",
+  "assetCode": "MVEH-000298",
+  "vehicleType": "Hiabs Logistics",
+  "costCenter": "CC039",
+  "vehicleCategory": "Hiab",
+  "active": true
+ },
+ {
+  "plate": "T5547LA",
+  "assetCode": "MVEH-000297",
+  "vehicleType": "Hiabs Logistics",
+  "costCenter": "CC039",
+  "vehicleCategory": "Hiab",
+  "active": true
+ },
+ {
+  "plate": "T-2413LA",
+  "assetCode": "MVEH-000146",
+  "vehicleType": "Closed Body Logistics",
+  "costCenter": "CC047",
+  "vehicleCategory": "CANTER",
+  "active": true
+ },
+ {
+  "plate": "T-1590LA",
+  "assetCode": "MVEH-000288",
+  "vehicleType": "Closed Body Logistics",
+  "costCenter": "CC047",
+  "vehicleCategory": "CANTER",
+  "active": true
+ },
+ {
+  "plate": "THIRD-PARTYHAULAGE",
+  "assetCode": "THIRD-PARTYHAULAGE",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "3rd Party",
+  "active": true
+ },
+ {
+  "plate": "T33401LA",
+  "assetCode": "MVEH-000447",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33402LA",
+  "assetCode": "MVEH-000446",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33403LA",
+  "assetCode": "MVEH-000445",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33405LA",
+  "assetCode": "MVEH-000443",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33404LA",
+  "assetCode": "MVEH-000444",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33076LA",
+  "assetCode": "MVEH-000449",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33075LA",
+  "assetCode": "MVEH-000450",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33073LA",
+  "assetCode": "MVEH-000452",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33074LA",
+  "assetCode": "MVEH-000451",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T33213LA",
+  "assetCode": "MVEH-000448",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31705LA",
+  "assetCode": "MVEH-000441",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31701LA",
+  "assetCode": "MVEH-000436",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31700LA",
+  "assetCode": "MVEH-000438",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31702LA",
+  "assetCode": "MVEH-000439",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31703LA",
+  "assetCode": "MVEH-000437",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31697LA",
+  "assetCode": "MVEH-000435",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31699LA",
+  "assetCode": "MVEH-000442",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31696LA",
+  "assetCode": "MVEH-000440",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31704LA",
+  "assetCode": "MVEH-000433",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ },
+ {
+  "plate": "T31698LA",
+  "assetCode": "MVEH-000434",
+  "vehicleType": "HAULAGE",
+  "costCenter": "CC059",
+  "vehicleCategory": "New Batch",
+  "active": true
+ }
+]
