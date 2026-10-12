@@ -179,13 +179,13 @@
     if (!c || !trip.loadingFrom || !trip.loadingTo) return { status: 'none', rate: null, candidates: [] };
     const scored = [];
     for (const r of rates || []) {
-      if (clientKey(r.client, clients) !== c) continue;
+      const rk = rateKeys(r, clients); if (rk.ck !== c) continue;
       if ((r.effectiveDate && r.effectiveDate > date) || (r.expiryDate && r.expiryDate < date)) continue;
-      if (v && norm(r.vehicleType) && norm(r.vehicleType) !== v) continue;
+      if (v && rk.v && rk.v !== v) continue;
       const f = locMatch(trip.loadingFrom, r.loadingFrom, zones), t = locMatch(trip.loadingTo, r.loadingTo, zones);
       if (!f || !t) continue;
-      const rc = normContract(r.contractType);
-      const score = (rc && rc === ct ? 40 : 0) + (norm(r.vehicleType) && norm(r.vehicleType) === v ? 4 : 0) + f * 3 + t * 3;
+      const rc = rk.ct;
+      const score = (rc && rc === ct ? 40 : 0) + (rk.v && rk.v === v ? 4 : 0) + f * 3 + t * 3;
       scored.push({ r, score });
     }
     if (!scored.length) return { status: 'none', rate: null, candidates: [] };
@@ -197,10 +197,28 @@
     return { status: 'found', rate: top[0], candidates: cands };
   }
   /** Client identity: matches the master list by name, code or alias (e.g. "Mega Manu-Local" → MEGA MANU). */
+  // The client index is built once per client list (name, code and aliases → canonical name) and reused for every
+  // trip and rate; the store replaces the client array whenever a client changes, so the cache is never stale.
+  const clientIndexCache = new WeakMap();
+  function clientIndex(clients) {
+    if (!Array.isArray(clients)) return null;
+    let entry = clientIndexCache.get(clients);
+    if (!entry || entry.n !== clients.length) {
+      const map = new Map();
+      for (const c of clients) { const key = norm(c.name); for (const alias of [c.name, c.code, ...(Array.isArray(c.aliases) ? c.aliases : [])]) { const a = norm(alias); if (a && !map.has(a)) map.set(a, key); } }
+      entry = { n: clients.length, map }; clientIndexCache.set(clients, entry);
+    }
+    return entry.map;
+  }
   function clientKey(name, clients) {
     const n = norm(name); if (!n) return '';
-    for (const c of clients || []) { if (norm(c.name) === n || norm(c.code) === n || (Array.isArray(c.aliases) && c.aliases.some((a) => norm(a) === n))) return norm(c.name); }
+    const idx = clientIndex(clients); if (idx) return idx.get(n) || n;
     return n;
+  }
+  // Per-rate normalised fields are cached on the rate object (rates are replaced, never mutated, by the stores).
+  function rateKeys(r, clients) {
+    if (!r._k || r._k.client !== r.client || r._k.clients !== clients) r._k = { client: r.client, clients, ck: clientKey(r.client, clients), v: norm(r.vehicleType), ct: normContract(r.contractType) };
+    return r._k;
   }
 
   function convertBasis(price, from, to, rate) { if (from === to) return price; return to === 'inclusive' ? round2(price * (1 + rate)) : round2(price / (1 + rate)); }

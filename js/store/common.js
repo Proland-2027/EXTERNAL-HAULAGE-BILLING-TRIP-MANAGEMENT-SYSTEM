@@ -59,7 +59,7 @@
     // ---------- auditing
     diff(before, after, fields) {
       const changes = [];
-      const keys = fields || [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter((k) => !['version', 'updatedAt', 'updatedBy', 'createdAt', 'createdBy', 'history', 'agreedCandidates', 'agreedRate', '_del'].includes(k));
+      const keys = fields || [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter((k) => !['version', 'updatedAt', 'updatedBy', 'createdAt', 'createdBy', 'history', 'agreedCandidates', 'agreedRate', '_del', '_k'].includes(k));
       for (const k of keys) {
         const a = before ? before[k] : undefined, b = after ? after[k] : undefined;
         const na = a === undefined || a === null ? '' : a, nb = b === undefined || b === null ? '' : b;
@@ -155,8 +155,9 @@
       if (!this.state[collection]) return;
       const list = this.state[collection]; const i = list.findIndex((x) => x.id === id);
       if (!data) { if (i >= 0) list.splice(i, 1); } else if (i >= 0) list[i] = data; else list.push(data);
+      if (collection === 'clients' || collection === 'rates') this.state[collection] = list.slice(); // new identity: lookup caches rebuild
     }
-    removeFromState(collection, id) { if (collection === 'trips') this.state.trips.delete(id); else if (this.state[collection]) { const i = this.state[collection].findIndex((x) => x.id === id); if (i >= 0) this.state[collection].splice(i, 1); } }
+    removeFromState(collection, id) { if (collection === 'trips') this.state.trips.delete(id); else if (this.state[collection]) { const i = this.state[collection].findIndex((x) => x.id === id); if (i >= 0) this.state[collection].splice(i, 1); if (collection === 'clients' || collection === 'rates') this.state[collection] = this.state[collection].slice(); } }
   }
 
   HB.BaseStore = BaseStore; HB.COLLECTIONS = COLLECTIONS; HB.DEMO_USERS = DEMO_USERS; HB.DEFAULT_SETTINGS = DEFAULT_SETTINGS;
