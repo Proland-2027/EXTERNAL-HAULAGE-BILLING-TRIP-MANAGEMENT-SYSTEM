@@ -8,7 +8,8 @@ const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/pla
 const BASE = process.env.BASE || 'http://localhost:8099';
 const results = []; const errors = [];
 let lastToast = '';
-const step = async (name, fn) => { try { if (typeof closeModals === 'function') await closeModals(); await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name + ' — ' + (e.message || e).toString().split('\n')[0] + (lastToast ? ' [last toast: ' + lastToast + ']' : '')]); } };
+let diag = async () => '';
+const step = async (name, fn) => { try { if (typeof closeModals === 'function') await closeModals(); await fn(); results.push(['PASS', name]); } catch (e) { let d = ''; try { d = await diag(); } catch (e2) { d = 'diag failed: ' + e2.message.split('\n')[0]; } results.push(['FAIL', name + ' — ' + (e.message || e).toString().split('\n')[0] + (lastToast ? ' [last toast: ' + lastToast + ']' : '') + (d ? ' [diag: ' + d + ']' : '')]); } };
 (async () => {
   const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await page.route(/cdnjs|googleapis|gstatic/, (r) => r.abort());
@@ -19,6 +20,7 @@ const step = async (name, fn) => { try { if (typeof closeModals === 'function') 
   const closeModals = async () => { await page.evaluate(() => { for (const o of document.querySelectorAll('.overlay')) o.remove(); }); };
   const nav = async (v, params) => { await page.evaluate(([v, p]) => HB.app.nav ? HB.app.nav(v, p) : (location.hash = '#' + v), [v, params || {}]); await page.waitForTimeout(350); };
   const ev = (fn, arg) => page.evaluate(fn, arg);
+  diag = async () => { const r = await Promise.race([page.evaluate(() => new Promise((res) => { const t0 = performance.now(); let raf = false; requestAnimationFrame(() => { raf = true; }); setTimeout(() => res(JSON.stringify({ ready: document.readyState, hidden: document.hidden, raf, hash: location.hash, ids: [...document.querySelectorAll('#content [id]')].map((e) => e.id).slice(0, 8), overlays: document.querySelectorAll('.overlay').length, bad: [...document.querySelectorAll('.notice.bad')].map((e) => e.textContent.slice(0, 120)), ms: Math.round(performance.now() - t0) })), 300); })), new Promise((res) => setTimeout(() => res('evaluate did not return in 5 s'), 5000))]); return r; };
 
   await login('admin', 'Admin@2026');
   const HB_MODE = await ev(() => HB.app.store.mode);
@@ -119,7 +121,7 @@ const step = async (name, fn) => { try { if (typeof closeModals === 'function') 
   await step('S17 billing cannot change the FMR; management is read-only', async () => {
     await logout(); await login('billing', 'Billing@2026');
     const r = await ev(async () => { const s = HB.app.store; const t = s.state.fleet.find((x) => x.status); try { await s.saveDoc('fleet', { id: t.id, remarks: 'billing note' }, { expectedVersion: t.version }); return 'accepted'; } catch (e) { return e.code; } });
-    if (r === 'accepted' && HB_MODE === 'server') throw new Error('billing wrote to the FMR');
+    if (r === 'accepted') throw new Error('billing wrote to the FMR');
     await logout(); await login('manager', 'Manager@2026'); await page.evaluate(() => { location.hash = '#fleet'; }); await page.waitForTimeout(500); if (await page.$('button:has-text("Add truck to FMR")')) throw new Error('management sees FMR edit controls');
   });
   // S18 Power Apps endpoint (server only)
@@ -198,7 +200,7 @@ const step = async (name, fn) => { try { if (typeof closeModals === 'function') 
   });
   await step('S26 approval workflow: planner cannot approve; operations manager approves; finance approves when required; nothing counts as issued yet', async () => {
     const no = await ev(async (id) => { const s = HB.app.store; const d = s.state.dispatches.find((x) => x.id === id); try { await s.saveDoc('dispatches', { id, opsApprovedAt: new Date().toISOString(), opsApprovedBy: 'planner' }, { expectedVersion: d.version }); return 'accepted'; } catch (e) { return e.code; } }, dspId);
-    if (no === 'accepted' && HB_MODE === 'server') throw new Error('planner approved a dispatch');
+    if (no === 'accepted') throw new Error('planner approved a dispatch');
     await logout(); await login('ops', 'Ops@2026'); await page.evaluate(() => { location.hash = '#dispatch'; }); await page.waitForTimeout(600); await ev((id) => HB.views.dispatch.openDispatch(HB.views.dispatch.ctx, id), dspId); await page.waitForSelector('.modal-foot');
     const approve = await page.$('.modal-foot button:has-text("Approve dispatch (Operations)")'); if (!approve) throw new Error('no operations approval button'); await approve.click(); await page.waitForTimeout(900);
     let st = await ev((id) => HB.dispatch.dispatchStatus(HB.app.store.state.dispatches.find((x) => x.id === id)), dspId);
@@ -221,10 +223,10 @@ const step = async (name, fn) => { try { if (typeof closeModals === 'function') 
   await step('S28 expense control, dispatch dashboard, assistant and PDF button', async () => {
     await page.evaluate(() => { location.hash = '#dashboard'; }); await page.waitForTimeout(300); await page.evaluate(() => { location.hash = '#dispatch'; }); await page.waitForSelector('#dsp-view', { timeout: 15000 }); await page.waitForTimeout(400);
     await page.click('#dsp-view button:has-text("Trip expense control")'); await page.waitForTimeout(600); const bad = await page.$('#content .notice.bad'); if (bad) throw new Error('render error: ' + (await bad.textContent())); let txt = await page.textContent('#dsp-view'); for (const k of ['Budget diesel', 'Approved', 'Issued', 'Variance', 'Supplementary diesel issued']) if (!txt.includes(k)) throw new Error('control missing ' + k);
-    await page.click('button:has-text("Dashboard")'); await page.waitForTimeout(500); txt = await page.textContent('#dsp-view'); for (const k of ['Total planned trips', 'Awaiting dispatch approval', 'Approved, awaiting diesel', 'Diesel required (planned trips)', 'Diesel issued', 'Road expenses required', 'Road expenses paid', 'Additional diesel requests', 'Available trucks not planned', 'Confirmed lost sales', 'Diesel variance by truck', 'Diesel by vehicle category', 'Diesel by route']) if (!txt.includes(k)) throw new Error('dashboard missing ' + k);
-    await page.click('button:has-text("Assistant & checks")'); await page.waitForTimeout(400); await page.fill('#asst-q', 'Which trucks have received diesel above the approved allowance?'); await page.keyboard.press('Enter'); await page.waitForTimeout(400); txt = await page.textContent('#asst-out'); if (!/answered from live records/.test(txt)) throw new Error('assistant did not answer');
+    await page.click('#dsp-view button:has-text("Dashboard")'); await page.waitForTimeout(500); txt = await page.textContent('#dsp-view'); for (const k of ['Total planned trips', 'Awaiting dispatch approval', 'Approved, awaiting diesel', 'Diesel required (planned trips)', 'Diesel issued', 'Road expenses required', 'Road expenses paid', 'Additional diesel requests', 'Available trucks not planned', 'Confirmed lost sales', 'Diesel variance by truck', 'Diesel by vehicle category', 'Diesel by route']) if (!txt.includes(k)) throw new Error('dashboard missing ' + k);
+    await page.click('#dsp-view button:has-text("Assistant & checks")'); await page.waitForTimeout(400); await page.fill('#asst-q', 'Which trucks have received diesel above the approved allowance?'); await page.keyboard.press('Enter'); await page.waitForTimeout(400); txt = await page.textContent('#asst-out'); if (!/answered from live records/.test(txt)) throw new Error('assistant did not answer');
     const n = await ev(() => HB.dispatch.QUESTIONS.filter((q) => HB.dispatch.assistant(q, HB.app.store.dispatchCtx())).length); if (n !== 9) throw new Error('assistant answered ' + n + ' of 9');
-    await page.click('button:has-text("Dispatch forms")'); await page.waitForTimeout(500); if (!(await page.$('#dsp-table button:has-text("PDF")'))) throw new Error('no PDF button');
+    await page.click('#dsp-view button:has-text("Dispatch forms")'); await page.waitForTimeout(500); if (!(await page.$('#dsp-table button:has-text("PDF")'))) throw new Error('no PDF button');
   });
   await step('S29 bulk cancellation of client requests with reason, truck release and lost-sales records', async () => {
     await logout(); await login('planner', 'Planner@2026'); await page.evaluate(() => { location.hash = '#planning'; }); await page.waitForTimeout(600);
@@ -235,7 +237,7 @@ const step = async (name, fn) => { try { if (typeof closeModals === 'function') 
     await page.waitForFunction((ids) => ids.every((id) => HB.app.store.state.lostsales.some((l) => l.requestId === id)), pick, { timeout: 20000 }).catch(() => {}); await page.waitForTimeout(400);
     const r = await ev((ids) => { const s = HB.app.store; return ids.map((id) => { const req = s.state.requests.find((x) => x.id === id); const ls = s.state.lostsales.find((x) => x.requestId === id); const live = s.state.allocations.filter((a) => a.requestId === id && !['Cancelled', 'Completed'].includes(a.status)).length; return { id, status: req.status, reason: req.cancelReason, by: req.cancelledBy, ls: ls && { kind: ls.kind, trucks: ls.unfulfilledTrucks, lost: ls.estimatedLost, rate: ls.agreedRate }, live, exists: !!req }; }); }, pick);
     for (const x of r) { if (!x.exists || x.status !== 'Cancelled' || !x.reason || !x.by || !x.ls || x.ls.kind !== 'Confirmed lost sale' || x.live) throw new Error(JSON.stringify(x)); if (x.ls.rate && Math.abs(x.ls.lost - x.ls.trucks * x.ls.rate) > 0.01) throw new Error('lost sales formula ' + JSON.stringify(x.ls)); }
-    await page.evaluate(() => { location.hash = '#lostsales'; }); await page.waitForTimeout(600); const txt = await page.textContent('#ls-view'); if (!txt.includes('Confirmed lost sales') || !txt.includes(pick[0])) throw new Error('lost sales view'); await page.click('button:has-text("Reports")'); await page.waitForTimeout(400); if (!(await page.textContent('#ls-view')).includes('Confirmed lost sales by client')) throw new Error('reports tab');
+    await page.evaluate(() => { location.hash = '#lostsales'; }); await page.waitForTimeout(600); const txt = await page.textContent('#ls-view'); if (!txt.includes('Confirmed lost sales') || !txt.includes(pick[0])) throw new Error('lost sales view'); await page.click('#ls-view button:has-text("Reports")'); await page.waitForTimeout(400); if (!(await page.textContent('#ls-view')).includes('Confirmed lost sales by client')) throw new Error('reports tab');
   });
   await step('S30 tracking officer and management are read-only on dispatch, requests and masters', async () => {
     await logout(); await login('manager', 'Manager@2026'); await page.evaluate(() => { location.hash = '#dispatch'; }); await page.waitForTimeout(600);

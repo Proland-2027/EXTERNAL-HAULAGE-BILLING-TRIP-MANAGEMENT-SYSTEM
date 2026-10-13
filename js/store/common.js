@@ -4,6 +4,7 @@
   const E = HB.engine, P = HB.planning, U = HB.U; const clean = E.clean;
 
   const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dispatches'];
+  const COLLECTION_ACTION = { clients: 'client.manage', assets: 'asset.manage', rates: 'rate.manage', invoices: 'invoice.manage', payments: 'payment.manage', users: 'user.manage', fleet: 'fmr.update', routes: 'planning.manage', requests: 'request.manage', allocations: 'planning.manage', waybilldocs: 'trip.edit', lostsales: 'lostsales.manage', distances: 'distance.manage', dispatches: 'dispatch.prepare' };
   const DEMO_USERS = [
     { username: 'admin', name: 'Adaeze Okonkwo', role: 'admin', password: 'Admin@2026' },
     { username: 'ops', name: 'Musa Bello', role: 'operations', password: 'Ops@2026' },
@@ -122,7 +123,7 @@
       await this.writeAudit(entry);
       // keep the allocation chain in step: a trip created from an allocation marks it Deployed and carries the Trip ID back
       // a split second leg never takes over the allocation link or its Trip ID; the first trip keeps them
-      if (trip.allocationId && !trip.allocationSplit && this.state.allocations && !this.serverLinksAllocations) { const a = this.state.allocations.find((x) => x.id === trip.allocationId); if (a && (!a.tripLogId || a.tripLogId === trip.id) && (a.tripLogId !== trip.id || (trip.journeyPlanId && a.tripId !== trip.journeyPlanId))) { const patch = { id: a.id, tripLogId: trip.id }; if (a.status === 'Planned') patch.status = 'Deployed'; if (trip.journeyPlanId && a.tripId !== trip.journeyPlanId) { patch.tripId = trip.journeyPlanId; patch.tripIdAt = U.nowISO(); patch.tripIdBy = this.user ? this.user.username : 'system'; } try { await this.saveDoc('allocations', patch, { expectedVersion: a.version, label: `${a.id} linked to trip` }); } catch (e) { console.warn('allocation link failed', e); } } }
+      if (trip.allocationId && !trip.allocationSplit && this.state.allocations && !this.serverLinksAllocations) { const a = this.state.allocations.find((x) => x.id === trip.allocationId); if (a && (!a.tripLogId || a.tripLogId === trip.id) && (a.tripLogId !== trip.id || (trip.journeyPlanId && a.tripId !== trip.journeyPlanId))) { const patch = { id: a.id, tripLogId: trip.id }; if (a.status === 'Planned') patch.status = 'Deployed'; if (trip.journeyPlanId && a.tripId !== trip.journeyPlanId) { patch.tripId = trip.journeyPlanId; patch.tripIdAt = U.nowISO(); patch.tripIdBy = this.user ? this.user.username : 'system'; } try { await this.saveDoc('allocations', patch, { expectedVersion: a.version, system: true, label: `${a.id} linked to trip` }); } catch (e) { console.warn('allocation link failed', e); } } }
       return trip;
     }
     /**
@@ -138,7 +139,7 @@
       const draft = P.tripFromAllocation(a, request, { dateDispatched: opts.dateDispatched, split: !!opts.split, note: opts.split ? `Split from ${a.id}: ${E.clean(opts.reason)}` : '' });
       if (opts.split) { draft.allocationSplit = true; }
       const trip = await this.saveTrip(draft, { split: !!opts.split });
-      if (opts.split) await this.saveDoc('allocations', { id: a.id, split: true, splitTripIds: [...(a.splitTripIds || []), trip.id], splitReason: E.clean(opts.reason), splitBy: this.user.username, splitAt: U.nowISO() }, { expectedVersion: this.state.allocations.find((x) => x.id === a.id).version, label: `${a.id} split: second trip ${trip.id}` });
+      if (opts.split) await this.saveDoc('allocations', { id: a.id, split: true, splitTripIds: [...(a.splitTripIds || []), trip.id], splitReason: E.clean(opts.reason), splitBy: this.user.username, splitAt: U.nowISO() }, { expectedVersion: this.state.allocations.find((x) => x.id === a.id).version, system: true, label: `${a.id} split: second trip ${trip.id}` });
       return trip;
     }
     /** Credit note (authorised correction): numbered CN-…, applied to the invoice's trips, recorded in the ledger. */
@@ -155,7 +156,7 @@
       const cn = { id: U.id('cn'), type: 'credit', number, againstId: inv.id, againstNumber: inv.number, client: inv.client, invoiceDate: U.todayISO(), amount, net: sp.net, vatAmount: sp.vat, vatRate: rate, reason, issuedAt: now, issuedBy: this.user.username, status: 'Issued', tripIds: alloc.touched.map((x) => x.trip.id) };
       await this.saveDoc('invoices', cn, { label: `${cn.number} · credit ${amount} against ${inv.number} · ${reason}` });
       for (const x of alloc.touched) await this.saveTrip(Object.assign({ id: x.trip.id }, x.patch), { expectedVersion: this.raw(x.trip.id).version, force: true });
-      await this.saveDoc('payments', { id: U.id('pay'), kind: 'credit', client: inv.client, invoiceId: inv.id, amount, date: U.todayISO(), method: 'Credit note', reference: cn.number, notes: reason, tripIds: cn.tripIds, recordedBy: this.user.username }, { label: `${cn.number} applied to ${inv.number}` });
+      await this.saveDoc('payments', { id: U.id('pay'), kind: 'credit', client: inv.client, invoiceId: inv.id, amount, date: U.todayISO(), method: 'Credit note', reference: cn.number, notes: reason, tripIds: cn.tripIds, recordedBy: this.user.username }, { system: true, label: `${cn.number} applied to ${inv.number}` });
       return cn;
     }
     /** Planning settings (statuses, repositioning rules, thresholds) live in meta/planning. */
@@ -173,14 +174,27 @@
     async saveDoc(collection, doc, opts) {
       opts = opts || {};
       const list = this.state[collection]; const current = list ? list.find((x) => x.id === doc.id) : null;
+      if (!opts.system && this.user && COLLECTION_ACTION[collection] && !E.can(this.user.role, COLLECTION_ACTION[collection])) { const err = new Error(`Your role (${E.ROLE_LABELS[this.user.role] || this.user.role}) cannot change ${collection}.`); err.code = 'forbidden'; throw err; }
       this.checkConflict(current, opts.expectedVersion);
       const next = Object.assign({}, current || {}, doc); if (!next.id) next.id = U.id(collection.slice(0, 2));
       // a truck is never promised to two requests over the same days (the server applies the same rule)
       if (collection === 'allocations' && P && next.status !== 'Cancelled' && next.plannedLoadingDate && next.backOnGround && !opts.allowDoubleBooking) { const clash = P.bookingConflicts(next.plate, next.plannedLoadingDate, next.backOnGround, this.state.allocations, next.id); if (clash.length) { const err = new Error(`${next.plate} is already allocated to ${clash[0].client} (${clash[0].id}) over these days.`); err.code = 'double_booking'; err.conflicts = clash.map((x) => x.id); throw err; } }
+      if (collection === 'dispatches' && current && HB.dispatch) this.dispatchGuard(current, next);
+      if (collection === 'distances' && next.verified && !(current && current.verified)) { next.verifiedBy = this.user ? this.user.username : 'system'; next.verifiedAt = U.nowISO(); }
       this.stamp(next, !current);
       await this.writeDoc(collection, next.id, next);
       if (!opts.silent) await this.writeAudit(this.auditEntry({ action: current ? 'update' : 'create', entity: collection, entityId: next.id, label: opts.label || next.name || next.number || next.id, changes: this.diff(current, next).filter((c) => !['hash', 'salt'].includes(c.field)) }));
       return next;
+    }
+    /** Dispatch approvals and issues are role-checked field by field (the server applies the same rules); the shared-database demo enforces them here. */
+    dispatchGuard(current, next) {
+      const D = HB.dispatch; const role = this.user ? this.user.role : ''; const changed = (k) => JSON.stringify(current[k]) !== JSON.stringify(next[k]);
+      const need = (action, msg) => { if (!E.can(role, action)) { const err = new Error(msg); err.code = 'forbidden'; throw err; } };
+      if (changed('opsApprovedAt') || changed('rejectedAt') || changed('approvedDiesel') || changed('approvedRoad') || changed('supplementary')) need('dispatch.approve', 'Only an operations manager or administrator can approve, reject or adjust a dispatch form.');
+      if (changed('financeApprovedAt')) need('dispatch.finance', 'Finance approval needs the finance or administrator role.');
+      if (changed('dieselIssues') || changed('expensePayments') || changed('actualDieselConsumed') || changed('closedAt')) need('dispatch.issue', 'Recording diesel issues or expense payments needs the operations, finance or administrator role.');
+      for (const [kind, list] of [['diesel', 'dieselIssues'], ['road', 'expensePayments']]) { const prev = current[list] || []; const now = next[list] || []; if (now.length > prev.length) { if (now.length - prev.length > 1) { const err = new Error('Record one issue at a time.'); err.code = 'invalid'; throw err; } const x = now[prev.length]; const why = D.issueError(Object.assign({}, current, { [list]: prev }), kind, kind === 'diesel' ? x.litres : x.amount, x.supplementaryId); if (why) { const err = new Error(why); err.code = 'issue_refused'; throw err; } } }
+      if ((changed('approvedDiesel') || changed('approvedRoad')) && (Number(current.approvedDiesel) !== Number(next.approvedDiesel) || Number(current.approvedRoad) !== Number(next.approvedRoad)) && (next.budgetDiesel !== next.approvedDiesel || next.budgetRoad !== next.approvedRoad) && !clean(next.adjustmentReason)) { const err = new Error('An adjustment to the calculated allowance needs a reason.'); err.code = 'invalid'; throw err; }
     }
     async deleteDoc(collection, id, label) {
       await this.removeDoc(collection, id);

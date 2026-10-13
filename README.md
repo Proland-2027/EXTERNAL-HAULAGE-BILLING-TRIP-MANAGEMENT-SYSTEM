@@ -55,7 +55,7 @@ docs/                   analysis, mapping, user guide, deployment
 
 ## Known limitations
 
-* In the shared-database demo, permissions are applied by the application; anyone the artifact owner gives write access to could, in principle, write to the database directly. The Node server enforces every rule server-side and is the recommended production path.
+* In the shared-database demo, permissions are applied by the application (the browser store enforces the same per-collection and per-field rules as the server: who may change which records, dispatch approvals and issues, double booking, Trip ID format); anyone the artifact owner gives write access to could, in principle, write to the database directly. The Node server enforces every rule server-side and is the recommended production path.
 * Power Apps could not be connected from the delivery environment; Trip IDs are entered manually or posted by Power Automate to the documented endpoint (docs/DEPLOYMENT.md).
 * The FMR demo data is the workbook snapshot re-dated to the import day (docs/WORKBOOK_ANALYSIS.md, Phase 3).
 * Excel/PDF generation uses browser libraries loaded from a CDN; when offline, exports fall back to CSV and PDF is unavailable.
