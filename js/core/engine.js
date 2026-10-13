@@ -216,10 +216,13 @@
     const idx = clientIndex(clients); if (idx) return idx.get(n) || n;
     return n;
   }
-  // Per-rate normalised fields are cached on the rate object (rates are replaced, never mutated, by the stores).
+  // Per-rate normalised fields are cached in a side table keyed by the rate object: documents from the shared
+  // database are frozen, so nothing is ever written onto them.
+  const rateKeyCache = new WeakMap();
   function rateKeys(r, clients) {
-    if (!r._k || r._k.client !== r.client || r._k.clients !== clients) r._k = { client: r.client, clients, ck: clientKey(r.client, clients), v: norm(r.vehicleType), ct: normContract(r.contractType) };
-    return r._k;
+    let k = rateKeyCache.get(r);
+    if (!k || k.client !== r.client || k.clients !== clients) { k = { client: r.client, clients, ck: clientKey(r.client, clients), v: norm(r.vehicleType), ct: normContract(r.contractType) }; rateKeyCache.set(r, k); }
+    return k;
   }
 
   function convertBasis(price, from, to, rate) { if (from === to) return price; return to === 'inclusive' ? round2(price * (1 + rate)) : round2(price / (1 + rate)); }

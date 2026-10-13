@@ -59,7 +59,7 @@
     // ---------- auditing
     diff(before, after, fields) {
       const changes = [];
-      const keys = fields || [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter((k) => !['version', 'updatedAt', 'updatedBy', 'createdAt', 'createdBy', 'history', 'agreedCandidates', 'agreedRate', '_del', '_k'].includes(k));
+      const keys = fields || [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter((k) => !['version', 'updatedAt', 'updatedBy', 'createdAt', 'createdBy', 'history', 'agreedCandidates', 'agreedRate', '_del'].includes(k));
       for (const k of keys) {
         const a = before ? before[k] : undefined, b = after ? after[k] : undefined;
         const na = a === undefined || a === null ? '' : a, nb = b === undefined || b === null ? '' : b;
