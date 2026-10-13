@@ -100,6 +100,8 @@ Backups: the database is a single file; copy `data/haulage.db` (and `-wal`/`-shm
    The server validates the format, refuses duplicates (HTTP 409), writes the ID to the allocation and its linked trip, and records the change in the audit trail as user `powerapps`. Map the Allocation ID into Power Apps (for example as a lookup field the dispatcher picks when raising the trip) so the flow can send it back.
 3. **Dataverse / Power Apps API pull**: a scheduled job can read new trips from the Dataverse Web API (`/api/data/v9.2/<trips table>`) with an Azure AD application registration and call the same endpoint. The connection details (tenant, environment URL, table and column names) were not available during this delivery; the endpoint above is the integration contract either way.
 
+`POST /api/trips/from-allocation` (`{ allocationId, dateDispatched?, split?, reason? }`, signed-in users with the *trip.fromPlanning* right) builds the Trip Log entry on the server from the allocation record, so a client cannot re-key or alter the operational data; a second trip for one allocation needs `split: true`, a reason and the *allocation.split* right.
+
 Relationship kept in the database: **Request ID → Allocation ID → Power Apps Trip ID → Trip Log entry → Invoice ID**, visible on every allocation (*chain stage*) and in Reports → Trip-to-billing pipeline.
 
 ## 3. WordPress

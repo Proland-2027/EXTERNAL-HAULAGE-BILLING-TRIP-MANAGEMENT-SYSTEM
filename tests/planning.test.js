@@ -170,3 +170,19 @@ test('historical Journey Plan IDs that do not fit the Power Apps format can stil
   assert.ok(E.validateTrip({ ...current, journeyPlanId: 'not valid!' }, { trips, current }).some((e) => /Power Apps format/.test(e)), 'a changed id is validated');
   assert.ok(E.validateTrip({ ...current, journeyPlanId: 'omos and sons ' }, { trips, current }).length === 0, 'case/space differences are not a change');
 });
+
+test('a Trip Log entry is built entirely from the allocation and its request; one allocation links to one trip unless split', () => {
+  const alloc = { id: 'ALC-261020-01', requestId: 'JAM-010', requestReference: 'PO-778', client: 'Jamara', plate: 'T33073LA', assetCode: 'MVEH-000452', truckBatch: 'New Batch', loadingFrom: 'Lagos', destination: 'Kano', vehicleType: 'JUMBO', tonnage: '30T', plannedLoadingDate: '2026-10-20', plannedDeploymentDate: '2026-10-20', status: 'Planned', tripId: 'TRP-00555', tripIdBy: 'powerapps' };
+  const t = P.tripFromAllocation(alloc, { id: 'JAM-010', reference: 'PO-778' }, {});
+  assert.equal(t.dateDispatched, '2026-10-20'); assert.equal(t.plate, 'T33073LA'); assert.equal(t.client, 'Jamara'); assert.equal(t.loadingFrom, 'Lagos'); assert.equal(t.loadingTo, 'Kano'); assert.equal(t.contractType, '30T'); assert.equal(t.truckBatch, 'New Batch');
+  assert.equal(t.journeyPlanId, 'TRP-00555'); assert.equal(t.tripIdSource, 'powerapps'); assert.equal(t.allocationId, alloc.id); assert.equal(t.requestId, 'JAM-010'); assert.equal(t.requestReference, 'PO-778');
+  assert.equal(t.sellingPrice, null); assert.equal(t.invoiceStatus, 'Not Invoiced'); assert.equal(t.waybill, '');
+  assert.equal(P.tripFromAllocation({ ...alloc, tripId: '' }, null, {}).journeyPlanId, '', 'Trip ID stays pending when Power Apps has not issued it');
+  assert.equal(P.allocationLinkError(alloc, null), '');
+  assert.ok(/already linked/.test(P.allocationLinkError({ ...alloc, tripLogId: 't-1' }, null)));
+  assert.equal(P.allocationLinkError({ ...alloc, tripLogId: 't-1' }, 't-1'), '', 're-saving the linked trip is fine');
+  assert.equal(P.allocationLinkError({ ...alloc, tripLogId: 't-1' }, null, { split: true }), '', 'authorised split allows a second trip');
+  assert.ok(/cancelled/.test(P.allocationLinkError({ ...alloc, status: 'Cancelled' }, null)));
+  assert.ok(E.can('billing', 'trip.fromPlanning') && !E.can('billing', 'trip.create') && !E.can('billing', 'allocation.split'), 'billing selects allocations but neither types trips nor splits allocations');
+  assert.ok(E.can('planning', 'allocation.split') && !E.can('tracking', 'trip.fromPlanning'));
+});

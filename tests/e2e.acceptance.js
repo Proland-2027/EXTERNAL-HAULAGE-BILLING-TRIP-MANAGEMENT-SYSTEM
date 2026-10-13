@@ -130,6 +130,44 @@ const step = async (name, fn) => { try { if (typeof closeModals === 'function') 
     const dup = await post({ tripLogId: tripId, tripId: (await ev((id) => HB.app.store.raw(id).journeyPlanId, tripId)) }); if (dup.status !== 409) throw new Error('duplicate accepted ' + JSON.stringify(dup));
     const noKey = await post({ allocationId: alloc.id, tripId: 'TRP-999999' }, 'wrong'); if (noKey.status !== 401) throw new Error('key not checked');
   });
+  // S19-S22 continuous workflow: billing selects allocations, duplicate links refused, authorised split, credit note
+  let billTrip;
+  await step('S19 Billing Team creates the Trip Log entry from Fleet Planning with a searchable list; nothing re-typed, no invoice issued', async () => {
+    await logout(); await login('billing', 'Billing@2026');
+    await page.evaluate(() => { location.hash = '#trips'; }); await page.waitForTimeout(500);
+    const before = await ev(() => HB.app.store.state.invoices.length);
+    await page.click('#btn-from-planning'); await page.waitForSelector('#sfp-search');
+    const target = await ev(() => { const a = HB.views.planning.allocationRows(HB.app.store).find((x) => !x.trip && !x.tripLogId && x.status === 'Planned'); return a && { id: a.id, plate: a.plate, client: a.client }; }); if (!target) throw new Error('no unlinked allocation left');
+    await page.fill('#sfp-search', target.plate); await page.waitForTimeout(400);
+    const rows = await page.$$eval('#sfp-list label', (ls) => ls.map((l) => l.textContent)); if (!rows.some((r) => r.includes(target.id))) throw new Error('search did not find ' + target.id);
+    await ev((id) => { const lab = [...document.querySelectorAll('#sfp-list label')].find((l) => l.textContent.includes(id)); lab.querySelector('input[type=checkbox]').click(); }, target.id); await page.waitForTimeout(200);
+    await page.click('#sfp-create'); await page.waitForTimeout(1200);
+    const r = await ev((id) => { const s = HB.app.store; const t = s.trips().find((x) => x.allocationId === id); const a = s.state.allocations.find((x) => x.id === id); return t ? { id: t.id, plate: t.plate, client: t.client, from: t.loadingFrom, to: t.loadingTo, batch: t.truckBatch, req: t.requestId, sp: t.sellingPrice, inv: t.invoiceStatus, allocStatus: a.status, link: a.tripLogId, createdBy: t.createdBy } : null; }, target.id);
+    if (!r) throw new Error('trip not created'); if (r.plate !== target.plate || r.client !== target.client || !r.from || !r.to || !r.req) throw new Error('fields not carried: ' + JSON.stringify(r));
+    if (r.sp !== null || r.inv !== 'Not Invoiced' || r.link !== r.id || r.allocStatus !== 'Deployed' || r.createdBy !== 'billing') throw new Error(JSON.stringify(r));
+    const after = await ev(() => HB.app.store.state.invoices.length); if (after !== before) throw new Error('an invoice was created'); billTrip = r.id;
+    await page.click('#btn-from-planning'); await page.waitForSelector('#sfp-search'); await page.fill('#sfp-search', target.id); await page.waitForTimeout(400);
+    if (await page.$('#sfp-list')) throw new Error('linked allocation still offered as unlinked');
+    await page.check('.modal input[type=checkbox]'); await page.waitForTimeout(300); const txt = await page.textContent('.modal'); if (!txt.includes('Open trip')) throw new Error('linked allocation cannot be reopened from the list');
+  });
+  await step('S20 a linked allocation cannot be linked to a second trip (client and server), unless split by an authorised role with a reason', async () => {
+    const r = await ev(async (id) => { const s = HB.app.store; const out = {}; try { await s.createTripFromAllocation(id, {}); out.dup = 'accepted'; } catch (e) { out.dup = e.code; } try { await s.createTripFromAllocation(id, { split: true, reason: 'x' }); out.split = 'accepted'; } catch (e) { out.split = e.code; } const t = s.trips().find((x) => x.id === billTrip); try { await s.saveTrip({ dateDispatched: t.dateDispatched, plate: t.plate, client: t.client, allocationId: id }, {}); out.raw = 'accepted'; } catch (e) { out.raw = e.code; } return out; }, (await ev((tid) => HB.app.store.raw(tid).allocationId, billTrip)));
+    if (r.dup !== 'linked' || r.split !== 'forbidden' || r.raw === 'accepted') throw new Error(JSON.stringify(r));
+    const srv = await fetch(BASE + '/api/trips/from-allocation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allocationId: 'x' }) }); if (srv.status !== 401 && srv.status !== 404) throw new Error('server route unauthenticated status ' + srv.status);
+  });
+  await step('S21 Fleet Planner can split an allocation with a reason; the second trip is linked and audited', async () => {
+    await logout(); await login('planner', 'Planner@2026');
+    const r = await ev(async (tid) => { const s = HB.app.store; const id = s.raw(tid).allocationId; try { await s.createTripFromAllocation(id, { split: true, reason: '' }); return { noReason: 'accepted' }; } catch (e) { if (e.code !== 'invalid') return { noReason: e.code }; } const t2 = await s.createTripFromAllocation(id, { split: true, reason: 'Load carried in two legs' }); await new Promise((r) => setTimeout(r, 300)); const a = s.state.allocations.find((x) => x.id === id); return { t2: t2.id, split: a.split, splitTrips: a.splitTripIds, linked: a.tripLogId, note: t2.note }; }, billTrip);
+    if (!r.t2 || !r.split || !(r.splitTrips || []).includes(r.t2) || r.linked !== billTrip || !/two legs/.test(r.note)) throw new Error(JSON.stringify(r));
+  });
+  await step('S22 credit note reduces the client balance on a sent invoice without altering the invoice; invoice stays issued/sent', async () => {
+    await logout(); await login('billing', 'Billing@2026');
+    const r = await ev(async (tid) => { const s = HB.app.store; const E = HB.engine; await s.saveTrip({ id: tid, sellingPrice: 1000000 }, { expectedVersion: s.raw(tid).version }); const t = s.trip(tid); const inv = { id: 'inv-cn-' + Date.now(), number: E.generateInvoiceNumber(t.client, t.dateDispatched, s.state.invoices.map((i) => i.number), s.state.clients), client: t.client, invoiceDate: s.planningCtx().today, dueDate: E.addDays(s.planningCtx().today, 7), fromMonth: t.month, toMonth: t.month, priceType: 'exclusive', vatRate: 0.075, tripIds: [tid], lines: [], subtotal: 1000000, vat: 75000, total: 1075000, status: 'Draft' }; await s.saveDoc('invoices', inv); await s.saveTrip({ id: tid, invoiceId: inv.id, invoiceNo: inv.number, invoiceStatus: 'Draft Invoice' }, { expectedVersion: s.raw(tid).version }); await s.saveDoc('invoices', { id: inv.id, status: 'Sent', issuedAt: new Date().toISOString(), sentAt: new Date().toISOString() }, { expectedVersion: s.state.invoices.find((i) => i.id === inv.id).version }); await s.saveTrip({ id: tid, invoiceStatus: 'Invoice Sent' }, { expectedVersion: s.raw(tid).version }); return { inv: inv.id, balance: s.trip(tid).balance }; }, billTrip);
+    await page.evaluate(() => { location.hash = '#invoices'; }); await page.waitForTimeout(600); await ev((id) => HB.views.invoices.openInvoice(HB.views.invoices.ctx, id), r.inv); await page.waitForSelector('.modal-foot');
+    await page.click('.modal-foot button:has-text("Issue credit note")'); await page.waitForSelector('.modal input[type=number]'); await page.fill('.modal input[type=number]', '75000'); await page.fill('.modal input[type=text]', 'Rate correction agreed'); await page.click('.modal-foot button:has-text("Issue credit note")'); await page.waitForTimeout(1200);
+    const out = await ev((p) => { const s = HB.app.store; const t = s.trip(p.tid); const inv = s.state.invoices.find((i) => i.id === p.inv); const cn = s.state.invoices.find((i) => i.type === 'credit' && i.againstId === p.inv); const pay = s.state.payments.find((x) => x.kind === 'credit' && x.invoiceId === p.inv); return { balance: t.balance, pay: t.paymentLabel, invStatus: inv.status, invTotal: inv.total, cn: cn && cn.number, cnAmount: cn && cn.amount, ledger: !!pay, tripInv: t.invoiceStatus }; }, { tid: billTrip, inv: r.inv });
+    if (Math.abs(out.balance - (r.balance - 75000)) > 0.01 || out.pay !== 'Part Paid' || out.invStatus !== 'Sent' || out.invTotal !== 1075000 || !/^CN-/.test(out.cn || '') || out.cnAmount !== 75000 || !out.ledger || out.tripInv !== 'Invoice Sent') throw new Error(JSON.stringify(out));
+  });
   await browser.close();
   for (const [s, n] of results) console.log(s, n);
   const fails = results.filter((r) => r[0] === 'FAIL').length; console.log(`\n${results.length - fails}/${results.length} passed`);

@@ -9,7 +9,7 @@ Demo accounts (change the passwords in **Users & Roles** before real use):
 |---|---|---|---|
 | Administrator | `admin` | `Admin@2026` | Everything: settings, users, price list, all records |
 | Operations Team | `ops` | `Ops@2026` | Create trips; edit dispatch, delivery, vehicle, client, route, journey plan, waybill |
-| Billing Team | `billing` | `Billing@2026` | Enter **Selling Price**, quote/SO numbers, invoice status; generate and send invoices |
+| Billing Team | `billing` | `Billing@2026` | Select allocated trucks into the Trip Log, enter **Selling Price**, waybill details, quote/SO numbers; verify waybills; generate, issue and send invoices; credit notes |
 | Finance Team | `finance` | `Finance@2026` | Payment status, advances, record payments, statements, outstanding balances |
 | Management | `manager` | `Manager@2026` | Dashboards, reports, price-variance review, audit trail (read-only) |
 | Tracking Officer | `tracking` | `Tracking@2026` | Update truck statuses on the Fleet Movement Report; read everything else |
@@ -79,11 +79,13 @@ KPIs (total fleet, available, allocated, on trip, returning today/tomorrow, work
 
 ## Trip ID, waybills and the trip-to-billing chain
 
-* **Select from Fleet Planning** (Trip Log toolbar) lists the allocations not yet in the Trip Log. Tick the deployed trucks and the trips are created with plate, client, route, dates, Request ID and Allocation ID filled in; the allocation moves to *Deployed*. Billing completes the selling price later.
+* **Select from Fleet Planning** (Trip Log toolbar; Billing, Operations and Planning) lists the allocations not yet in the Trip Log, searchable by client, plate, request, allocation or Trip ID. Tick the deployed trucks (one or many) and the trips are created with client, vehicle and asset code, truck batch, route, loading date, Request ID / client reference, Allocation ID and the Power Apps Trip ID when already issued; the allocation moves to *Deployed*. Nothing is re-typed and no invoice is issued by this step; billing completes the selling price, VAT basis and waybill afterwards.
+* **One allocation → one trip.** A linked allocation never reappears in the list; tick *Show allocations already in the Trip Log* to search it and **open the existing trip** instead. A second trip for the same allocation (for example a load carried in two legs) needs the *Split allocation* action on the allocation, which only Operations, the Fleet Planner or an administrator can use, with a reason that is written to the audit trail.
 * **Trip ID** comes from Power Apps. Enter it on the trip or the allocation (or let Power Automate post it, see docs/DEPLOYMENT.md). It is validated against the configured format and must be unique; the app never generates a replacement. Until then the trip shows *Pending*.
 * **Waybill later**: the trip can be saved without a waybill. Add the number when it arrives (entry date stamped), the date the physical copy was received (and by whom), and attach a photo / PDF. Billing clicks *Verify waybill*. The **Waybill Status** moves automatically: Awaiting Waybill → Waybill Number Entered → Waybill Verification Pending → Waybill Verified (or *Waybill Received* when verification is switched off in Settings).
 * **Invoice Status** is no longer typed: *Not Invoiced* → *Draft Invoice* (generated) → *Invoice Issued* (**Issue invoice**, date and user recorded) → *Invoice Sent* (**Mark as Sent**: channel, recipient, date recorded separately) → *Invoice Voided* / *Internal Client* (tick on the trip). Requests show *Partially Invoiced* when only some of their trips are invoiced.
-* **Payment status** stays separate (Unpaid / Part Paid / Paid); the trip closes financially only when fully settled. The Reports → *Trip-to-billing pipeline* and *Outstanding waybills* tabs list every trip with stage, owner and timestamps.
+* **Payment status** stays separate (Unpaid / Part Paid / Paid); the trip closes financially only when fully settled.
+* **Corrections**: a Draft invoice can be voided (its trips become available again); an issued or sent invoice is never edited. Use **Issue credit note** on the invoice instead: the amount is applied to the invoice's trips like a receipt, numbered CN-…, recorded in the payments ledger and shown in the invoice list, while the issued document and its PDF stay as sent. Trips already on an invoice are never offered for a second invoice. The Reports → *Trip-to-billing pipeline* and *Outstanding waybills* tabs list every trip with stage, owner and timestamps.
 
 ## Client Price List
 

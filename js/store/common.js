@@ -99,6 +99,8 @@
       if (trip.journeyPlanId) trip.journeyPlanId = E.clean(trip.journeyPlanId).toUpperCase();
       if (clean(trip.waybill) && !trip.waybillEnteredAt) trip.waybillEnteredAt = U.nowISO();
       if (!clean(trip.waybill)) trip.waybillEnteredAt = '';
+      // one allocation → one trip (unless split through the authorised workflow)
+      if (trip.allocationId && this.state.allocations && (!current || current.allocationId !== trip.allocationId)) { const a = this.state.allocations.find((x) => x.id === trip.allocationId); const why = P ? P.allocationLinkError(a || null, trip.id, { split: opts.split || (a && a.split) }) : ''; if (why && a) { const err = new Error(why); err.code = 'linked'; err.tripLogId = a.tripLogId; throw err; } }
       // Trip IDs come from Power Apps: validate the format and reject duplicates across the Trip Log
       const errors = E.validateTrip(trip, Object.assign(this.ctx(), { trips: [...this.state.trips.values()], current })); if (errors.length && !opts.force) { const err = new Error(errors.join(' ')); err.code = 'invalid'; err.errors = errors; throw err; }
       this.stamp(trip, !current);
@@ -109,6 +111,22 @@
       await this.writeAudit(entry);
       // keep the allocation chain in step: a trip created from an allocation marks it Deployed and carries the Trip ID back
       if (trip.allocationId && this.state.allocations && !this.serverLinksAllocations) { const a = this.state.allocations.find((x) => x.id === trip.allocationId); if (a && (a.tripLogId !== trip.id || (trip.journeyPlanId && a.tripId !== trip.journeyPlanId))) { const patch = { id: a.id, tripLogId: trip.id }; if (a.status === 'Planned') patch.status = 'Deployed'; if (trip.journeyPlanId && a.tripId !== trip.journeyPlanId) { patch.tripId = trip.journeyPlanId; patch.tripIdAt = U.nowISO(); patch.tripIdBy = this.user ? this.user.username : 'system'; } try { await this.saveDoc('allocations', patch, { expectedVersion: a.version, label: `${a.id} linked to trip` }); } catch (e) { console.warn('allocation link failed', e); } } }
+      return trip;
+    }
+    /**
+     * Select from Fleet Planning: build the Trip Log entry from the allocation (no re-keying), link it, mark the
+     * allocation Deployed. split = authorised second trip for one allocation (allocation.split right, reason recorded).
+     */
+    async createTripFromAllocation(allocationId, opts) {
+      opts = opts || {}; const a = this.state.allocations.find((x) => x.id === allocationId);
+      if (!this.user || !E.can(this.user.role, 'trip.fromPlanning')) { const err = new Error('Your role cannot create trips from Fleet Planning.'); err.code = 'forbidden'; throw err; }
+      const why = P.allocationLinkError(a || null, null, { split: opts.split }); if (why) { const err = new Error(why); err.code = 'linked'; err.tripLogId = a && a.tripLogId; throw err; }
+      if (opts.split) { if (!E.can(this.user.role, 'allocation.split')) { const err = new Error('Splitting an allocation needs the planning or administrator role.'); err.code = 'forbidden'; throw err; } if (!E.clean(opts.reason)) { const err = new Error('A reason is required to split an allocation.'); err.code = 'invalid'; throw err; } }
+      const request = this.state.requests.find((r) => r.id === a.requestId) || null;
+      const draft = P.tripFromAllocation(a, request, { dateDispatched: opts.dateDispatched, note: opts.split ? `Split from ${a.id}: ${E.clean(opts.reason)}` : '' });
+      if (opts.split) { draft.allocationSplit = true; }
+      const trip = await this.saveTrip(draft, { split: !!opts.split });
+      if (opts.split) await this.saveDoc('allocations', { id: a.id, split: true, splitTripIds: [...(a.splitTripIds || []), trip.id], splitReason: E.clean(opts.reason), splitBy: this.user.username, splitAt: U.nowISO() }, { expectedVersion: this.state.allocations.find((x) => x.id === a.id).version, label: `${a.id} split: second trip ${trip.id}` });
       return trip;
     }
     /** Planning settings (statuses, repositioning rules, thresholds) live in meta/planning. */

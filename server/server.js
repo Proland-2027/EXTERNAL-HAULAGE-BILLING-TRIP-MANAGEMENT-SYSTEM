@@ -161,6 +161,7 @@ const routes = {
     if (!next.vatTreatment) next.vatTreatment = 'exclusive';
     if (next.journeyPlanId) next.journeyPlanId = E.clean(next.journeyPlanId).toUpperCase();
     if (E.clean(next.waybill) && !next.waybillEnteredAt) next.waybillEnteredAt = nowISO(); if (!E.clean(next.waybill)) next.waybillEnteredAt = '';
+    if (next.allocationId && (!current || current.allocationId !== next.allocationId)) { const a = store.doc('allocations', next.allocationId); const why = P.allocationLinkError(a, next.id, { split: a && a.split }); if (why && a) throw new HttpError(409, why, { code: 'linked', tripLogId: a.tripLogId }); }
     const tripIdChanged = !!next.journeyPlanId && !(current && E.norm(current.journeyPlanId) === E.norm(next.journeyPlanId));
     const errors = E.validateTrip(next, { assets: store.list('assets'), trips: tripIdChanged ? store.trips() : [], planning: store.doc('meta', 'planning') || {}, current }); if (errors.length) throw new HttpError(400, errors.join(' '), { code: 'invalid', errors });
     const ts = nowISO(); if (!current) { next.createdAt = ts; next.createdBy = user.username; } next.updatedAt = ts; next.updatedBy = user.username; next.version = Number(current ? current.version : 0) + 1;
@@ -195,6 +196,27 @@ const routes = {
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
     return { ok: true, tripId, allocationId: alloc ? alloc.id : null, tripLogId: trip ? trip.id : null };
+  },
+  /** Select from Fleet Planning: the trip is built here from the allocation record, so no operational data is re-keyed. */
+  'POST /api/trips/from-allocation': (req, res, body) => {
+    const user = requireUser(req); requireAction(user, 'trip.fromPlanning');
+    const a = store.doc('allocations', String((body && body.allocationId) || '')); const split = !!(body && body.split);
+    const why = P.allocationLinkError(a, null, { split }); if (why) throw new HttpError(a ? 409 : 404, why, { code: 'linked', tripLogId: a && a.tripLogId });
+    if (split) { requireAction(user, 'allocation.split'); if (!E.clean(body.reason)) throw new HttpError(400, 'A reason is required to split an allocation.', { code: 'invalid' }); }
+    const request = store.doc('requests', a.requestId || '') || null; const ts = nowISO();
+    const next = P.tripFromAllocation(a, request, { dateDispatched: body && body.dateDispatched, note: split ? `Split from ${a.id}: ${E.clean(body.reason)}` : '' });
+    next.id = 't-' + Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex'); if (split) next.allocationSplit = true;
+    const asset = E.assetFor(next.plate, store.list('assets')); if (asset) { next.assetCode = asset.assetCode; next.vehicleType = asset.vehicleType; next.vehicleCategory = asset.vehicleCategory; next.costCenter = asset.costCenter; } if (!next.truckBatch) next.truckBatch = E.batchOn(asset, next.dateDispatched);
+    const errors = E.validateTrip(next, { assets: store.list('assets'), trips: next.journeyPlanId ? store.trips() : [], planning: store.doc('meta', 'planning') || {} }); if (errors.length) throw new HttpError(400, errors.join(' '), { code: 'invalid', errors });
+    next.createdAt = ts; next.createdBy = user.username; next.updatedAt = ts; next.updatedBy = user.username; next.version = 1; next.history = [{ ts, user: user.name, changes: [{ field: 'source', from: '', to: `Fleet Planning ${a.id}` }] }];
+    db.exec('BEGIN'); try {
+      store.putTrip(next); store.audit(auditEntry(user, 'create', 'trip', next.id, `${next.client} · ${next.plate} · ${next.dateDispatched} (from ${a.id})`, diff(null, next)));
+      const na = Object.assign({}, a, { updatedAt: ts, updatedBy: user.username, version: Number(a.version || 1) + 1 });
+      if (split) { na.split = true; na.splitTripIds = [...(a.splitTripIds || []), next.id]; na.splitReason = E.clean(body.reason); na.splitBy = user.username; na.splitAt = ts; } else { na.tripLogId = next.id; if (na.status === 'Planned') na.status = 'Deployed'; }
+      store.putDoc('allocations', na); store.audit(auditEntry(user, 'update', 'allocations', na.id, split ? `${na.id} split: second trip ${next.id}` : `${na.id} linked to trip ${next.id}`, diff(a, na)));
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
+    return next;
   },
   'DELETE /api/trips/:id': (req, res, body, url, params) => { const user = requireUser(req); requireAction(user, 'trip.delete'); const cur = store.trip(params.id); if (!cur) throw new HttpError(404, 'Trip not found'); db.exec('BEGIN'); try { store.delTrip(params.id); store.audit(auditEntry(user, 'delete', 'trip', params.id, `${cur.client} · ${cur.plate} · ${cur.dateDispatched}`, [])); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } return { ok: true }; },
   'POST /api/trips/bulk': (req, res, body) => {

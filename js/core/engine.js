@@ -32,7 +32,7 @@
     operations: ['dateDispatched', 'dateDelivered', 'plate', 'contractType', 'client', 'loadingFrom', 'loadingTo', 'journeyPlanId', 'waybill', 'returnWaybill', 'note', 'agreedRateId',
       'allocationId', 'requestId', 'waybillEnteredAt', 'waybillReceivedAt', 'waybillReceivedBy', 'waybillDocId', 'waybillDocName', 'tripIdSource'],
     // invoiceStatus / invoiceId / invoiceNo are written by the invoice workflow only (no manual selection in the UI).
-    billing: ['sellingPrice', 'vatTreatment', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceStatus', 'invoiceNo', 'invoiceId', 'agreedRateId', 'internalClient', 'waybillVerifiedAt', 'waybillVerifiedBy', 'waybillReceivedAt', 'waybillReceivedBy', 'waybillDocId', 'waybillDocName'],
+    billing: ['sellingPrice', 'vatTreatment', 'quoteNo', 'soNo', 'manualInvoiceNo', 'invoiceStatus', 'invoiceNo', 'invoiceId', 'agreedRateId', 'internalClient', 'waybillVerifiedAt', 'waybillVerifiedBy', 'waybillReceivedAt', 'waybillReceivedBy', 'waybillDocId', 'waybillDocName', 'waybill', 'journeyPlanId'],
     finance: ['paymentStatus', 'advance', 'note'],
   };
   const ROLE_FIELDS = {
@@ -46,11 +46,12 @@
   };
   // Coarse actions.
   const ROLE_ACTIONS = {
-    admin: ['trip.create', 'trip.edit', 'trip.delete', 'trip.import', 'rate.manage', 'invoice.manage', 'payment.manage', 'client.manage', 'asset.manage', 'user.manage', 'settings.manage', 'report.view', 'variance.review', 'audit.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'waybill.verify', 'tripid.assign'],
-    operations: ['trip.create', 'trip.edit', 'trip.import', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign'],
+    admin: ['trip.create', 'trip.edit', 'trip.delete', 'trip.import', 'rate.manage', 'invoice.manage', 'payment.manage', 'client.manage', 'asset.manage', 'user.manage', 'settings.manage', 'report.view', 'variance.review', 'audit.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'waybill.verify', 'tripid.assign', 'trip.fromPlanning', 'allocation.split'],
+    operations: ['trip.create', 'trip.edit', 'trip.import', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign', 'trip.fromPlanning', 'allocation.split'],
     tracking: ['fmr.update', 'report.view', 'export'],
-    planning: ['trip.create', 'trip.edit', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign'],
-    billing: ['trip.edit', 'invoice.manage', 'report.view', 'export', 'rate.view', 'waybill.verify'],
+    planning: ['trip.create', 'trip.edit', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign', 'trip.fromPlanning', 'allocation.split'],
+    // billing creates Trip Log entries only from fleet allocations (trip.fromPlanning), never by typing operational data
+    billing: ['trip.edit', 'invoice.manage', 'report.view', 'export', 'rate.view', 'waybill.verify', 'trip.fromPlanning'],
     finance: ['trip.edit', 'payment.manage', 'report.view', 'export'],
     management: ['report.view', 'variance.review', 'export', 'audit.view', 'rate.view'],
   };

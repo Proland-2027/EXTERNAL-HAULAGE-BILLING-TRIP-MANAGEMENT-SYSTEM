@@ -231,6 +231,24 @@
   // -------------------------------------------------------- waybill/invoice (rules live in engine.js; re-exported here)
   const waybillStatus = E.waybillStatus, invoiceAutoStatus = E.invoiceAutoStatus, paymentLabel = E.paymentLabel;
   function tripIdValid(id, setup) { return E.tripIdValid(id, setupOf({ setup }).tripIdPattern); }
+  /**
+   * The Trip Log entry for an allocation: every operational field comes from the allocation (and its request), nothing is
+   * re-typed. Billing fields stay empty; the Trip ID is carried over when Power Apps has already issued it.
+   */
+  function tripFromAllocation(alloc, request, opts) {
+    opts = opts || {}; const r = request || {};
+    return { dateDispatched: opts.dateDispatched || alloc.plannedDeploymentDate || alloc.plannedLoadingDate || todayISO(), dateDelivered: '', plate: alloc.plate, assetCode: alloc.assetCode || '', client: alloc.client, contractType: alloc.tonnage || r.tonnage || '', loadingFrom: alloc.loadingFrom || r.loadingFrom || '', loadingTo: alloc.destination || r.destination || '',
+      journeyPlanId: alloc.tripId || '', tripIdSource: alloc.tripId ? (alloc.tripIdBy === 'powerapps' ? 'powerapps' : 'allocation') : '', waybill: '', returnWaybill: '', invoiceStatus: 'Not Invoiced', sellingPrice: null, vatTreatment: 'exclusive', quoteNo: '', soNo: '', manualInvoiceNo: '', paymentStatus: 'Not Paid', advance: null, note: opts.note || '',
+      allocationId: alloc.id, requestId: alloc.requestId || r.id || '', requestReference: alloc.requestReference || r.reference || '', truckBatch: alloc.truckBatch || '', source: 'fleet-planning' };
+  }
+  /** One allocation → one trip. Returns the reason the link is refused, or '' when it is allowed. */
+  function allocationLinkError(alloc, tripId, opts) {
+    opts = opts || {};
+    if (!alloc) return 'Allocation not found.';
+    if (alloc.status === 'Cancelled') return `Allocation ${alloc.id} is cancelled.`;
+    if (alloc.tripLogId && alloc.tripLogId !== tripId) return opts.split ? '' : `Allocation ${alloc.id} is already linked to a Trip Log entry (${alloc.tripLogId}). Open that trip instead, or split the allocation through the authorised workflow.`;
+    return '';
+  }
   /** Chain stage of one allocation (the furthest stage reached), for lists and KPIs. */
   function chainStage(alloc, trip, invoice) {
     if (alloc.status === 'Cancelled') return 'Cancelled';
@@ -317,7 +335,7 @@
   }
 
   return {
-    DEFAULT_STATUSES, STATUS_ALIASES, DEFAULT_SETUP, REQUEST_STATUSES, ALLOCATION_STATUSES, PRIORITIES, WAYBILL_STATUSES, INVOICE_STATUS_AUTO, INVOICE_DOC_STATUSES, AVAILABILITY_CATEGORIES, DEFAULT_BODY_RUNS, CHAIN_STAGES, chainStage, requestBilling,
+    DEFAULT_STATUSES, STATUS_ALIASES, DEFAULT_SETUP, REQUEST_STATUSES, ALLOCATION_STATUSES, PRIORITIES, WAYBILL_STATUSES, INVOICE_STATUS_AUTO, INVOICE_DOC_STATUSES, AVAILABILITY_CATEGORIES, DEFAULT_BODY_RUNS, CHAIN_STAGES, chainStage, requestBilling, tripFromAllocation, allocationLinkError,
     todayISO, addDays, diffDays, maxDate, plateKey, setupOf, statusList, statusInfo, canonicalStatus, repoDays, routeTiming, routeLabel, findRoute, routeCost, fits, bodyRuns,
     truckStatus, overlappingAllocations, allocationDates, bookingConflicts, planForRequest, requestCounts, requestStatus, nextRequestId, nextAllocationId, allocationChain,
     waybillStatus, invoiceAutoStatus, paymentLabel, tripIdValid, runway, fleetKpis, billingKpis,

@@ -4,13 +4,14 @@
   const U = HB.U, E = HB.engine, h = U.h;
   HB.views = HB.views || {};
   const view = { title: 'Invoices', filters: {} };
-  const KIND = { Paid: 'good', Sent: 'warn', Issued: 'info', Draft: 'neutral', Void: 'neutral' };
+  const KIND = { Paid: 'good', Sent: 'warn', Issued: 'info', Draft: 'neutral', Void: 'neutral', 'Credit note': 'info' };
   const SENT_CHANNELS = ['Email', 'Client portal', 'Hand delivery', 'Courier', 'WhatsApp'];
 
   view.render = function (root, ctx) { view.ctx = ctx; view.root = root; root.append(h('div', { class: 'stack', id: 'inv-view' })); view.draw(); if (ctx.params && ctx.params.open) openInvoice(ctx, ctx.params.open); };
   view.onStoreChange = () => { if (view.root && view.root.isConnected) view.draw(); };
 
-  function invRows(store) { const trips = store.trips(); return store.state.invoices.map((inv) => { const mine = trips.filter((t) => t.invoiceId === inv.id); const priceType = inv.priceType || (inv.includesVat ? 'inclusive' : 'exclusive'); const tot = inv.lines && inv.lines.length ? { subtotal: inv.subtotal, vat: inv.vat, total: inv.total } : E.invoiceTotals(mine, E.vatRateOf(store.state.settings), priceType); return Object.assign({}, inv, { priceType, trips: mine, subtotal: tot.subtotal, vat: tot.vat, total: tot.total, paid: E.sum(mine, 'amountPaid'), balance: E.round2(tot.total - E.sum(mine, 'amountPaid')), liveStatus: E.invoiceDocStatus(inv, trips) }); }); }
+  function invRows(store) { const trips = store.trips(); return store.state.invoices.map((inv) => {
+    if (inv.type === 'credit') return Object.assign({}, inv, { priceType: inv.priceType || 'exclusive', trips: [], subtotal: -(inv.net || inv.amount), vat: -(inv.vatAmount || 0), total: -inv.amount, paid: 0, balance: 0, liveStatus: 'Credit note' }); const mine = trips.filter((t) => t.invoiceId === inv.id); const priceType = inv.priceType || (inv.includesVat ? 'inclusive' : 'exclusive'); const tot = inv.lines && inv.lines.length ? { subtotal: inv.subtotal, vat: inv.vat, total: inv.total } : E.invoiceTotals(mine, E.vatRateOf(store.state.settings), priceType); return Object.assign({}, inv, { priceType, trips: mine, subtotal: tot.subtotal, vat: tot.vat, total: tot.total, paid: E.sum(mine, 'amountPaid'), balance: E.round2(tot.total - E.sum(mine, 'amountPaid')), liveStatus: E.invoiceDocStatus(inv, trips) }); }); }
 
   view.draw = function () {
     const ctx = view.ctx, store = ctx.store, wrap = view.root.querySelector('#inv-view'); if (!wrap) return; U.clear(wrap);
@@ -28,7 +29,7 @@
     wrap.append(h('div', { class: 'toolbar' },
       h('input', { type: 'search', placeholder: 'Search invoice number or client…', value: f.search || '', onInput: U.debounce((e) => { f.search = e.target.value; view.draw(); }, 200) }),
       U.select([['', 'All clients'], ...store.clientNames().map((c) => [c, c])], f.client || '', { onChange: (e) => { f.client = e.target.value; view.draw(); } }),
-      U.select([['', 'All statuses'], ...E.INVOICE_DOC_STATUSES.map((s) => [s, s])], f.status || '', { onChange: (e) => { f.status = e.target.value; view.draw(); } }),
+      U.select([['', 'All statuses'], ...E.INVOICE_DOC_STATUSES.map((s) => [s, s]), ['Credit note', 'Credit notes']], f.status || '', { onChange: (e) => { f.status = e.target.value; view.draw(); } }),
       manage ? h('button', { class: 'btn accent', onClick: () => newInvoice(ctx) }, '+ Generate invoice') : null,
       h('button', { class: 'btn', onClick: () => HB.exporter.xlsx([{ name: 'Invoices', rows: [['Invoice No.', 'Client', 'Invoice Date', 'Due Date', 'Period From', 'Period To', 'Price Type', 'Trips', 'Subtotal excl. VAT (₦)', 'VAT (₦)', 'Total (₦)', 'Paid (₦)', 'Balance (₦)', 'Status', 'Issued on', 'Issued by', 'Sent on', 'Sent by', 'Sent via', 'Sent to', 'Manual number?'], ...rows.map((r) => [r.number, r.client, r.invoiceDate, r.dueDate, r.fromMonth, r.toMonth, E.VAT_TREATMENT_LABELS[r.priceType], r.trips.length, r.subtotal, r.vat, r.total, r.paid, r.balance, r.liveStatus, r.issuedAt || '', r.issuedBy || '', r.sentAt || '', r.sentBy || '', r.sentChannel || '', r.sentTo || '', r.manualNumber ? 'Yes' : 'No'])] }], `Invoices_${U.todayISO()}.xlsx`) }, 'Export Excel')));
     const kind = (s) => KIND[s];
@@ -93,6 +94,7 @@
 
   function openInvoice(ctx, id) {
     const { store } = ctx; const r = invRows(store).find((x) => x.id === id); if (!r) return U.toast('Invoice not found.', 'bad');
+    if (r.type === 'credit') { const orig = store.state.invoices.find((i) => i.id === r.againstId); const m0 = U.modal({ title: `Credit note ${r.number}`, size: 'narrow', body: h('div', { class: 'stack' }, h('div', { class: 'row' }, U.pill('Credit note', 'info'), h('span', { class: 'small muted', text: `Against invoice ${orig ? orig.number : r.againstId} · ${r.client}` })), h('div', { class: 'form-grid' }, U.field('Amount credited (₦, incl. VAT)', h('input', { value: U.money(r.amount), disabled: true }), { locked: true }), U.field('Issued', h('input', { value: `${U.dateTime(r.issuedAt)} · ${r.issuedBy}`, disabled: true }), { locked: true }), U.field('Reason', h('input', { value: r.reason || '', disabled: true }), { locked: true, span2: true })), h('p', { class: 'small muted', text: 'The credit was applied to the trips of the original invoice (oldest first) and appears in the payments ledger; the original invoice and its PDF are unchanged.' })) }); m0.setActions([orig ? h('button', { class: 'btn', onClick: () => { m0.close(); openInvoice(ctx, orig.id); } }, 'Open original invoice') : null, h('button', { class: 'btn', onClick: () => m0.close() }, 'Close')]); return; }
     const s = store.state.settings; const manage = ctx.can('invoice.manage');
     const co = Object.assign({ name: s.company, address: s.address, phone: s.phone, email: s.email, tin: s.tin, rcNumber: s.rcNumber }, r.company || {});
     const lines = r.lines && r.lines.length ? r.lines : U.sortBy(r.trips, 'dateDispatched').map((t) => { const sp = E.vatSplit(t.sellingPrice, r.vatRate || E.vatRateOf(s), r.priceType); return { date: t.dateDispatched, loadingFrom: t.loadingFrom, loadingTo: t.loadingTo, plate: t.plate, journeyPlanId: t.journeyPlanId, waybill: t.waybill, manualInvoiceNo: t.manualInvoiceNo, sellingPrice: t.sellingPrice, net: sp.net, vat: sp.vat, gross: sp.gross, tripId: t.id }; });
@@ -110,10 +112,32 @@
     if (manage && r.liveStatus === 'Draft') acts.push(h('button', { class: 'btn primary', onClick: async () => { if (r.trips.some((t) => t.sellingPrice === null)) return U.toast('Every trip on the invoice needs a selling price before it can be issued.', 'bad'); try { const now = U.nowISO(); await store.saveDoc('invoices', { id: r.id, status: 'Issued', issuedAt: now, issuedBy: store.user.username }, { expectedVersion: r.version, label: `${r.number} issued` }); for (const t of r.trips) await store.saveTrip({ id: t.id, invoiceStatus: 'Invoice Issued' }, { expectedVersion: t.version }); m.close(); view.draw(); U.toast(`Invoice ${r.number} issued. Trips now show "Invoice Issued".`, 'good'); openInvoice(ctx, r.id); } catch (e) { U.toast(e.message, 'bad'); } } }, 'Issue invoice'));
     if (manage && r.liveStatus === 'Issued') acts.push(h('button', { class: 'btn primary', onClick: () => markSent(ctx, r, m) }, 'Mark as Sent'));
     if (manage && (r.liveStatus === 'Draft' || r.liveStatus === 'Issued')) acts.push(h('button', { class: 'btn', onClick: async () => { const n = await U.prompt({ title: 'Override invoice number', label: 'New invoice number', value: r.number }); if (n === null) return; const num = E.clean(n); if (!num) return; const dup = E.findDuplicateInvoiceNumber(num, store.state.invoices, r.id); if (dup) return U.toast(`Number ${num} already belongs to invoice for ${dup.client}.`, 'bad'); try { await store.saveDoc('invoices', { id: r.id, number: num, manualNumber: true }, { expectedVersion: r.version, label: `${r.number} renumbered ${num}` }); for (const t of r.trips) await store.saveTrip({ id: t.id, invoiceNo: num }, { expectedVersion: t.version }); m.close(); view.draw(); openInvoice(ctx, r.id); } catch (e) { U.toast(e.message, 'bad'); } } }, 'Change number'));
+    if (manage && (r.liveStatus === 'Sent' || r.liveStatus === 'Issued' || r.liveStatus === 'Paid') && r.balance > 0) acts.push(h('button', { class: 'btn', title: 'Authorised correction: reduce what the client owes on this invoice without altering the issued document', onClick: () => creditNote(ctx, r, m) }, 'Issue credit note'));
     if (ctx.can('payment.manage') && r.liveStatus !== 'Void' && r.balance > 0) acts.push(h('button', { class: 'btn accent', onClick: () => { m.close(); HB.views.payments.recordPayment(ctx, { client: r.client, invoiceId: r.id }); } }, 'Record payment'));
     if (manage && r.liveStatus !== 'Void' && r.liveStatus !== 'Paid') acts.push(h('button', { class: 'btn danger', onClick: async () => { if (!(await U.confirm({ title: 'Void invoice', message: `Void ${r.number}? Its trips become available for a new invoice. Paid trips are left untouched.`, okLabel: 'Void', danger: true }))) return; try { await store.saveDoc('invoices', { id: r.id, status: 'Void', voidedAt: U.nowISO() }, { expectedVersion: r.version, label: `${r.number} voided` }); for (const t of r.trips) if (t.paymentStatus !== 'Paid') await store.saveTrip({ id: t.id, invoiceId: '', invoiceNo: '', invoiceStatus: 'Not Invoiced', voidedInvoiceNo: r.number }, { expectedVersion: t.version }); m.close(); view.draw(); U.toast('Invoice voided.'); } catch (e) { U.toast(e.message, 'bad'); } } }, 'Void'));
     acts.push(h('button', { class: 'btn', onClick: () => m.close() }, 'Close'));
     m.setActions(acts);
+  }
+  /** Credit note: an authorised correction against an issued/sent invoice. Applied to its trips like a receipt. */
+  function creditNote(ctx, r, parent) {
+    const { store } = ctx; const trips = U.sortBy(r.trips.filter((t) => t.balance > 0), 'dateDispatched');
+    const inp = { amount: h('input', { type: 'number', step: '0.01', min: '0.01', max: String(r.balance), value: r.balance }), reason: h('input', { type: 'text', placeholder: 'e.g. rate correction agreed with the client' }) };
+    const nextNo = 'CN-' + r.number + '-' + String(store.state.invoices.filter((i) => i.type === 'credit' && i.againstId === r.id).length + 1).padStart(2, '0');
+    const m = U.modal({ title: `Credit note against ${r.number}`, size: 'narrow', body: h('div', { class: 'stack' }, h('p', { class: 'small muted', text: `Reduces the amount the client owes on ${r.number} (balance ${U.money(r.balance)}). The issued invoice is not altered; the credit is numbered ${nextNo}, recorded in the ledger and applied to the invoice's trips oldest first.` }), h('div', { class: 'form-grid' }, U.field('Amount to credit (₦, incl. VAT)', inp.amount), U.field('Reason (required)', inp.reason, { span2: true }))) });
+    m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Cancel'), h('button', { class: 'btn primary', onClick: async () => {
+      const amount = E.round2(E.num(inp.amount.value) || 0); const reason = E.clean(inp.reason.value);
+      if (!(amount > 0) || amount > r.balance + 0.005) return U.toast('Enter an amount between ₦0.01 and the invoice balance.', 'bad'); if (!reason) return U.toast('A reason is required.', 'bad');
+      try {
+        const rate = r.vatRate || E.vatRateOf(store.state.settings); const sp = E.vatSplit(amount, rate, 'inclusive'); const now = U.nowISO();
+        let remaining = amount; const touched = [];
+        for (const t of trips) { const due = Math.max(0, E.round2(t.balance)); if (remaining <= 0 || due <= 0) continue; const pay = Math.min(due, remaining); remaining = E.round2(remaining - pay); touched.push({ t, pay }); }
+        const cn = { id: U.id('cn'), type: 'credit', number: nextNo, againstId: r.id, againstNumber: r.number, client: r.client, invoiceDate: U.todayISO(), amount, net: sp.net, vatAmount: sp.vat, vatRate: rate, reason, issuedAt: now, issuedBy: store.user.username, status: 'Issued', tripIds: touched.map((x) => x.t.id) };
+        await store.saveDoc('invoices', cn, { label: `${cn.number} · credit ${U.money(amount)} against ${r.number} · ${reason}` });
+        for (const { t, pay } of touched) { const covered = pay >= E.round2(t.balance) - 0.005; await store.saveTrip(covered ? { id: t.id, paymentStatus: 'Paid' } : { id: t.id, paymentStatus: 'Advance', advance: E.round2((t.amountPaid || 0) + pay) }, { expectedVersion: t.version, force: true }); }
+        await store.saveDoc('payments', { id: U.id('pay'), kind: 'credit', client: r.client, invoiceId: r.id, amount, date: U.todayISO(), method: 'Credit note', reference: cn.number, notes: reason, tripIds: touched.map((x) => x.t.id), recordedBy: store.user.username }, { label: `${cn.number} applied to ${r.number}` });
+        m.close(); if (parent) parent.close(); view.draw(); U.toast(`Credit note ${cn.number} issued and applied.`, 'good');
+      } catch (e) { U.toast(e.message, 'bad'); }
+    } }, 'Issue credit note')]);
   }
   function markSent(ctx, r, parent) {
     const { store } = ctx; const client = store.state.clients.find((c) => E.norm(c.name) === E.norm(r.client));

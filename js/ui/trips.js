@@ -95,7 +95,7 @@
     const toolbar = h('div', { class: 'toolbar' }, search,
       h('button', { class: 'btn' + (view.showFilters || activeFilters ? ' primary' : ''), onClick: () => { view.showFilters = !view.showFilters; view.draw(); } }, `Filters${activeFilters ? ' (' + activeFilters + ')' : ''}`),
       ctx.can('trip.create') ? h('button', { class: 'btn accent', onClick: () => openDetail(ctx, null) }, '+ New trip') : null,
-      ctx.can('trip.create') ? h('button', { class: 'btn', id: 'btn-from-planning', onClick: () => selectFromPlanning(ctx) }, (() => { const n = store.state.allocations.filter((a) => !a.tripLogId && ['Planned', 'Deployed', 'Loaded'].includes(a.status)).length; return n ? `Select from Fleet Planning (${n})` : 'Select from Fleet Planning'; })()) : null,
+      ctx.can('trip.fromPlanning') ? h('button', { class: 'btn', id: 'btn-from-planning', onClick: () => selectFromPlanning(ctx) }, (() => { const n = store.state.allocations.filter((a) => !a.tripLogId && ['Planned', 'Deployed', 'Loaded'].includes(a.status)).length; return n ? `Select from Fleet Planning (${n})` : 'Select from Fleet Planning'; })()) : null,
       ctx.can('trip.import') ? h('button', { class: 'btn', onClick: () => importDialog(ctx) }, 'Import Excel') : null,
       ctx.can('export') ? h('button', { class: 'btn', onClick: () => HB.exporter.xlsx([{ name: 'Trip Log', rows: HB.exporter.tripsToRows(rows) }], `Trip_Log_${U.todayISO()}.xlsx`) }, 'Export Excel') : null,
       h('span', { class: 'muted small grow', style: { textAlign: 'right' }, text: `${U.int(rows.length)} of ${U.int(store.trips().length)} trips` }));
@@ -328,27 +328,32 @@
 
   // ---------------------------------------------------------------- create trips from fleet allocations
   function selectFromPlanning(ctx, preselect) {
-    const { store } = ctx; if (!ctx.can('trip.create')) return U.toast('Your role cannot create trips.', 'bad');
-    const rows = HB.views.planning.allocationRows(store).filter((a) => !a.trip && !a.tripLogId && ['Planned', 'Deployed', 'Loaded'].includes(a.status));
-    const picked = new Set(preselect || []); const dates = new Map(rows.map((a) => [a.id, a.plannedDeploymentDate || a.plannedLoadingDate || U.todayISO()]));
+    const { store } = ctx; if (!ctx.can('trip.fromPlanning')) return U.toast('Your role cannot create trips from Fleet Planning.', 'bad');
+    const all = HB.views.planning.allocationRows(store).filter((a) => a.status !== 'Cancelled');
+    const st = { search: '', showLinked: false, picked: new Set(preselect || []), dates: new Map() };
     const body = h('div', { class: 'stack' }); const m = U.modal({ title: 'Select from Fleet Planning', size: 'wide', body });
     const draw = () => {
       U.clear(body);
-      body.append(h('p', { class: 'small muted', text: 'Allocations not yet in the Trip Log. Tick the ones that have been deployed: each creates one trip with the truck, client, route, dates, Request ID and Allocation ID filled in. The Trip ID comes from Power Apps (shown as Pending until it is entered); billing completes the selling price later.' }));
-      if (!rows.length) { body.append(h('div', { class: 'empty', text: 'Every live allocation is already in the Trip Log.' })); m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Close')]); return; }
-      const byReq = new Map(); for (const a of rows) { if (!byReq.has(a.requestId)) byReq.set(a.requestId, []); byReq.get(a.requestId).push(a); }
-      const list = h('div', { class: 'check-list' });
-      for (const [req, as] of byReq) { list.append(h('label', { style: { background: 'var(--surface-2)', fontWeight: 600 } }, h('input', { type: 'checkbox', checked: as.every((a) => picked.has(a.id)) ? true : null, onChange: (e) => { for (const a of as) { if (e.target.checked) picked.add(a.id); else picked.delete(a.id); } draw(); } }), h('span', { text: `Request ${req || '—'} · ${as[0].client} · ${as[0].loadingFrom} → ${as[0].destination}` }), h('span', { class: 'small muted', text: `${as.length} truck${as.length > 1 ? 's' : ''}` })));
-        for (const a of as) list.append(h('label', {}, h('input', { type: 'checkbox', checked: picked.has(a.id) ? true : null, onChange: (e) => { if (e.target.checked) picked.add(a.id); else picked.delete(a.id); draw(); } }), h('span', { class: 'grow' }, `${a.id} · ${a.plate}${a.truckBatch ? ' (' + a.truckBatch + ')' : ''} · planned loading ${U.date(a.plannedLoadingDate)} · `, a.tripId ? h('span', { class: 'num', text: 'Trip ID ' + a.tripId }) : h('span', { class: 'pill warn', text: 'Trip ID pending' }), ' ', U.pill(a.status, a.status === 'Planned' ? 'warn' : 'info')), h('span', { class: 'row small' }, 'Dispatched ', h('input', { type: 'date', value: dates.get(a.id), onChange: (e) => dates.set(a.id, e.target.value), onClick: (e) => e.stopPropagation() })))); }
-      body.append(list);
-      m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Cancel'), h('button', { class: 'btn primary', disabled: picked.size ? null : true, onClick: async () => {
-        let n = 0; const errors = [];
-        for (const a of rows.filter((x) => picked.has(x.id))) {
-          try { await store.saveTrip({ dateDispatched: dates.get(a.id), dateDelivered: '', plate: a.plate, client: a.client, contractType: a.tonnage || '', loadingFrom: a.loadingFrom, loadingTo: a.destination, journeyPlanId: a.tripId || '', waybill: '', returnWaybill: '', invoiceStatus: 'Not Invoiced', sellingPrice: null, vatTreatment: 'exclusive', paymentStatus: 'Not Paid', advance: null, note: '', allocationId: a.id, requestId: a.requestId || '', truckBatch: a.truckBatch || '', source: 'fleet-planning' }); n++; }
-          catch (e) { errors.push(`${a.id}: ${e.message}`); }
+      const q = E.norm(st.search); const match = (a) => !q || E.norm(`${a.id} ${a.requestId} ${a.requestReference || ''} ${a.client} ${a.plate} ${a.assetCode} ${a.loadingFrom} ${a.destination} ${a.tripId} ${a.truckBatch}`).includes(q);
+      const unlinked = all.filter((a) => !a.trip && !a.tripLogId && match(a)); const linked = all.filter((a) => (a.trip || a.tripLogId) && match(a));
+      body.append(h('p', { class: 'small muted', text: 'Allocations made by Fleet Planning that are not yet in the Trip Log. Tick the trucks that were deployed: each becomes one trip with client, vehicle, batch, route, loading date, Request ID, Allocation ID and the Power Apps Trip ID (when already issued) filled in from the allocation. Nothing is re-typed; billing completes the selling price afterwards and no invoice is issued by this step.' }));
+      body.append(h('div', { class: 'toolbar' }, h('input', { type: 'search', id: 'sfp-search', placeholder: 'Search client, plate, request, allocation, Trip ID…', value: st.search, onInput: U.debounce((e) => { st.search = e.target.value; draw(); }, 150) }), h('label', { class: 'row small' }, h('input', { type: 'checkbox', checked: st.showLinked ? true : null, onChange: (e) => { st.showLinked = e.target.checked; draw(); } }), ` Show allocations already in the Trip Log (${linked.length})`)));
+      if (!unlinked.length && !st.showLinked) body.append(h('div', { class: 'empty', text: q ? 'No unlinked allocation matches the search. Tick "Show allocations already in the Trip Log" to reopen an existing trip.' : 'Every live allocation is already in the Trip Log.' }));
+      if (unlinked.length) {
+        const byReq = new Map(); for (const a of unlinked) { if (!byReq.has(a.requestId)) byReq.set(a.requestId, []); byReq.get(a.requestId).push(a); }
+        const list = h('div', { class: 'check-list', id: 'sfp-list' });
+        for (const [req, as] of byReq) { list.append(h('label', { style: { background: 'var(--surface-2)', fontWeight: 600 } }, h('input', { type: 'checkbox', checked: as.every((a) => st.picked.has(a.id)) ? true : null, onChange: (e) => { for (const a of as) { if (e.target.checked) st.picked.add(a.id); else st.picked.delete(a.id); } draw(); } }), h('span', { text: `Request ${req || '—'}${as[0].requestReference ? ' (' + as[0].requestReference + ')' : ''} · ${as[0].client} · ${as[0].loadingFrom} → ${as[0].destination}` }), h('span', { class: 'small muted', text: `${as.length} truck${as.length > 1 ? 's' : ''}` })));
+          for (const a of as) { if (!st.dates.has(a.id)) st.dates.set(a.id, a.plannedDeploymentDate || a.plannedLoadingDate || U.todayISO()); list.append(h('label', {}, h('input', { type: 'checkbox', checked: st.picked.has(a.id) ? true : null, onChange: (e) => { if (e.target.checked) st.picked.add(a.id); else st.picked.delete(a.id); draw(); } }), h('span', { class: 'grow' }, `${a.id} · ${a.plate}${a.assetCode ? ' (' + a.assetCode + ')' : ''} · `, a.truckBatch ? U.pill(a.truckBatch, a.truckBatch === 'New Batch' ? 'info' : 'neutral') : null, ` · ${a.vehicleType || ''} ${a.tonnage || ''} · planned loading ${U.date(a.plannedLoadingDate)} · `, a.tripId ? h('span', { class: 'num', text: 'Trip ID ' + a.tripId }) : h('span', { class: 'pill warn', text: 'Trip ID pending' }), ' ', U.pill(a.status, a.status === 'Planned' ? 'warn' : 'info')), h('span', { class: 'row small' }, 'Dispatched ', h('input', { type: 'date', value: st.dates.get(a.id), onChange: (e) => st.dates.set(a.id, e.target.value), onClick: (e) => e.stopPropagation() })))); }
         }
-        m.close(); view.draw(); if (n) U.toast(`${n} trip${n > 1 ? 's' : ''} created from Fleet Planning. Trip IDs show as Pending until entered from Power Apps.`, 'good'); if (errors.length) U.toast(errors.join(' | '), 'bad');
-      } }, `Create ${picked.size || ''} trip${picked.size === 1 ? '' : 's'}`)]);
+        body.append(list);
+      }
+      if (st.showLinked) body.append(h('div', { class: 'table-frame short' }, linked.length ? h('table', { class: 'data' }, h('thead', {}, h('tr', {}, ['Allocation', 'Request', 'Client', 'Truck', 'Planned loading', 'Trip Log entry', 'Trip ID', 'Invoice status', ''].map((x) => h('th', { text: x })))), h('tbody', {}, linked.map((a) => h('tr', {}, h('td', { class: 'num', text: a.id + (a.split ? ' (split)' : '') }), h('td', { class: 'num', text: a.requestId || '' }), h('td', { text: a.client }), h('td', { text: a.plate }), h('td', { text: U.date(a.plannedLoadingDate) }), h('td', { text: a.trip ? `${U.date(a.trip.dateDispatched)} · ${a.trip.waybillStatus}` : a.tripLogId }), h('td', { text: (a.trip && a.trip.journeyPlanId) || a.tripId || 'Pending' }), h('td', { text: a.trip ? a.trip.invoiceStatus : '' }), h('td', {}, a.trip ? h('button', { class: 'btn sm', onClick: () => { m.close(); openDetail(ctx, a.trip.id); } }, 'Open trip') : ''))))) : h('div', { class: 'empty', text: 'No linked allocation matches.' })));
+      const n = st.picked.size;
+      m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Cancel'), h('button', { class: 'btn primary', id: 'sfp-create', disabled: n ? null : true, onClick: async () => {
+        let made = 0; const errors = [];
+        for (const id of [...st.picked]) { try { await store.createTripFromAllocation(id, { dateDispatched: st.dates.get(id) }); made++; } catch (e) { errors.push(`${id}: ${e.message}`); } }
+        m.close(); view.draw(); if (made) U.toast(`${made} trip${made > 1 ? 's' : ''} created from Fleet Planning. Trip IDs show as Pending until entered from Power Apps.`, 'good'); if (errors.length) U.toast(errors.join(' | '), 'bad');
+      } }, `Create ${n || ''} trip${n === 1 ? '' : 's'}`)]);
     };
     draw();
   }
