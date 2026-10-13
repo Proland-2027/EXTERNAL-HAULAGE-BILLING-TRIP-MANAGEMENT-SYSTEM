@@ -161,7 +161,8 @@ const routes = {
     if (!next.vatTreatment) next.vatTreatment = 'exclusive';
     if (next.journeyPlanId) next.journeyPlanId = E.clean(next.journeyPlanId).toUpperCase();
     if (E.clean(next.waybill) && !next.waybillEnteredAt) next.waybillEnteredAt = nowISO(); if (!E.clean(next.waybill)) next.waybillEnteredAt = '';
-    const errors = E.validateTrip(next, { assets: store.list('assets'), trips: next.journeyPlanId ? store.trips() : [], planning: store.doc('meta', 'planning') || {} }); if (errors.length) throw new HttpError(400, errors.join(' '), { code: 'invalid', errors });
+    const tripIdChanged = !!next.journeyPlanId && !(current && E.norm(current.journeyPlanId) === E.norm(next.journeyPlanId));
+    const errors = E.validateTrip(next, { assets: store.list('assets'), trips: tripIdChanged ? store.trips() : [], planning: store.doc('meta', 'planning') || {}, current }); if (errors.length) throw new HttpError(400, errors.join(' '), { code: 'invalid', errors });
     const ts = nowISO(); if (!current) { next.createdAt = ts; next.createdBy = user.username; } next.updatedAt = ts; next.updatedBy = user.username; next.version = Number(current ? current.version : 0) + 1;
     const changes = diff(current, next); next.history = [...(current && current.history || []), { ts, user: user.name, changes }].slice(-40);
     const label = `${next.client} · ${next.plate} · ${next.dateDispatched}`;

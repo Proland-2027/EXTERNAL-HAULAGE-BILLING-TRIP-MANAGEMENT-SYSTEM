@@ -162,3 +162,11 @@ test('fleet and billing KPIs on the seeded data', () => {
   const b = P.billingKpis({ trips, invoices: [{ id: 'i1', status: 'Sent', issuedAt: 'a', sentAt: 'b' }, { id: 'i2', status: 'Issued', issuedAt: 'a' }], allocations: [{ id: 'A', status: 'Planned' }, { id: 'B', status: 'Deployed', tripLogId: 't1' }, { id: 'C', status: 'Cancelled' }], today: TODAY });
   assert.equal(b.allocatedNotInTripLog, 1); assert.equal(b.allocatedAwaitingTripId, 2); assert.equal(b.tripsAwaitingWaybill, 1); assert.equal(b.completedNotInvoiced, 1); assert.equal(b.issuedNotSent, 1); assert.equal(b.sentAwaitingPayment, 1);
 });
+
+test('historical Journey Plan IDs that do not fit the Power Apps format can still be saved; only new or changed IDs are checked', () => {
+  const current = { id: 'wb-1', client: 'A', plate: 'X', dateDispatched: '2024-03-01', journeyPlanId: 'OMOS AND SONS' };
+  const trips = [current, { id: 'wb-2', journeyPlanId: 'OMOS AND SONS', client: 'A', dateDispatched: '2024-03-02' }];
+  assert.deepEqual(E.validateTrip({ ...current, sellingPrice: 100 }, { trips, current }), [], 'unchanged legacy id passes');
+  assert.ok(E.validateTrip({ ...current, journeyPlanId: 'not valid!' }, { trips, current }).some((e) => /Power Apps format/.test(e)), 'a changed id is validated');
+  assert.ok(E.validateTrip({ ...current, journeyPlanId: 'omos and sons ' }, { trips, current }).length === 0, 'case/space differences are not a change');
+});

@@ -319,9 +319,12 @@
     if (num(t.sellingPrice) !== null && num(t.sellingPrice) < 0) errors.push('Selling Price cannot be negative.');
     if (t.paymentStatus && !PAYMENT_STATUSES.includes(t.paymentStatus)) errors.push('Payment Status is invalid.');
     if (t.invoiceStatus && !INVOICE_STATUSES.includes(t.invoiceStatus) && !LEGACY_INVOICE_STATUS[t.invoiceStatus]) errors.push('Invoice Status is invalid.');
+    // Trip ID format and uniqueness apply to IDs being entered or changed now. Values already on the record (the
+    // workbook history holds free-text Journey Plan entries and repeats) are left as they are.
     const pattern = ctx && ctx.planning && ctx.planning.setup && ctx.planning.setup.tripIdPattern;
-    if (clean(t.journeyPlanId) && !tripIdValid(t.journeyPlanId, pattern)) errors.push(`Trip ID "${clean(t.journeyPlanId)}" does not match the Power Apps format.`);
-    if (ctx && ctx.trips && clean(t.journeyPlanId)) { const dup = findDuplicateTripId(t.journeyPlanId, ctx.trips, t.id); if (dup) errors.push(`Trip ID ${clean(t.journeyPlanId)} is already on the trip of ${dup.client} dispatched ${dup.dateDispatched}.`); }
+    const tripIdChanged = clean(t.journeyPlanId) && !(ctx && ctx.current && norm(ctx.current.journeyPlanId) === norm(t.journeyPlanId));
+    if (tripIdChanged && !tripIdValid(t.journeyPlanId, pattern)) errors.push(`Trip ID "${clean(t.journeyPlanId)}" does not match the Power Apps format.`);
+    if (tripIdChanged && ctx && ctx.trips) { const dup = findDuplicateTripId(t.journeyPlanId, ctx.trips, t.id); if (dup) errors.push(`Trip ID ${clean(t.journeyPlanId)} is already on the trip of ${dup.client} dispatched ${dup.dateDispatched}.`); }
     if (t.waybillReceivedAt && t.waybillEnteredAt && t.waybillReceivedAt.slice(0, 10) < (t.dateDispatched || '')) errors.push('Waybill received date cannot be before the dispatch date.');
     if (t.vatTreatment && !VAT_TREATMENTS.includes(t.vatTreatment)) errors.push('VAT treatment is invalid.');
     if (t.paymentStatus === 'Advance' && !(num(t.advance) > 0)) errors.push('Advance amount is required when Payment Status is Advance.');

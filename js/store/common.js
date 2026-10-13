@@ -100,7 +100,7 @@
       if (clean(trip.waybill) && !trip.waybillEnteredAt) trip.waybillEnteredAt = U.nowISO();
       if (!clean(trip.waybill)) trip.waybillEnteredAt = '';
       // Trip IDs come from Power Apps: validate the format and reject duplicates across the Trip Log
-      const errors = E.validateTrip(trip, Object.assign(this.ctx(), { trips: [...this.state.trips.values()] })); if (errors.length && !opts.force) { const err = new Error(errors.join(' ')); err.code = 'invalid'; err.errors = errors; throw err; }
+      const errors = E.validateTrip(trip, Object.assign(this.ctx(), { trips: [...this.state.trips.values()], current })); if (errors.length && !opts.force) { const err = new Error(errors.join(' ')); err.code = 'invalid'; err.errors = errors; throw err; }
       this.stamp(trip, !current);
       const changes = this.diff(current, trip);
       const entry = this.auditEntry({ action: current ? 'update' : 'create', entity: 'trip', entityId: trip.id, label: `${trip.client} · ${trip.plate} · ${trip.dateDispatched}`, changes });
