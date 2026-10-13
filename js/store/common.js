@@ -129,6 +129,23 @@
       if (opts.split) await this.saveDoc('allocations', { id: a.id, split: true, splitTripIds: [...(a.splitTripIds || []), trip.id], splitReason: E.clean(opts.reason), splitBy: this.user.username, splitAt: U.nowISO() }, { expectedVersion: this.state.allocations.find((x) => x.id === a.id).version, label: `${a.id} split: second trip ${trip.id}` });
       return trip;
     }
+    /** Credit note (authorised correction): numbered CN-…, applied to the invoice's trips, recorded in the ledger. */
+    async issueCreditNote(invoiceId, amount, reason) {
+      if (!this.user || !E.can(this.user.role, 'invoice.manage')) { const err = new Error('Only the billing team or an administrator can issue credit notes.'); err.code = 'forbidden'; throw err; }
+      const inv = this.state.invoices.find((i) => i.id === invoiceId); amount = E.round2(E.num(amount) || 0); reason = E.clean(reason);
+      if (!inv || inv.type === 'credit') { const err = new Error('Invoice not found.'); err.code = 'invalid'; throw err; }
+      if (inv.status === 'Void' || inv.status === 'Draft') { const err = new Error('Credit notes apply to issued or sent invoices; void a draft instead.'); err.code = 'invalid'; throw err; }
+      if (!reason) { const err = new Error('A reason is required.'); err.code = 'invalid'; throw err; }
+      const alloc = E.creditNoteAllocation(inv, this.trips(), amount);
+      if (!(amount > 0) || amount > alloc.balance + 0.005) { const err = new Error(`Enter an amount between ₦0.01 and the invoice balance (${alloc.balance}).`); err.code = 'invalid'; throw err; }
+      const rate = inv.vatRate || E.vatRateOf(this.state.settings); const sp = E.vatSplit(amount, rate, 'inclusive'); const now = U.nowISO();
+      const number = 'CN-' + inv.number + '-' + String(this.state.invoices.filter((i) => i.type === 'credit' && i.againstId === inv.id).length + 1).padStart(2, '0');
+      const cn = { id: U.id('cn'), type: 'credit', number, againstId: inv.id, againstNumber: inv.number, client: inv.client, invoiceDate: U.todayISO(), amount, net: sp.net, vatAmount: sp.vat, vatRate: rate, reason, issuedAt: now, issuedBy: this.user.username, status: 'Issued', tripIds: alloc.touched.map((x) => x.trip.id) };
+      await this.saveDoc('invoices', cn, { label: `${cn.number} · credit ${amount} against ${inv.number} · ${reason}` });
+      for (const x of alloc.touched) await this.saveTrip(Object.assign({ id: x.trip.id }, x.patch), { expectedVersion: this.raw(x.trip.id).version, force: true });
+      await this.saveDoc('payments', { id: U.id('pay'), kind: 'credit', client: inv.client, invoiceId: inv.id, amount, date: U.todayISO(), method: 'Credit note', reference: cn.number, notes: reason, tripIds: cn.tripIds, recordedBy: this.user.username }, { label: `${cn.number} applied to ${inv.number}` });
+      return cn;
+    }
     /** Planning settings (statuses, repositioning rules, thresholds) live in meta/planning. */
     async savePlanning(patch) {
       const before = this.state.planning || {}; const next = Object.assign({}, before, patch, { id: 'planning' }); this.stamp(next, !before.version);

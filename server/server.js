@@ -218,6 +218,27 @@ const routes = {
     } catch (e) { db.exec('ROLLBACK'); throw e; }
     return next;
   },
+  /** Credit note: billing's authorised correction. The trips' payment position is adjusted here, atomically, so the finance-only field rule does not apply. */
+  'POST /api/invoices/:id/credit-note': (req, res, body, url, params) => {
+    const user = requireUser(req); requireAction(user, 'invoice.manage');
+    const inv = store.doc('invoices', params.id); const amount = E.round2(E.num(body && body.amount) || 0); const reason = E.clean(body && body.reason);
+    if (!inv || inv.type === 'credit') throw new HttpError(404, 'Invoice not found'); if (inv.status === 'Void' || inv.status === 'Draft') throw new HttpError(400, 'Credit notes apply to issued or sent invoices; void a draft instead.', { code: 'invalid' }); if (!reason) throw new HttpError(400, 'A reason is required.', { code: 'invalid' });
+    const settings = store.settings(); const invoices = store.list('invoices'); const assets = store.list('assets');
+    const computed = store.trips().filter((t) => t.invoiceId === inv.id).map((t) => E.computeTrip(t, { settings, assets, rates: [], invoices }));
+    const alloc = E.creditNoteAllocation(inv, computed, amount);
+    if (!(amount > 0) || amount > alloc.balance + 0.005) throw new HttpError(400, `Enter an amount between 0.01 and the invoice balance (${alloc.balance}).`, { code: 'invalid' });
+    const rate = inv.vatRate || E.vatRateOf(settings); const sp = E.vatSplit(amount, rate, 'inclusive'); const ts = nowISO();
+    const number = 'CN-' + inv.number + '-' + String(invoices.filter((i) => i.type === 'credit' && i.againstId === inv.id).length + 1).padStart(2, '0');
+    const cn = { id: 'cn-' + Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex'), type: 'credit', number, againstId: inv.id, againstNumber: inv.number, client: inv.client, invoiceDate: ts.slice(0, 10), amount, net: sp.net, vatAmount: sp.vat, vatRate: rate, reason, issuedAt: ts, issuedBy: user.username, status: 'Issued', tripIds: alloc.touched.map((x) => x.trip.id), createdAt: ts, createdBy: user.username, updatedAt: ts, updatedBy: user.username, version: 1 };
+    const payment = { id: 'pay-' + Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex'), kind: 'credit', client: inv.client, invoiceId: inv.id, amount, date: ts.slice(0, 10), method: 'Credit note', reference: number, notes: reason, tripIds: cn.tripIds, recordedBy: user.username, createdAt: ts, createdBy: user.username, updatedAt: ts, updatedBy: user.username, version: 1 };
+    db.exec('BEGIN'); try {
+      store.putDoc('invoices', cn); store.audit(auditEntry(user, 'create', 'invoices', cn.id, `${number} · credit ${amount} against ${inv.number} · ${reason}`, diff(null, cn)));
+      for (const x of alloc.touched) { const cur = store.trip(x.trip.id); const next = Object.assign({}, cur, x.patch, { updatedAt: ts, updatedBy: user.username, version: Number(cur.version || 1) + 1 }); const ch = diff(cur, next); next.history = [...(cur.history || []), { ts, user: user.name, changes: ch }].slice(-40); store.putTrip(next); store.audit(auditEntry(user, 'update', 'trip', next.id, `${next.client} · ${next.plate} · ${next.dateDispatched} (credit note ${number})`, ch)); }
+      store.putDoc('payments', payment); store.audit(auditEntry(user, 'create', 'payments', payment.id, `${number} applied to ${inv.number}`, diff(null, payment)));
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
+    return { creditNote: cn, payment, applied: alloc.applied };
+  },
   'DELETE /api/trips/:id': (req, res, body, url, params) => { const user = requireUser(req); requireAction(user, 'trip.delete'); const cur = store.trip(params.id); if (!cur) throw new HttpError(404, 'Trip not found'); db.exec('BEGIN'); try { store.delTrip(params.id); store.audit(auditEntry(user, 'delete', 'trip', params.id, `${cur.client} · ${cur.plate} · ${cur.dateDispatched}`, [])); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } return { ok: true }; },
   'POST /api/trips/bulk': (req, res, body) => {
     const user = requireUser(req); requireAction(user, 'trip.import'); const trips = (body && body.trips) || []; if (!Array.isArray(trips) || trips.length > 20000) throw new HttpError(400, 'Invalid import');

@@ -373,6 +373,14 @@
     return { subtotal: round2(subtotal), vat: round2(vat), total: round2(total), count: trips.length };
   }
   /** Invoice document status: Draft → Issued → Sent → Paid (every trip settled); Void is terminal. */
+  /** Credit note against an invoice: the amount is applied to the invoice's trips oldest-first, like a receipt. */
+  function creditNoteAllocation(inv, computedTrips, amount) {
+    const trips = (computedTrips || []).filter((t) => t.invoiceId === inv.id).sort((a, b) => String(a.dateDispatched).localeCompare(String(b.dateDispatched)));
+    let remaining = round2(amount); const touched = [];
+    for (const t of trips) { const due = Math.max(0, round2(t.balance || 0)); if (remaining <= 0 || due <= 0) continue; const pay = Math.min(due, remaining); remaining = round2(remaining - pay); const covered = pay >= due - 0.005; touched.push({ trip: t, pay, patch: covered ? { paymentStatus: 'Paid' } : { paymentStatus: 'Advance', advance: round2((t.amountPaid || 0) + pay) } }); }
+    const balance = round2(sum(trips, 'balance'));
+    return { trips, touched, applied: round2(amount - remaining), unapplied: remaining, balance };
+  }
   function invoiceDocStatus(inv, trips) {
     if (inv.status === 'Void') return 'Void';
     const mine = trips.filter((t) => t.invoiceId === inv.id);
@@ -561,7 +569,7 @@
     assetFor, vatRateOf, rateStatus, lookupAgreedRate, clientKey, variance, tripStatus, computeTrip, validateTrip,
     normContract, locKey, locTokens, zoneOf, locMatch, vatSplit, batchOn, convertBasis, batchPerformance, RATE_HEADERS, mapRateHeaders, rowToRate,
     can, canEditField, editableFields,
-    clientCode, generateInvoiceNumber, eligibleTrips, invoiceTotals, invoiceDocStatus, findDuplicateInvoiceNumber,
+    clientCode, generateInvoiceNumber, eligibleTrips, invoiceTotals, invoiceDocStatus, findDuplicateInvoiceNumber, creditNoteAllocation,
     sum, filterTrips, tripMatches, clientSummary, pivotByMonth, dashboard,
     HEADER_ALIASES, mapHeaders, normalizeInvoiceStatus, normalizePaymentStatus, normalizeReturnWaybill, excelDateToISO, rowToTrip, dupKey,
   };

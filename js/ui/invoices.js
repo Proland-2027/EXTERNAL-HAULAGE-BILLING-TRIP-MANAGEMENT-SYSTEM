@@ -120,7 +120,7 @@
   }
   /** Credit note: an authorised correction against an issued/sent invoice. Applied to its trips like a receipt. */
   function creditNote(ctx, r, parent) {
-    const { store } = ctx; const trips = U.sortBy(r.trips.filter((t) => t.balance > 0), 'dateDispatched');
+    const { store } = ctx;
     const inp = { amount: h('input', { type: 'number', step: '0.01', min: '0.01', max: String(r.balance), value: r.balance }), reason: h('input', { type: 'text', placeholder: 'e.g. rate correction agreed with the client' }) };
     const nextNo = 'CN-' + r.number + '-' + String(store.state.invoices.filter((i) => i.type === 'credit' && i.againstId === r.id).length + 1).padStart(2, '0');
     const m = U.modal({ title: `Credit note against ${r.number}`, size: 'narrow', body: h('div', { class: 'stack' }, h('p', { class: 'small muted', text: `Reduces the amount the client owes on ${r.number} (balance ${U.money(r.balance)}). The issued invoice is not altered; the credit is numbered ${nextNo}, recorded in the ledger and applied to the invoice's trips oldest first.` }), h('div', { class: 'form-grid' }, U.field('Amount to credit (₦, incl. VAT)', inp.amount), U.field('Reason (required)', inp.reason, { span2: true }))) });
@@ -128,13 +128,7 @@
       const amount = E.round2(E.num(inp.amount.value) || 0); const reason = E.clean(inp.reason.value);
       if (!(amount > 0) || amount > r.balance + 0.005) return U.toast('Enter an amount between ₦0.01 and the invoice balance.', 'bad'); if (!reason) return U.toast('A reason is required.', 'bad');
       try {
-        const rate = r.vatRate || E.vatRateOf(store.state.settings); const sp = E.vatSplit(amount, rate, 'inclusive'); const now = U.nowISO();
-        let remaining = amount; const touched = [];
-        for (const t of trips) { const due = Math.max(0, E.round2(t.balance)); if (remaining <= 0 || due <= 0) continue; const pay = Math.min(due, remaining); remaining = E.round2(remaining - pay); touched.push({ t, pay }); }
-        const cn = { id: U.id('cn'), type: 'credit', number: nextNo, againstId: r.id, againstNumber: r.number, client: r.client, invoiceDate: U.todayISO(), amount, net: sp.net, vatAmount: sp.vat, vatRate: rate, reason, issuedAt: now, issuedBy: store.user.username, status: 'Issued', tripIds: touched.map((x) => x.t.id) };
-        await store.saveDoc('invoices', cn, { label: `${cn.number} · credit ${U.money(amount)} against ${r.number} · ${reason}` });
-        for (const { t, pay } of touched) { const covered = pay >= E.round2(t.balance) - 0.005; await store.saveTrip(covered ? { id: t.id, paymentStatus: 'Paid' } : { id: t.id, paymentStatus: 'Advance', advance: E.round2((t.amountPaid || 0) + pay) }, { expectedVersion: t.version, force: true }); }
-        await store.saveDoc('payments', { id: U.id('pay'), kind: 'credit', client: r.client, invoiceId: r.id, amount, date: U.todayISO(), method: 'Credit note', reference: cn.number, notes: reason, tripIds: touched.map((x) => x.t.id), recordedBy: store.user.username }, { label: `${cn.number} applied to ${r.number}` });
+        const cn = await store.issueCreditNote(r.id, amount, reason);
         m.close(); if (parent) parent.close(); view.draw(); U.toast(`Credit note ${cn.number} issued and applied.`, 'good');
       } catch (e) { U.toast(e.message, 'bad'); }
     } }, 'Issue credit note')]);

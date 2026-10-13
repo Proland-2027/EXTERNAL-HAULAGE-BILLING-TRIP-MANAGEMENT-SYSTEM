@@ -187,3 +187,12 @@ test('a Trip Log entry is built entirely from the allocation and its request; on
   assert.ok(E.can('billing', 'trip.fromPlanning') && !E.can('billing', 'trip.create') && !E.can('billing', 'allocation.split'), 'billing selects allocations but neither types trips nor splits allocations');
   assert.ok(E.can('planning', 'allocation.split') && !E.can('tracking', 'trip.fromPlanning'));
 });
+
+test('credit note allocation applies oldest-first against the invoice trips and never exceeds the balance', () => {
+  const inv = { id: 'i9' };
+  const trips = [{ id: 'b', invoiceId: 'i9', dateDispatched: '2026-10-05', balance: 500, amountPaid: 0 }, { id: 'a', invoiceId: 'i9', dateDispatched: '2026-10-01', balance: 300, amountPaid: 100 }, { id: 'c', invoiceId: 'other', dateDispatched: '2026-10-02', balance: 900 }];
+  const r = E.creditNoteAllocation(inv, trips, 400);
+  assert.equal(r.balance, 800); assert.equal(r.applied, 400); assert.equal(r.unapplied, 0);
+  assert.deepEqual(r.touched.map((x) => [x.trip.id, x.pay, x.patch.paymentStatus, x.patch.advance]), [['a', 300, 'Paid', undefined], ['b', 100, 'Advance', 100]]);
+  assert.equal(E.creditNoteAllocation(inv, trips, 1000).unapplied, 200);
+});

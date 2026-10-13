@@ -40,6 +40,7 @@
     async writeAudit() { /* the server records the audit trail itself */ }
     async fetchAudit(limit) { const d = await this.req('GET', '/api/audit?limit=' + (limit || 300)); return d.audit || []; }
     async bulkWriteTrips(trips) { const d = await this.req('POST', '/api/trips/bulk', { trips }); for (const t of d.trips || []) this.state.trips.set(t.id, t); this.emit({ type: 'trips' }); }
+    async issueCreditNote(invoiceId, amount, reason) { const d = await this.req('POST', '/api/invoices/' + encodeURIComponent(invoiceId) + '/credit-note', { amount, reason }); await this.poll().catch(() => {}); this.emit({ type: 'invoices', id: d.creditNote.id }); return d.creditNote; }
     async createTripFromAllocation(allocationId, opts) { const saved = await this.req('POST', '/api/trips/from-allocation', Object.assign({ allocationId }, opts || {})); this.state.trips.set(saved.id, saved); await this.poll().catch(() => {}); this.emit({ type: 'trip', id: saved.id }); return saved; }
     async changePassword(username, password) { await this.req('POST', '/api/users/' + encodeURIComponent(username) + '/password', { password }); }
   }
