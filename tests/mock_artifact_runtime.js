@@ -1,0 +1,39 @@
+/* In-page mock of the claude.ai artifact runtime (`window.claude.use('db' | 'user' | 'downloads')`) so the shared-database
+ * code path (js/store/artifact.js) can be exercised with Playwright. Injected with page.addInitScript before the app loads.
+ * Documents are seeded from data/workbook/*.json exactly as tools/build_artifact_seed.js lays them out. */
+(() => {
+  const subs = new Map(); // collection -> Set(cb)
+  const cols = new Map(); // collection -> Map(id -> data)
+  const col = (n) => { if (!cols.has(n)) cols.set(n, new Map()); return cols.get(n); };
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const deepMerge = (base, patch) => { const out = Object.assign({}, base || {}); for (const [k, v] of Object.entries(patch || {})) { if (v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' && !Array.isArray(out[k])) out[k] = deepMerge(out[k], v); else if (v && typeof v === 'object' && v.__delete__) delete out[k]; else out[k] = clone(v); } return out; };
+  const notify = (n, type, id) => { const data = col(n).get(id); for (const cb of subs.get(n) || []) setTimeout(() => cb({ docChanges: () => [{ type, doc: { id, data: () => (data === undefined ? undefined : clone(data)) } }] }), 0); };
+  const docRef = (path) => { const [n, id] = path.split('/'); return {
+    async set(data) { const exists = col(n).has(id); col(n).set(id, clone(data)); notify(n, exists ? 'modified' : 'added', id); },
+    async update(patch) { if (!col(n).has(id)) { const e = new Error('No document to update'); e.code = 'invalid_argument'; throw e; } col(n).set(id, deepMerge(col(n).get(id), patch)); notify(n, 'modified', id); },
+    async delete() { col(n).delete(id); notify(n, 'removed', id); },
+  }; };
+  let seeded = null;
+  async function seed() {
+    const get = async (f) => { const r = await fetch('data/workbook/' + f); return r.ok ? r.json() : null; };
+    const [trips, assets, clients, locations, rates, zones, fleet, routes, requests, allocations, planning] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones', 'fleet', 'routes', 'requests', 'allocations', 'planning'].map((n) => get(n + '.json')));
+    const chunks = {}; for (const t of trips || []) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; (chunks[m] = chunks[m] || {})[t.id] = t; }
+    for (const [m, ts] of Object.entries(chunks)) col('tripchunks').set(m, { month: m, trips: ts });
+    for (const a of assets || []) { const id = a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'); const tb = a.vehicleCategory === 'New Batch' ? 'New Batch' : a.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; col('assets').set(id, Object.assign({ id, version: 1 }, a, { truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] })); }
+    for (const c of clients || []) col('clients').set(c.id, Object.assign({ version: 1 }, c));
+    col('meta').set('locations', { list: locations || [] }); col('meta').set('zones', { map: zones || {} });
+    if (planning) col('meta').set('planning', Object.assign({ version: 1 }, planning, { id: 'planning' }));
+    col('settings').set('main', { company: 'JMG Limited', companyShort: 'JMG', vatRate: 0.075, paymentTermsDays: 7, invoiceNote: 'Thank you for your business.', version: 1 });
+    for (const r of rates || []) col('rates').set(r.id, r);
+    for (const [n, list] of [['fleet', fleet], ['requests', requests], ['allocations', allocations]]) for (const d of list || []) col(n).set(d.id, Object.assign({ version: 1 }, d));
+    // routes stay a static file in the artifact (see js/store/artifact.js); the collection starts empty
+  }
+  const db = {
+    collection(n) { const q = { _n: n, _limit: 1000, _order: null, limit(k) { q._limit = k; return q; }, orderBy(f, dir) { q._order = [f, dir]; return q; },
+      async get() { if (!seeded) seeded = seed(); await seeded; let docs = [...col(n).entries()].map(([id, data]) => ({ id, data: () => clone(data) })); if (q._order) { const [f, dir] = q._order; docs.sort((a, b) => (String(a.data()[f]) < String(b.data()[f]) ? -1 : 1) * (dir === 'desc' ? -1 : 1)); } return { docs: docs.slice(0, q._limit) }; },
+      onSnapshot(cb) { if (!subs.has(n)) subs.set(n, new Set()); subs.get(n).add(cb); return () => subs.get(n).delete(cb); } }; return q; },
+    doc: docRef,
+  };
+  window.__mockDb = { cols, reset: () => cols.clear() };
+  window.claude = { use: async (cap) => (cap === 'db' ? db : cap === 'user' ? { id: async () => 'u_mock', can: async () => true } : cap === 'downloads' ? { save: async () => true } : null) };
+})();

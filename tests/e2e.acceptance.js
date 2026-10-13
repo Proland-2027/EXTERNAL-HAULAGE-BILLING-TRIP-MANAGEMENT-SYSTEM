@@ -1,4 +1,5 @@
 /* Browser acceptance run (not part of `npm test`): drives the app against a local server with Playwright.
+ *   MOCK_ARTIFACT=1 runs the same scenarios through the shared-database store (js/store/artifact.js) with an in-page mock of the claude.ai runtime.
  *   node server/seed.js && PORT=8099 node server/server.js &
  *   BASE=http://localhost:8099 node tests/e2e.acceptance.js
  * Covers the 18 acceptance scenarios of the fleet-planning brief at UI level where practical and via the store API otherwise. */
@@ -10,6 +11,7 @@ const step = async (name, fn) => { try { if (typeof closeModals === 'function') 
 (async () => {
   const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await page.route(/cdnjs|googleapis|gstatic/, (r) => r.abort());
+  if (process.env.MOCK_ARTIFACT) { await page.addInitScript({ path: path.join(__dirname, 'mock_artifact_runtime.js') }); console.log('shared-database mode (mock artifact runtime)'); }
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message)); page.on('crash', () => errors.push('PAGE CRASHED')); page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   const login = async (u, p) => { await page.goto(BASE + '/?t=' + Date.now() + '#dashboard', { waitUntil: 'domcontentloaded' }); await page.waitForSelector('#login-user, .shell', { timeout: 15000 }); if (await page.$('#login-user')) { await page.fill('#login-user', u); await page.fill('#login-pass', p); await page.click('button[type=submit]'); } await page.waitForSelector('.shell', { timeout: 40000, state: 'attached' }); await page.waitForTimeout(600); };
   const logout = async () => { await page.evaluate(async () => { await HB.app.store.logout(); }); };
