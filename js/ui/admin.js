@@ -88,6 +88,9 @@
       logoBlock(ctx, s, manage),
       manage ? h('div', { class: 'row' }, h('button', { class: 'btn primary', onClick: async () => { const d = { company: E.clean(inp.company.value), companyShort: E.clean(inp.companyShort.value), address: E.clean(inp.address.value), phone: E.clean(inp.phone.value), email: E.clean(inp.email.value), website: E.clean(inp.website.value), tin: E.clean(inp.tin.value), rcNumber: E.clean(inp.rcNumber.value), vatRate: E.num(inp.vatRate.value), paymentTermsDays: E.num(inp.paymentTermsDays.value), bankName: E.clean(inp.bankName.value), accountName: E.clean(inp.accountName.value), accountNumber: E.clean(inp.accountNumber.value), invoiceNote: E.clean(inp.invoiceNote.value) }; if (!(d.vatRate >= 0 && d.vatRate < 1)) return U.toast('VAT rate must be between 0 and 1.', 'bad'); try { await store.saveSettings(d); U.toast('Settings saved. VAT and billing columns recalculated.', 'good'); } catch (e) { U.toast(e.message, 'bad'); } } }, 'Save settings')) : h('p', { class: 'muted small', text: 'Only administrators can change settings.' })));
     wrap.append(planningBlock(ctx, manage));
+    wrap.append(HB.masters.dispatchBlock(ctx, manage));
+    wrap.append(HB.masters.distanceBlock(ctx));
+    wrap.append(HB.masters.locationBlock(ctx));
     // location zones (price-list matching)
     const zoneText = Object.entries(store.state.zones || {}).sort().map(([k, v]) => `${k} = ${v}`).join('\n');
     const zoneArea = h('textarea', { rows: 8, style: { fontFamily: 'var(--mono)', fontSize: '12px' }, disabled: !manage ? true : null }, zoneText);

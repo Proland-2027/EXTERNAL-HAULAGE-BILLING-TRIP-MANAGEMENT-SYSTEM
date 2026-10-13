@@ -171,6 +171,78 @@ const step = async (name, fn) => { try { if (typeof closeModals === 'function') 
     const out = await ev((p) => { const s = HB.app.store; const t = s.trip(p.tid); const inv = s.state.invoices.find((i) => i.id === p.inv); const cn = s.state.invoices.find((i) => i.type === 'credit' && i.againstId === p.inv); const pay = s.state.payments.find((x) => x.kind === 'credit' && x.invoiceId === p.inv); return { balance: t.balance, pay: t.paymentLabel, invStatus: inv.status, invTotal: inv.total, cn: cn && cn.number, cnAmount: cn && cn.amount, ledger: !!pay, tripInv: t.invoiceStatus }; }, { tid: billTrip, inv: r.inv });
     if (Math.abs(out.balance - (r.balance - 75000)) > 0.01 || out.pay !== 'Part Paid' || out.invStatus !== 'Sent' || out.invTotal !== 1075000 || !/^CN-/.test(out.cn || '') || out.cnAmount !== 75000 || !out.ledger || out.tripInv !== 'Invoice Sent') throw new Error(JSON.stringify(out));
   });
+  // S23-S30 dispatch, diesel, lost sales, location and distance masters (fourth brief)
+  await step('S23 Settings shows the consumption matrix, Route Distance Master and Location Master; admin verifies a distance', async () => {
+    await logout(); await login('admin', 'Admin@2026'); await page.evaluate(() => { location.hash = '#settings'; }); await page.waitForTimeout(900);
+    const txt = await page.textContent('#content'); for (const k of ['Diesel consumption matrix', 'Route Distance Master', 'Location Master']) if (!txt.includes(k)) throw new Error('missing ' + k);
+    const r = await ev(async () => { const s = HB.app.store; const d = s.state.distances.find((x) => x.destState === 'Kano'); await s.saveDoc('distances', { id: d.id, verified: true, verifiedBy: s.user.username, verifiedAt: new Date().toISOString(), oneWayKm: 1000, returnKm: 1000, totalKm: 2000 }, { expectedVersion: d.version }); const nd = s.state.distances.find((x) => x.id === d.id); const calc = HB.dispatch.resolveDistance({ originState: 'Lagos', destState: 'Kano' }, s.dispatchCtx()); return { verified: nd.verified, by: nd.verifiedBy, src: calc.source, km: calc.totalKm }; });
+    if (!r.verified || r.src !== 'approved' || r.km !== 2000) throw new Error(JSON.stringify(r));
+  });
+  await step('S24 Location Master: an ambiguous location is confirmed by the administrator and reused everywhere', async () => {
+    const r = await ev(async () => { const s = HB.app.store; const G = HB.geo; const before = G.standardize('Ejigbo', s.state.locationMaster); const m = Object.assign({}, s.state.locationMaster); m[G.key('Ejigbo')] = Object.assign({}, m[G.key('Ejigbo')] || { name: 'Ejigbo' }, { state: 'Lagos', status: 'approved', source: 'corrected by administrator' }); await s.saveLocationMaster(m, 'Ejigbo → Lagos'); return { before: before.confidence, after: s.stateOf('Ejigbo'), orig: 'Ejigbo', trip: HB.engine.computeTrip({ client: 'A', plate: 'T-1678LA', loadingFrom: 'Apapa', loadingTo: 'Ejigbo', dateDispatched: '2026-10-01' }, s.ctx()) }; });
+    if (r.before !== 'ambiguous' || r.after !== 'Lagos' || r.trip.loadingState !== 'Lagos' || r.trip.deliveryState !== 'Lagos' || r.trip.loadingTo !== 'Ejigbo') throw new Error(JSON.stringify({ before: r.before, after: r.after, ls: r.trip.loadingState, ds: r.trip.deliveryState, to: r.trip.loadingTo }));
+  });
+  let dspId;
+  await step('S25 dispatch form: planner prepares it from the linked trip with diesel and road expenses calculated from the approved distance and matrix', async () => {
+    await logout(); await login('planner', 'Planner@2026');
+    const r = await ev(async () => { const s = HB.app.store; const D = HB.dispatch; const t = s.trips().find((x) => x.allocationId && !s.state.dispatches.some((d) => d.tripLogId === x.id)); const calc = D.dispatchCalc(t, s.dispatchCtx()); return { tripId: t.id, cat: calc.category, rate: calc.rate, km: calc.distance.totalKm, src: calc.distance.source, diesel: calc.diesel, road: calc.road, ready: calc.ready, issues: calc.issues }; });
+    if (r.diesel === null || r.road === null) throw new Error(JSON.stringify(r));
+    if (Math.abs(r.diesel - r.km * r.rate) > 0.02 || Math.abs(r.road - r.km * 25) > 0.02) throw new Error('formula ' + JSON.stringify(r));
+    await page.evaluate(() => { location.hash = '#dispatch'; }); await page.waitForTimeout(600); await ev((id) => HB.views.dispatch.openForTrip(HB.views.dispatch.ctx, id), r.tripId); await page.waitForSelector('.modal-foot');
+    const txt = await page.textContent('.modal'); for (const k of ['Outbound diesel', 'Return diesel', 'Total diesel allowance', 'Road expense rate', 'Total road expense allowance']) if (!txt.includes(k)) throw new Error('missing ' + k);
+    const btn = await page.$('.modal-foot button:has-text("Submit for approval")'); const draft = await page.$('.modal-foot button:has-text("Save as draft")'); if (!btn && !draft) throw new Error('no save buttons');
+    if (btn && !(await btn.isDisabled())) await btn.click(); else await draft.click(); await page.waitForTimeout(900);
+    const d = await ev((id) => { const s = HB.app.store; const d = s.state.dispatches.find((x) => x.tripLogId === id); return d && { id: d.id, number: d.number, status: HB.dispatch.dispatchStatus(d), budget: d.budgetDiesel, approved: d.approvedDiesel, road: d.approvedRoad, fin: d.financeRequired }; }, r.tripId);
+    if (!d || !/^DSP-\d{6}-\d{2}$/.test(d.number) || d.approved !== d.budget) throw new Error(JSON.stringify(d)); dspId = d.id;
+    if (d.status === 'Draft') await ev(async (id) => { const s = HB.app.store; const d = s.state.dispatches.find((x) => x.id === id); await s.saveDoc('dispatches', { id, submittedAt: new Date().toISOString() }, { expectedVersion: d.version }); }, dspId);
+  });
+  await step('S26 approval workflow: planner cannot approve; operations manager approves; finance approves when required; nothing counts as issued yet', async () => {
+    const no = await ev(async (id) => { const s = HB.app.store; const d = s.state.dispatches.find((x) => x.id === id); try { await s.saveDoc('dispatches', { id, opsApprovedAt: new Date().toISOString(), opsApprovedBy: 'planner' }, { expectedVersion: d.version }); return 'accepted'; } catch (e) { return e.code; } }, dspId);
+    if (no === 'accepted' && HB_MODE === 'server') throw new Error('planner approved a dispatch');
+    await logout(); await login('ops', 'Ops@2026'); await page.evaluate(() => { location.hash = '#dispatch'; }); await page.waitForTimeout(600); await ev((id) => HB.views.dispatch.openDispatch(HB.views.dispatch.ctx, id), dspId); await page.waitForSelector('.modal-foot');
+    const approve = await page.$('.modal-foot button:has-text("Approve dispatch (Operations)")'); if (!approve) throw new Error('no operations approval button'); await approve.click(); await page.waitForTimeout(900);
+    let st = await ev((id) => HB.dispatch.dispatchStatus(HB.app.store.state.dispatches.find((x) => x.id === id)), dspId);
+    if (st === 'Awaiting Finance') { await logout(); await login('finance', 'Finance@2026'); await ev(async (id) => { const s = HB.app.store; const d = s.state.dispatches.find((x) => x.id === id); await s.saveDoc('dispatches', { id, financeApprovedAt: new Date().toISOString(), financeApprovedBy: s.user.username }, { expectedVersion: d.version }); }, dspId); st = await ev((id) => HB.dispatch.dispatchStatus(HB.app.store.state.dispatches.find((x) => x.id === id)), dspId); }
+    if (st !== 'Approved') throw new Error('status ' + st);
+    const t = await ev((id) => HB.dispatch.approvedTotals(HB.app.store.state.dispatches.find((x) => x.id === id)), dspId); if (t.dieselIssued !== 0 || t.roadPaid !== 0) throw new Error('issued before recording');
+  });
+  await step('S27 issuance: diesel and road expenses recorded separately; over-issue and duplicate issue refused; supplementary needs approval', async () => {
+    await logout(); await login('ops', 'Ops@2026');
+    const r = await ev(async (id) => { const s = HB.app.store; const out = {}; const get = () => s.state.dispatches.find((x) => x.id === id); let d = get();
+      const issue = async (kind, qty, suppId) => { const cur = get(); const why = HB.dispatch.issueError(cur, kind, qty, suppId); if (why) return why; const list = kind === 'diesel' ? 'dieselIssues' : 'expensePayments'; const entry = { id: 'x' + Date.now() + Math.random(), [kind === 'diesel' ? 'litres' : 'amount']: qty, type: suppId ? 'supplementary' : 'initial', supplementaryId: suppId || '', by: s.user.username, at: new Date().toISOString(), ref: 'REF-' + kind }; try { await s.saveDoc('dispatches', { id, [list]: [...(cur[list] || []), entry] }, { expectedVersion: cur.version }); return ''; } catch (e) { return e.message; } };
+      out.over = await issue('diesel', d.approvedDiesel + 100); out.ok = await issue('diesel', d.approvedDiesel); out.dup = await issue('diesel', 10); out.statusAfterDiesel = HB.dispatch.dispatchStatus(get());
+      out.road = await issue('road', get().approvedRoad); out.status = HB.dispatch.dispatchStatus(get());
+      d = get(); await s.saveDoc('dispatches', { id, supplementary: [{ id: 'sup1', kind: 'diesel', qty: 40, reason: 'Diversion', requestedBy: s.user.username, requestedAt: new Date().toISOString(), status: 'Pending' }] }, { expectedVersion: d.version });
+      out.suppPending = await issue('diesel', 40, 'sup1');
+      d = get(); await s.saveDoc('dispatches', { id, supplementary: [Object.assign({}, d.supplementary[0], { status: 'Approved', decidedBy: s.user.username, decidedAt: new Date().toISOString() })] }, { expectedVersion: d.version });
+      out.suppOk = await issue('diesel', 40, 'sup1'); out.suppDup = await issue('diesel', 40, 'sup1'); const c = HB.dispatch.expenseControl(get()); out.control = { issued: c.dieselIssued, approved: c.approvedDiesel, supp: c.supplementaryDiesel, variance: c.dieselVariance }; return out; }, dspId);
+    if (!/exceeds/.test(r.over) || r.ok !== '' || !/already/.test(r.dup) || r.statusAfterDiesel !== 'Partly Dispatched' || r.road !== '' || r.status !== 'Dispatched' || !/not approved/.test(r.suppPending) || r.suppOk !== '' || !/already/.test(r.suppDup) || r.control.supp !== 40 || r.control.variance !== 0) throw new Error(JSON.stringify(r));
+  });
+  await step('S28 expense control, dispatch dashboard, assistant and PDF button', async () => {
+    await page.evaluate(() => { location.hash = '#dispatch'; }); await page.waitForTimeout(600);
+    await page.click('button:has-text("Trip expense control")'); await page.waitForTimeout(500); let txt = await page.textContent('#dsp-view'); for (const k of ['Budget diesel', 'Approved', 'Issued', 'Variance', 'Supplementary diesel issued']) if (!txt.includes(k)) throw new Error('control missing ' + k);
+    await page.click('button:has-text("Dashboard")'); await page.waitForTimeout(500); txt = await page.textContent('#dsp-view'); for (const k of ['Total planned trips', 'Awaiting dispatch approval', 'Approved, awaiting diesel', 'Diesel required (planned trips)', 'Diesel issued', 'Road expenses required', 'Road expenses paid', 'Additional diesel requests', 'Available trucks not planned', 'Confirmed lost sales', 'Diesel variance by truck', 'Diesel by vehicle category', 'Diesel by route']) if (!txt.includes(k)) throw new Error('dashboard missing ' + k);
+    await page.click('button:has-text("Assistant & checks")'); await page.waitForTimeout(400); await page.fill('#asst-q', 'Which trucks have received diesel above the approved allowance?'); await page.keyboard.press('Enter'); await page.waitForTimeout(400); txt = await page.textContent('#asst-out'); if (!/answered from live records/.test(txt)) throw new Error('assistant did not answer');
+    const n = await ev(() => HB.dispatch.QUESTIONS.filter((q) => HB.dispatch.assistant(q, HB.app.store.dispatchCtx())).length); if (n !== 9) throw new Error('assistant answered ' + n + ' of 9');
+    await page.click('button:has-text("Dispatch forms")'); await page.waitForTimeout(500); if (!(await page.$('#dsp-table button:has-text("PDF")'))) throw new Error('no PDF button');
+  });
+  await step('S29 bulk cancellation of client requests with reason, truck release and lost-sales records', async () => {
+    await logout(); await login('planner', 'Planner@2026'); await page.evaluate(() => { location.hash = '#planning'; }); await page.waitForTimeout(600);
+    const pick = await ev(() => { const s = HB.app.store; const rows = HB.views.planning.requestRows(s).filter((r) => !['Completed', 'Cancelled'].includes(r.liveStatus) && r.counts.outstanding > 0).slice(0, 2); return rows.map((r) => r.id); }); if (pick.length < 2) throw new Error('need two open requests');
+    for (const id of pick) await ev((id) => { const row = [...document.querySelectorAll('#req-table tbody tr')].find((tr) => tr.textContent.includes(id)); row.querySelector('input.req-pick').click(); }, id); await page.waitForTimeout(300);
+    await page.click('#btn-cancel-selected'); await page.waitForSelector('#btn-confirm-cancel'); await page.click('#btn-confirm-cancel'); await page.waitForTimeout(600);
+    const confirm = await page.$('.overlay:last-child .modal-foot button:has-text("Release trucks")'); if (confirm) { await confirm.click(); await page.waitForTimeout(1500); } else await page.waitForTimeout(1200);
+    const r = await ev((ids) => { const s = HB.app.store; return ids.map((id) => { const req = s.state.requests.find((x) => x.id === id); const ls = s.state.lostsales.find((x) => x.requestId === id); const live = s.state.allocations.filter((a) => a.requestId === id && !['Cancelled', 'Completed'].includes(a.status)).length; return { id, status: req.status, reason: req.cancelReason, by: req.cancelledBy, ls: ls && { kind: ls.kind, trucks: ls.unfulfilledTrucks, lost: ls.estimatedLost, rate: ls.agreedRate }, live, exists: !!req }; }); }, pick);
+    for (const x of r) { if (!x.exists || x.status !== 'Cancelled' || !x.reason || !x.by || !x.ls || x.ls.kind !== 'Confirmed lost sale' || x.live) throw new Error(JSON.stringify(x)); if (x.ls.rate && Math.abs(x.ls.lost - x.ls.trucks * x.ls.rate) > 0.01) throw new Error('lost sales formula ' + JSON.stringify(x.ls)); }
+    await page.evaluate(() => { location.hash = '#lostsales'; }); await page.waitForTimeout(600); const txt = await page.textContent('#ls-view'); if (!txt.includes('Confirmed lost sales') || !txt.includes(pick[0])) throw new Error('lost sales view'); await page.click('button:has-text("Reports")'); await page.waitForTimeout(400); if (!(await page.textContent('#ls-view')).includes('Confirmed lost sales by client')) throw new Error('reports tab');
+  });
+  await step('S30 tracking officer and management are read-only on dispatch, requests and masters', async () => {
+    await logout(); await login('manager', 'Manager@2026'); await page.evaluate(() => { location.hash = '#dispatch'; }); await page.waitForTimeout(600);
+    const r = await ev(() => { const E = HB.engine; return { prep: E.can('management', 'dispatch.prepare'), appr: E.can('management', 'dispatch.approve'), dist: E.can('management', 'distance.manage'), loc: E.can('tracking', 'location.manage'), req: E.can('tracking', 'request.manage'), fin: E.can('finance', 'dispatch.finance'), opsFin: E.can('operations', 'dispatch.finance') }; });
+    if (r.prep || r.appr || r.dist || r.loc || r.req || !r.fin || r.opsFin) throw new Error(JSON.stringify(r));
+    if (await page.$('#req-bulk')) throw new Error('management sees bulk cancel');
+  });
+
   await browser.close();
   for (const [s, n] of results) console.log(s, n);
   const fails = results.filter((r) => r[0] === 'FAIL').length; console.log(`\n${results.length - fails}/${results.length} passed`);

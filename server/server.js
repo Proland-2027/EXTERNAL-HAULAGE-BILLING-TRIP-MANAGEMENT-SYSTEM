@@ -16,13 +16,16 @@ const crypto = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
 const E = require('../js/core/engine.js');
 const P = require('../js/core/planning.js');
+const G = require('../js/core/geo.js');
+const D = require('../js/core/dispatch.js');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = Number(process.env.PORT || 8080);
 const DB_PATH = process.env.DB || path.join(ROOT, 'data', 'haulage.db');
 const SECURE_COOKIE = process.env.SECURE_COOKIE === '1';
-const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'settings', 'meta', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs'];
-const COLLECTION_ACTION = { clients: 'client.manage', assets: 'asset.manage', rates: 'rate.manage', invoices: 'invoice.manage', payments: 'payment.manage', users: 'user.manage', settings: 'settings.manage', meta: 'settings.manage', fleet: 'fmr.update', routes: 'planning.manage', requests: 'request.manage', allocations: 'planning.manage', waybilldocs: 'trip.edit' };
+const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'settings', 'meta', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dispatches'];
+const COLLECTION_ACTION = { clients: 'client.manage', assets: 'asset.manage', rates: 'rate.manage', invoices: 'invoice.manage', payments: 'payment.manage', users: 'user.manage', settings: 'settings.manage', meta: 'settings.manage', fleet: 'fmr.update', routes: 'planning.manage', requests: 'request.manage', allocations: 'planning.manage', waybilldocs: 'trip.edit', lostsales: 'lostsales.manage', distances: 'distance.manage', dispatches: 'dispatch.prepare' };
+const DISTANCE_ROUTER = process.env.OSRM_URL || ''; // e.g. https://router.project-osrm.org — road-distance service used by the Route Distance Master
 // Power Apps integration: an API key lets Power Automate post Trip IDs (see docs/DEPLOYMENT.md). Empty = endpoint disabled.
 const POWERAPPS_API_KEY = process.env.POWERAPPS_API_KEY || '';
 
@@ -61,6 +64,7 @@ const q = {
   purgeSessions: db.prepare('DELETE FROM sessions WHERE expires_at < ?'),
 };
 const parse = (row) => (row ? JSON.parse(row.json) : null);
+const num = E.num;
 const nowISO = () => new Date().toISOString();
 
 const store = {
@@ -124,8 +128,8 @@ const routes = {
   'POST /api/logout': (req, res) => { const t = cookieToken(req); if (t) q.delSession.run(t); res.setHeader('Set-Cookie', 'hb_session=; Path=/; HttpOnly; Max-Age=0'); return { ok: true }; },
   'GET /api/me': (req) => ({ user: currentUser(req) }),
   'GET /api/bootstrap': (req) => {
-    const user = requireUser(req); const out = { user, settings: store.settings(), trips: store.trips(), seq: q.maxSeq.get().seq, locations: ((store.doc('meta', 'locations') || {}).list) || [], zones: ((store.doc('meta', 'zones') || {}).map) || {}, planning: store.doc('meta', 'planning') || {} };
-    for (const c of ['clients', 'assets', 'rates', 'invoices', 'payments', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs']) out[c] = store.list(c);
+    const user = requireUser(req); const out = { user, settings: store.settings(), trips: store.trips(), seq: q.maxSeq.get().seq, locations: ((store.doc('meta', 'locations') || {}).list) || [], zones: ((store.doc('meta', 'zones') || {}).map) || {}, planning: store.doc('meta', 'planning') || {}, locationMaster: (() => { const m = Object.assign({}, store.doc('meta', 'locationmaster') || {}); delete m.id; return m; })() };
+    for (const c of ['clients', 'assets', 'rates', 'invoices', 'payments', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dispatches']) out[c] = store.list(c);
     out.users = store.list('users').map((u) => (E.can(user.role, 'user.manage') ? Object.assign({}, u, { hash: undefined, salt: undefined }) : publicUser(u)));
     return out;
   },
@@ -239,6 +243,16 @@ const routes = {
     } catch (e) { db.exec('ROLLBACK'); throw e; }
     return { creditNote: cn, payment, applied: alloc.applied };
   },
+  /** Road distance between two points from the routing service (when configured); the administrator still approves it. */
+  'GET /api/routing/distance': async (req, res, body, url) => {
+    const user = requireUser(req); requireAction(user, 'distance.manage');
+    if (!DISTANCE_ROUTER) throw new HttpError(404, 'No routing service configured on this server (set OSRM_URL).', { code: 'unavailable' });
+    const from = url.searchParams.get('from'), to = url.searchParams.get('to'); const pt = (s) => { const m = /^(-?[\d.]+),(-?[\d.]+)$/.exec(s || ''); return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null; };
+    const a = pt(from), b = pt(to); if (!a || !b) throw new HttpError(400, 'from and to must be lat,lng');
+    const r = await fetch(`${DISTANCE_ROUTER}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`, { signal: AbortSignal.timeout(15000) }); if (!r.ok) throw new HttpError(502, 'Routing service error ' + r.status);
+    const j = await r.json(); const m = j.routes && j.routes[0]; if (!m) throw new HttpError(502, 'No route found');
+    return { km: Math.round(m.distance / 1000), minutes: Math.round(m.duration / 60), source: DISTANCE_ROUTER };
+  },
   'DELETE /api/trips/:id': (req, res, body, url, params) => { const user = requireUser(req); requireAction(user, 'trip.delete'); const cur = store.trip(params.id); if (!cur) throw new HttpError(404, 'Trip not found'); db.exec('BEGIN'); try { store.delTrip(params.id); store.audit(auditEntry(user, 'delete', 'trip', params.id, `${cur.client} · ${cur.plate} · ${cur.dateDispatched}`, [])); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; } return { ok: true }; },
   'POST /api/trips/bulk': (req, res, body) => {
     const user = requireUser(req); requireAction(user, 'trip.import'); const trips = (body && body.trips) || []; if (!Array.isArray(trips) || trips.length > 20000) throw new HttpError(400, 'Invalid import');
@@ -259,6 +273,15 @@ const routes = {
     if (c === 'allocations' && next.status !== 'Cancelled' && next.plannedLoadingDate && next.backOnGround) { const clash = P.bookingConflicts(next.plate, next.plannedLoadingDate, next.backOnGround, store.list('allocations'), next.id); if (clash.length && !incoming.allowDoubleBooking) throw new HttpError(409, `${next.plate} is already allocated to ${clash[0].client} (${clash[0].id}) over these days.`, { code: 'double_booking', conflicts: clash.map((x) => x.id) }); }
     if (c === 'allocations' && next.tripId) { next.tripId = E.clean(next.tripId).toUpperCase(); const planning = store.doc('meta', 'planning') || {}; if (!E.tripIdValid(next.tripId, P.setupOf(planning).tripIdPattern)) throw new HttpError(400, 'Trip ID is not in the Power Apps format.', { code: 'invalid' }); const other = store.list('allocations').find((a) => a.id !== next.id && a.tripId && a.tripId.toUpperCase() === next.tripId); const dupTrip = E.findDuplicateTripId(next.tripId, store.trips(), next.tripLogId || null); if (other || dupTrip) throw new HttpError(409, `Trip ID ${next.tripId} is already in use.`, { code: 'duplicate' }); }
     if (c === 'fleet' && current && incoming.status !== undefined && incoming.status !== current.status) { next.statusAt = incoming.statusAt || ts0; next.statusBy = user.username; }
+    // dispatch approvals and issues are role-checked field by field
+    if (c === 'dispatches') { const changed = (k) => JSON.stringify(current ? current[k] : undefined) !== JSON.stringify(next[k]);
+      if (changed('opsApprovedAt') || changed('rejectedAt') || changed('approvedDiesel') || changed('approvedRoad') || changed('supplementary')) requireAction(user, next.rejectedAt && !current?.rejectedAt ? 'dispatch.approve' : (changed('supplementary') && (next.supplementary || []).some((s, i) => !(current && current.supplementary && current.supplementary[i]) || s.status !== current.supplementary[i].status) ? 'dispatch.approve' : 'dispatch.approve'));
+      if (changed('financeApprovedAt')) requireAction(user, 'dispatch.finance');
+      if (changed('dieselIssues') || changed('expensePayments') || changed('actualDieselConsumed') || changed('closedAt')) requireAction(user, 'dispatch.issue');
+      for (const [kind, list] of [['diesel', 'dieselIssues'], ['road', 'expensePayments']]) { const prev = (current && current[list]) || []; const now = next[list] || []; if (now.length > prev.length) { const added = now.slice(prev.length); if (now.length - prev.length > 1) throw new HttpError(400, 'Record one issue at a time.', { code: 'invalid' }); const x = added[0]; const base = Object.assign({}, current, { [list]: prev }); const why = D.issueError(base, kind, kind === 'diesel' ? x.litres : x.amount, x.supplementaryId); if (why) throw new HttpError(409, why, { code: 'issue_refused' }); } }
+      if (changed('approvedDiesel') || changed('approvedRoad')) { if (current && (num(current.approvedDiesel) !== num(next.approvedDiesel) || num(current.approvedRoad) !== num(next.approvedRoad)) && (next.budgetDiesel !== next.approvedDiesel || next.budgetRoad !== next.approvedRoad) && !E.clean(next.adjustmentReason)) throw new HttpError(400, 'An adjustment to the calculated allowance needs a reason.', { code: 'invalid' }); }
+    }
+    if (c === 'distances' && next.verified && !(current && current.verified)) { next.verifiedBy = user.username; next.verifiedAt = ts0; }
     if (c === 'waybilldocs' && typeof next.data === 'string' && next.data.length > 700000) throw new HttpError(413, 'Waybill file too large (limit ~500 KB).');
     const ts = ts0; if (!current) { next.createdAt = next.createdAt || ts; next.createdBy = user.username; } next.updatedAt = ts; next.updatedBy = user.username; next.version = Number(current ? current.version : 0) + 1;
     db.exec('BEGIN'); try { store.putDoc(c, next); if (c !== 'meta' || params.id === 'planning') store.audit(auditEntry(user, current ? 'update' : 'create', c, next.id, next.name || next.number || next.plate || next.id, diff(current, next))); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }

@@ -22,7 +22,8 @@
   let seeded = null;
   async function seed() {
     const get = async (f) => { const r = await fetch('data/workbook/' + f); return r.ok ? r.json() : null; };
-    const [trips, assets, clients, locations, rates, zones, fleet, routes, requests, allocations, planning] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones', 'fleet', 'routes', 'requests', 'allocations', 'planning'].map((n) => get(n + '.json')));
+    const [trips, assets, clients, locations, rates, zones, fleet, routes, requests, allocations, planning, distances, locationmaster] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones', 'fleet', 'routes', 'requests', 'allocations', 'planning', 'distances', 'locationmaster'].map((n) => get(n + '.json')));
+    for (const d of distances || []) col('distances').set(d.id, d); if (locationmaster) col('meta').set('locationmaster', Object.assign({ version: 1 }, locationmaster, { id: 'locationmaster' }));
     const chunks = {}; for (const t of trips || []) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; (chunks[m] = chunks[m] || {})[t.id] = t; }
     for (const [m, ts] of Object.entries(chunks)) col('tripchunks').set(m, { month: m, trips: ts });
     for (const a of assets || []) { const id = a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'); const tb = a.vehicleCategory === 'New Batch' ? 'New Batch' : a.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; col('assets').set(id, Object.assign({ id, version: 1 }, a, { truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] })); }

@@ -46,13 +46,14 @@
   };
   // Coarse actions.
   const ROLE_ACTIONS = {
-    admin: ['trip.create', 'trip.edit', 'trip.delete', 'trip.import', 'rate.manage', 'invoice.manage', 'payment.manage', 'client.manage', 'asset.manage', 'user.manage', 'settings.manage', 'report.view', 'variance.review', 'audit.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'waybill.verify', 'tripid.assign', 'trip.fromPlanning', 'allocation.split'],
-    operations: ['trip.create', 'trip.edit', 'trip.import', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign', 'trip.fromPlanning', 'allocation.split'],
+    admin: ['trip.create', 'trip.edit', 'trip.delete', 'trip.import', 'rate.manage', 'invoice.manage', 'payment.manage', 'client.manage', 'asset.manage', 'user.manage', 'settings.manage', 'report.view', 'variance.review', 'audit.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'waybill.verify', 'tripid.assign', 'trip.fromPlanning', 'allocation.split', 'dispatch.prepare', 'dispatch.approve', 'dispatch.finance', 'dispatch.issue', 'distance.manage', 'location.manage', 'lostsales.manage'],
+    // operations = operations manager: prepares and approves dispatches, records issues
+    operations: ['trip.create', 'trip.edit', 'trip.import', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign', 'trip.fromPlanning', 'allocation.split', 'dispatch.prepare', 'dispatch.approve', 'dispatch.issue', 'lostsales.manage', 'location.suggest'],
     tracking: ['fmr.update', 'report.view', 'export'],
-    planning: ['trip.create', 'trip.edit', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign', 'trip.fromPlanning', 'allocation.split'],
+    planning: ['trip.create', 'trip.edit', 'report.view', 'export', 'fmr.update', 'planning.manage', 'request.manage', 'tripid.assign', 'trip.fromPlanning', 'allocation.split', 'dispatch.prepare', 'lostsales.manage', 'location.suggest'],
     // billing creates Trip Log entries only from fleet allocations (trip.fromPlanning), never by typing operational data
     billing: ['trip.edit', 'invoice.manage', 'report.view', 'export', 'rate.view', 'waybill.verify', 'trip.fromPlanning'],
-    finance: ['trip.edit', 'payment.manage', 'report.view', 'export'],
+    finance: ['trip.edit', 'payment.manage', 'report.view', 'export', 'dispatch.finance', 'dispatch.issue'],
     management: ['report.view', 'variance.review', 'export', 'audit.view', 'rate.view'],
   };
 
@@ -300,6 +301,7 @@
     t.invoiceIssuedAt = inv ? inv.issuedAt || '' : t.invoiceIssuedAt || '';
     t.invoiceSentAt = inv ? inv.sentAt || '' : t.invoiceSentAt || '';
     t.waybillStatus = waybillStatus(t, ctx.planning && ctx.planning.setup);
+    if (ctx.stateOf) { t.loadingState = ctx.stateOf(t.loadingFrom); t.deliveryState = ctx.stateOf(t.loadingTo); }
     t.paymentLabel = paymentLabel(t.paymentStatus);
     t.tripStatus = tripStatus(t);
     const lk = lookupAgreedRate(t, ctx.rates, ctx.zones, ctx.clients);

@@ -3,7 +3,7 @@
   'use strict';
   const E = HB.engine, P = HB.planning, U = HB.U; const clean = E.clean;
 
-  const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs'];
+  const COLLECTIONS = ['clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dispatches'];
   const DEMO_USERS = [
     { username: 'admin', name: 'Adaeze Okonkwo', role: 'admin', password: 'Admin@2026' },
     { username: 'ops', name: 'Musa Bello', role: 'operations', password: 'Ops@2026' },
@@ -18,17 +18,28 @@
   class BaseStore {
     constructor() {
       this.mode = 'base'; this.live = false; this.user = null; this.listeners = new Set();
-      this.state = { settings: Object.assign({}, DEFAULT_SETTINGS), clients: [], assets: [], rates: [], trips: new Map(), invoices: [], payments: [], users: [], locations: [], zones: {}, audit: [], fleet: [], routes: [], requests: [], allocations: [], waybilldocs: [], planning: {} };
+      this.state = { settings: Object.assign({}, DEFAULT_SETTINGS), clients: [], assets: [], rates: [], trips: new Map(), invoices: [], payments: [], users: [], locations: [], zones: {}, audit: [], fleet: [], routes: [], requests: [], allocations: [], waybilldocs: [], lostsales: [], distances: [], dispatches: [], planning: {}, locationMaster: {} };
       this._computed = null;
     }
     subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
     emit(evt) { this._computed = null; for (const fn of this.listeners) { try { fn(evt || {}); } catch (e) { console.error(e); } } }
 
     // ---------- derived data
-    ctx() { return { settings: this.state.settings, assets: this.state.assets, rates: this.state.rates, zones: this.state.zones, clients: this.state.clients, invoices: this.state.invoices, planning: this.state.planning }; }
+    ctx() { const self = this; return { settings: this.state.settings, assets: this.state.assets, rates: this.state.rates, zones: this.state.zones, clients: this.state.clients, invoices: this.state.invoices, planning: this.state.planning, stateOf: HB.geo ? (n) => self.stateOf(n) : null }; }
     /** Context for the fleet-planning engine (FMR, planner, runway, KPIs). */
     planningCtx() { return { planning: this.state.planning, routes: this.state.routes, fleet: this.state.fleet, requests: this.state.requests, allocations: this.state.allocations, trips: this.trips(), invoices: this.state.invoices, setup: P ? P.setupOf(this.state.planning) : {}, today: U.todayISO(), now: U.nowISO() }; }
     planningSetup() { return P ? P.setupOf(this.state.planning) : {}; }
+    /** Context for the dispatch engine (distances, consumption matrix, dispatch records, lost sales, location master). */
+    dispatchCtx() { return Object.assign(this.planningCtx(), { assets: this.state.assets, rates: this.state.rates, zones: this.state.zones, clients: this.state.clients, distances: this.state.distances, dispatches: this.state.dispatches, lostsales: this.state.lostsales, locationMaster: this.state.locationMaster, settings: this.state.settings }); }
+    dispatchSetup() { return HB.dispatch ? HB.dispatch.setupOf(this.state.planning) : {}; }
+    /** Standardised state for a location name (Location Master first, then the gazetteer). */
+    stateOf(name) { return HB.geo ? HB.geo.standardize(name, this.state.locationMaster).state : ''; }
+    async saveLocationMaster(map, label) {
+      const before = this.state.locationMaster || {}; const next = Object.assign({}, map, { id: 'locationmaster' }); const n = Object.keys(next).filter((k) => k !== 'id').length;
+      await this.writeDoc('meta', 'locationmaster', next);
+      await this.writeAudit(this.auditEntry({ action: 'update', entity: 'settings', entityId: 'locationmaster', label: label || 'Location Master', changes: [{ field: 'entries', from: Object.keys(before).length, to: n }] }));
+      return next;
+    }
     trips() {
       if (!this._computed) { const ctx = this.ctx(); this._computed = [...this.state.trips.values()].filter((t) => !t._del).map((t) => E.computeTrip(t, ctx)); }
       return this._computed;
@@ -187,7 +198,7 @@
     // apply a document coming from storage into state
     applyDoc(collection, id, data) {
       if (collection === 'settings') { this.state.settings = Object.assign({}, DEFAULT_SETTINGS, data || {}); return; }
-      if (collection === 'meta') { if (id === 'locations') this.state.locations = (data && data.list) || []; if (id === 'zones') this.state.zones = (data && data.map) || {}; if (id === 'planning') this.state.planning = data || {}; return; }
+      if (collection === 'meta') { if (id === 'locations') this.state.locations = (data && data.list) || []; if (id === 'zones') this.state.zones = (data && data.map) || {}; if (id === 'planning') this.state.planning = data || {}; if (id === 'locationmaster') { const m = Object.assign({}, data || {}); delete m.id; this.state.locationMaster = m; } return; }
       if (collection === 'tripchunks') { for (const [tid, t] of Object.entries((data && data.trips) || {})) { if (t && t._del) this.state.trips.delete(tid); else if (t) this.state.trips.set(tid, t); } return; }
       if (collection === 'trips') { if (!data || data._del) this.state.trips.delete(id); else this.state.trips.set(id, data); return; }
       if (!this.state[collection]) return;

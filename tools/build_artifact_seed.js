@@ -16,7 +16,8 @@ const only = process.argv[3] ? process.argv[3].split(',') : null; // e.g. "fleet
 const want = (c) => !only || only.includes(c);
 fs.rmSync(out, { recursive: true, force: true });
 const manifest = [];
-for (const c of ['fleet', 'routes', 'requests', 'allocations']) if (want(c) && fs.existsSync(path.join(ROOT, 'data', 'workbook', c + '.json'))) for (const d of read(c + '.json')) manifest.push(write(c, d.id, Object.assign({ version: 1 }, d)));
+for (const c of ['fleet', 'routes', 'requests', 'allocations', 'distances']) if (want(c) && fs.existsSync(path.join(ROOT, 'data', 'workbook', c + '.json'))) for (const d of read(c + '.json')) manifest.push(write(c, d.id, Object.assign({ version: 1 }, d)));
+if (want('locationmaster') && fs.existsSync(path.join(ROOT, 'data', 'workbook', 'locationmaster.json'))) manifest.push(write('meta', 'locationmaster', Object.assign({ version: 1 }, read('locationmaster.json'), { id: 'locationmaster' })));
 if (want('planning') && fs.existsSync(path.join(ROOT, 'data', 'workbook', 'planning.json'))) manifest.push(write('meta', 'planning', Object.assign({ version: 1 }, read('planning.json'), { id: 'planning' })));
 const chunks = new Map();
 if (want('trips')) for (const t of read('trips.json')) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; if (!chunks.has(m)) chunks.set(m, {}); const c = { ...t }; delete c.history; chunks.get(m)[t.id] = c; }

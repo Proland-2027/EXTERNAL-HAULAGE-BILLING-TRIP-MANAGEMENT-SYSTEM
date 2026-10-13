@@ -12,7 +12,8 @@
       if (saved) { this._load(saved); return; }
       progress && progress('Loading the workbook data…');
       try {
-        const [trips, assets, clients, locations, rates, zones, fleet, routes, requests, allocations, planning] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones', 'fleet', 'routes', 'requests', 'allocations', 'planning'].map((n) => fetch(`data/workbook/${n}.json`).then((r) => (r.ok ? r.json() : (n === 'zones' || n === 'planning' ? {} : [])))));
+        const [trips, assets, clients, locations, rates, zones, fleet, routes, requests, allocations, planning, distances, locationmaster] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones', 'fleet', 'routes', 'requests', 'allocations', 'planning', 'distances', 'locationmaster'].map((n) => fetch(`data/workbook/${n}.json`).then((r) => (r.ok ? r.json() : (n === 'zones' || n === 'planning' || n === 'locationmaster' ? {} : [])))));
+        this.state.distances = distances || []; this.state.locationMaster = locationmaster || {};
         for (const t of trips) this.state.trips.set(t.id, t);
         this.state.assets = assets.map((a) => Object.assign({ id: a.plate }, a));
         this.state.clients = clients; this.state.locations = locations; this.state.zones = zones || {};
@@ -25,11 +26,11 @@
     _load(s) {
       this.state.settings = Object.assign({}, HB.DEFAULT_SETTINGS, s.settings || {});
       for (const c of HB.COLLECTIONS) this.state[c] = s[c] || [];
-      this.state.locations = s.locations || []; this.state.zones = s.zones || {}; this.state.audit = s.audit || []; this.state.planning = s.planning || {};
+      this.state.locations = s.locations || []; this.state.zones = s.zones || {}; this.state.audit = s.audit || []; this.state.planning = s.planning || {}; this.state.locationMaster = s.locationMaster || {};
       this.state.trips = new Map((s.trips || []).map((t) => [t.id, t]));
     }
     _persist() {
-      const s = { settings: this.state.settings, locations: this.state.locations, zones: this.state.zones, planning: this.state.planning, audit: this.state.audit.slice(-2000), trips: [...this.state.trips.values()] };
+      const s = { settings: this.state.settings, locations: this.state.locations, zones: this.state.zones, planning: this.state.planning, locationMaster: this.state.locationMaster, audit: this.state.audit.slice(-2000), trips: [...this.state.trips.values()] };
       for (const c of HB.COLLECTIONS) s[c] = this.state[c];
       U.storage.set(KEY, s);
     }

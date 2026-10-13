@@ -37,7 +37,8 @@ try {
   if (!store.list('users').length) for (const u of DEMO_USERS) store.putDoc('users', makeUser(u));
   for (const u of DEMO_USERS) if (!store.doc('users', u.username)) store.putDoc('users', makeUser(u)); // accounts added in later releases
   // fleet planning (Truck Planning Management workbook)
-  for (const c of ['fleet', 'routes', 'requests', 'allocations']) if (!store.list(c).length && exists(c + '.json')) for (const d of read(c + '.json')) store.putDoc(c, Object.assign({ version: 1 }, d));
+  for (const c of ['fleet', 'routes', 'requests', 'allocations', 'distances']) if (!store.list(c).length && exists(c + '.json')) for (const d of read(c + '.json')) store.putDoc(c, Object.assign({ version: 1 }, d));
+  if (!store.doc('meta', 'locationmaster') && exists('locationmaster.json')) store.putDoc('meta', Object.assign({ version: 1 }, read('locationmaster.json'), { id: 'locationmaster' }));
   if (!store.doc('meta', 'planning') && exists('planning.json')) store.putDoc('meta', Object.assign({ version: 1 }, read('planning.json'), { id: 'planning' }));
   store.audit({ id: 'a-seed-' + Date.now().toString(36), ts: new Date().toISOString(), user: 'system', userName: 'Seed script', role: '', action: 'import', entity: 'workbook', entityId: 'Haulage_Billing_Sheet_September_R2', label: 'Workbook data loaded', changes: [] });
   db.exec('COMMIT');

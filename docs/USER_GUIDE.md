@@ -13,6 +13,8 @@ Demo accounts (change the passwords in **Users & Roles** before real use):
 | Finance Team | `finance` | `Finance@2026` | Payment status, advances, record payments, statements, outstanding balances |
 | Management | `manager` | `Manager@2026` | Dashboards, reports, price-variance review, audit trail (read-only) |
 | Tracking Officer | `tracking` | `Tracking@2026` | Update truck statuses on the Fleet Movement Report; read everything else |
+
+Dispatch rights: Operations prepares, approves and records issues (Operations Manager); the Fleet Planner prepares forms and raises supplementary requests; Finance gives the finance approval and may record issues; administrators manage the Route Distance Master, Location Master and consumption matrix.
 | Fleet Planner | `planner` | `Planner@2026` | Log client requests, allocate / reassign / cancel trucks, create trips from allocations, enter Trip IDs |
 
 Operations has the planner's rights too; Billing additionally verifies waybills and issues / sends invoices.
@@ -86,6 +88,28 @@ KPIs (total fleet, available, allocated, on trip, returning today/tomorrow, work
 * **Invoice Status** is no longer typed: *Not Invoiced* → *Draft Invoice* (generated) → *Invoice Issued* (**Issue invoice**, date and user recorded) → *Invoice Sent* (**Mark as Sent**: channel, recipient, date recorded separately) → *Invoice Voided* / *Internal Client* (tick on the trip). Requests show *Partially Invoiced* when only some of their trips are invoiced.
 * **Payment status** stays separate (Unpaid / Part Paid / Paid); the trip closes financially only when fully settled.
 * **Corrections**: a Draft invoice can be voided (its trips become available again); an issued or sent invoice is never edited. Use **Issue credit note** on the invoice instead: the amount is applied to the invoice's trips like a receipt, numbered CN-…, recorded in the payments ledger and shown in the invoice list, while the issued document and its PDF stay as sent. Trips already on an invoice are never offered for a second invoice. The Reports → *Trip-to-billing pipeline* and *Outstanding waybills* tabs list every trip with stage, owner and timestamps.
+
+## Dispatch & Diesel Planning
+
+*Fleet → Dispatch & Diesel*. The continuous workflow is Client Request → Fleet Allocation → Trip Log → Route calculation → Diesel and road-expense calculation → Dispatch approval → Diesel / expense issuance → Trip execution → Waybill → Invoice → Payment.
+
+* **Dispatch forms**: once an allocation is linked to a Trip Log record, *Prepare dispatch form* (Operations / Planner) builds the **Trip Dispatch Authorization Form**: standardised origin and destination states, the approved route distance (one-way, return, total), the truck's consumption category and rate, outbound / return / total diesel, and the road expense allowance at ₦/km. Every figure shows its calculation; an adjustment to the calculated allowance needs a reason. Submit for approval → Operations Manager approves (or rejects with a reason) → Finance approves when the road expenses exceed the threshold.
+* **Issuance**: on an approved form, *Record diesel issued* and *Record road expense paid* are recorded separately with references. The initial issue can be recorded once and never above the approved allowance; anything more needs a *Supplementary request* (reason) approved by the Operations Manager. Calculated allowances never count as diesel issued or cash paid until recorded. The form is downloadable as a PDF.
+* **Trip expense control**: budgeted vs approved vs actual diesel (initial, supplementary, consumed) and road expenses, with variances and exceptions highlighted.
+* **Assistant & checks**: ask the management questions (trips awaiting diesel, diesel for tomorrow, road expenses for the next seven days, routes consuming most diesel, trucks above allowance, highest variance, diesel for planned trips to a state, available but unallocated trucks, requests at risk of lost sales). Answers come from live records and are labelled as such; approved operational values are never replaced by a recommendation. Automatic checks list duplicate routes, inconsistent state names, implausible distances, wrong consumption categories, duplicate or excessive diesel and missing approved distances.
+* **Dashboard**: planned trips, awaiting approval, approved awaiting diesel, diesel required / issued, road expenses required / paid, supplementary requests, variance by truck, diesel by category and route, available trucks not planned, confirmed lost sales, with filters for date, client, vehicle category, truck batch, route and station.
+
+## Lost Sales
+
+*Fleet → Lost Sales*. Every cancelled request with trucks still required becomes a record: **Lost Sales = unfulfilled trucks × agreed client rate** (price list first, then the route register). Records are classified as *Confirmed lost sale*, *At risk* or *Not a lost sale* (the cancellation reason suggests the class; it can be changed). Open requests that still lack trucks show live as *At risk*. Reports by client, route, month, station, vehicle type and reason, exportable.
+
+In **Requests & Allocation**, tick requests (or *Select all visible*) and use **Cancel selected requests**: choose the reason, classification and department, add remarks, and confirm whether allocated trucks are released. Cancelled requests are never deleted; the user, time and reason stay in the audit trail.
+
+## Location Master and Route Distance Master (Settings)
+
+* **Location Master**: every loading / delivery location typed anywhere is mapped to a Nigerian state (Apapa → Lagos, Fagge → Kano, Ilesa → Osun, Port Harcourt → Rivers, Abuja → FCT…). Exact matches are approved automatically; spelling matches, zone lists spanning several states and unknown names wait for an administrator to approve or correct them. The original text is always kept; the standardised states drive reports, route grouping, distances and fuel.
+* **Route Distance Master**: road distances from JMG Gbagada, Lagos to a reference point in every state (one-way, return, two-leg). Suggested distances (routing service or reference atlas) are marked unverified until an administrator approves them; approved distances are used automatically by every dispatch form. A trip starting from another station uses its own origin state. *Suggest from routing service* asks the road-routing service when the server or browser can reach it.
+* **Diesel consumption matrix**: Haulage 45T 0.50 L/km, Jumbo 30T / 102 CBM 0.45 L/km, Flatbed 0.42 L/km, road expenses ₦25 per km, finance approval threshold; all editable by an administrator.
 
 ## Client Price List
 

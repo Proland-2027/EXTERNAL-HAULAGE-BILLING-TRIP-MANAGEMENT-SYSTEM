@@ -14,7 +14,7 @@ The demo at the link given with the delivery is published from `index.html` with
 
 Sharing: the artifact is private to its owner until shared from the page's **Share** menu. People given access open the same link and sign in with the application accounts. Viewers who are only allowed to *view* the artifact can read every record but their saves are refused by the platform; give team members **Contributor** (or higher) access so they can write.
 
-Data layout in the shared database: `tripchunks/<YYYY-MM>` (one document per dispatch month, trips keyed by id and merged on write so concurrent edits to different trips never collide), `clients`, `assets`, `rates`, `invoices`, `payments`, `users`, `settings/main`, `meta/locations`, `meta/zones`, `meta/planning` (fleet-planning setup), `fleet`, `routes`, `requests`, `allocations`, `waybilldocs` (attached waybill scans, ≤ ~500 KB each), `audit/<YYYY-MM-DD>`.
+Data layout in the shared database: `tripchunks/<YYYY-MM>` (one document per dispatch month, trips keyed by id and merged on write so concurrent edits to different trips never collide), `clients`, `assets`, `rates`, `invoices`, `payments`, `users`, `settings/main`, `meta/locations`, `meta/zones`, `meta/planning` (fleet-planning setup), `fleet`, `routes`, `requests`, `allocations`, `waybilldocs` (attached waybill scans, ≤ ~500 KB each), `lostsales`, `distances` (Route Distance Master), `dispatches`, `meta/locationmaster`, `audit/<YYYY-MM-DD>`.
 
 ## 2. Your own server (recommended for production)
 
@@ -103,6 +103,10 @@ Backups: the database is a single file; copy `data/haulage.db` (and `-wal`/`-shm
 `POST /api/trips/from-allocation` (`{ allocationId, dateDispatched?, split?, reason? }`, signed-in users with the *trip.fromPlanning* right) builds the Trip Log entry on the server from the allocation record, so a client cannot re-key or alter the operational data; a second trip for one allocation needs `split: true`, a reason and the *allocation.split* right.
 
 Relationship kept in the database: **Request ID → Allocation ID → Power Apps Trip ID → Trip Log entry → Invoice ID**, visible on every allocation (*chain stage*) and in Reports → Trip-to-billing pipeline.
+
+### Road-routing service for the Route Distance Master
+
+Set `OSRM_URL=https://router.project-osrm.org` (or your own OSRM / OpenRouteService-compatible endpoint) when starting the server; *Suggest from routing service* in Settings → Route Distance Master then fetches the road distance through `GET /api/routing/distance?from=lat,lng&to=lat,lng`. In the shared-database demo the browser calls the public OSRM endpoint directly when it can. Suggested distances are never used operationally until an administrator approves them.
 
 ## 3. WordPress
 
