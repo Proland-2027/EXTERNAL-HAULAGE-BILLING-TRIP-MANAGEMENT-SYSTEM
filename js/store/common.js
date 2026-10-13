@@ -110,7 +110,8 @@
       await this.writeTrip(trip, current);
       await this.writeAudit(entry);
       // keep the allocation chain in step: a trip created from an allocation marks it Deployed and carries the Trip ID back
-      if (trip.allocationId && this.state.allocations && !this.serverLinksAllocations) { const a = this.state.allocations.find((x) => x.id === trip.allocationId); if (a && (a.tripLogId !== trip.id || (trip.journeyPlanId && a.tripId !== trip.journeyPlanId))) { const patch = { id: a.id, tripLogId: trip.id }; if (a.status === 'Planned') patch.status = 'Deployed'; if (trip.journeyPlanId && a.tripId !== trip.journeyPlanId) { patch.tripId = trip.journeyPlanId; patch.tripIdAt = U.nowISO(); patch.tripIdBy = this.user ? this.user.username : 'system'; } try { await this.saveDoc('allocations', patch, { expectedVersion: a.version, label: `${a.id} linked to trip` }); } catch (e) { console.warn('allocation link failed', e); } } }
+      // a split second leg never takes over the allocation link or its Trip ID; the first trip keeps them
+      if (trip.allocationId && !trip.allocationSplit && this.state.allocations && !this.serverLinksAllocations) { const a = this.state.allocations.find((x) => x.id === trip.allocationId); if (a && (!a.tripLogId || a.tripLogId === trip.id) && (a.tripLogId !== trip.id || (trip.journeyPlanId && a.tripId !== trip.journeyPlanId))) { const patch = { id: a.id, tripLogId: trip.id }; if (a.status === 'Planned') patch.status = 'Deployed'; if (trip.journeyPlanId && a.tripId !== trip.journeyPlanId) { patch.tripId = trip.journeyPlanId; patch.tripIdAt = U.nowISO(); patch.tripIdBy = this.user ? this.user.username : 'system'; } try { await this.saveDoc('allocations', patch, { expectedVersion: a.version, label: `${a.id} linked to trip` }); } catch (e) { console.warn('allocation link failed', e); } } }
       return trip;
     }
     /**

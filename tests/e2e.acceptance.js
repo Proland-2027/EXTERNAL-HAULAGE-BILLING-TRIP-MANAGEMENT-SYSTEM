@@ -7,12 +7,13 @@ const path = require('path');
 const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/playwright');
 const BASE = process.env.BASE || 'http://localhost:8099';
 const results = []; const errors = [];
-const step = async (name, fn) => { try { if (typeof closeModals === 'function') await closeModals(); await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name + ' — ' + (e.message || e).toString().split('\n')[0]]); } };
+let lastToast = '';
+const step = async (name, fn) => { try { if (typeof closeModals === 'function') await closeModals(); await fn(); results.push(['PASS', name]); } catch (e) { results.push(['FAIL', name + ' — ' + (e.message || e).toString().split('\n')[0] + (lastToast ? ' [last toast: ' + lastToast + ']' : '')]); } };
 (async () => {
   const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await page.route(/cdnjs|googleapis|gstatic/, (r) => r.abort());
   if (process.env.MOCK_ARTIFACT) { await page.addInitScript({ path: path.join(__dirname, 'mock_artifact_runtime.js') }); console.log('shared-database mode (mock artifact runtime)'); }
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message)); page.on('crash', () => errors.push('PAGE CRASHED')); page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message)); await page.exposeFunction('__toast', (t) => { lastToast = t; }); await page.addInitScript(() => { const orig = window.setTimeout; document.addEventListener('DOMContentLoaded', () => { const t = document.getElementById('toast'); if (t) new MutationObserver(() => { if (t.textContent) window.__toast(t.textContent); }).observe(t, { childList: true, characterData: true, subtree: true }); }); }); page.on('crash', () => errors.push('PAGE CRASHED')); page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   const login = async (u, p) => { await page.goto(BASE + '/?t=' + Date.now() + '#dashboard', { waitUntil: 'domcontentloaded' }); await page.waitForSelector('#login-user, .shell', { timeout: 15000 }); if (await page.$('#login-user')) { await page.fill('#login-user', u); await page.fill('#login-pass', p); await page.click('button[type=submit]'); } await page.waitForSelector('.shell', { timeout: 40000, state: 'attached' }); await page.waitForTimeout(600); };
   const logout = async () => { await page.evaluate(async () => { await HB.app.store.logout(); }); };
   const closeModals = async () => { await page.evaluate(() => { for (const o of document.querySelectorAll('.overlay')) o.remove(); }); };
