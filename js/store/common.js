@@ -123,7 +123,7 @@
       const why = P.allocationLinkError(a || null, null, { split: opts.split }); if (why) { const err = new Error(why); err.code = 'linked'; err.tripLogId = a && a.tripLogId; throw err; }
       if (opts.split) { if (!E.can(this.user.role, 'allocation.split')) { const err = new Error('Splitting an allocation needs the planning or administrator role.'); err.code = 'forbidden'; throw err; } if (!E.clean(opts.reason)) { const err = new Error('A reason is required to split an allocation.'); err.code = 'invalid'; throw err; } }
       const request = this.state.requests.find((r) => r.id === a.requestId) || null;
-      const draft = P.tripFromAllocation(a, request, { dateDispatched: opts.dateDispatched, note: opts.split ? `Split from ${a.id}: ${E.clean(opts.reason)}` : '' });
+      const draft = P.tripFromAllocation(a, request, { dateDispatched: opts.dateDispatched, split: !!opts.split, note: opts.split ? `Split from ${a.id}: ${E.clean(opts.reason)}` : '' });
       if (opts.split) { draft.allocationSplit = true; }
       const trip = await this.saveTrip(draft, { split: !!opts.split });
       if (opts.split) await this.saveDoc('allocations', { id: a.id, split: true, splitTripIds: [...(a.splitTripIds || []), trip.id], splitReason: E.clean(opts.reason), splitBy: this.user.username, splitAt: U.nowISO() }, { expectedVersion: this.state.allocations.find((x) => x.id === a.id).version, label: `${a.id} split: second trip ${trip.id}` });

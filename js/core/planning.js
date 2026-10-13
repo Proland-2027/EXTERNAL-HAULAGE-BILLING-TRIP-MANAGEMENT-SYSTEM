@@ -238,7 +238,8 @@
   function tripFromAllocation(alloc, request, opts) {
     opts = opts || {}; const r = request || {};
     return { dateDispatched: opts.dateDispatched || alloc.plannedDeploymentDate || alloc.plannedLoadingDate || todayISO(), dateDelivered: '', plate: alloc.plate, assetCode: alloc.assetCode || '', client: alloc.client, contractType: alloc.tonnage || r.tonnage || '', loadingFrom: alloc.loadingFrom || r.loadingFrom || '', loadingTo: alloc.destination || r.destination || '',
-      journeyPlanId: alloc.tripId || '', tripIdSource: alloc.tripId ? (alloc.tripIdBy === 'powerapps' ? 'powerapps' : 'allocation') : '', waybill: '', returnWaybill: '', invoiceStatus: 'Not Invoiced', sellingPrice: null, vatTreatment: 'exclusive', quoteNo: '', soNo: '', manualInvoiceNo: '', paymentStatus: 'Not Paid', advance: null, note: opts.note || '',
+      // a split (second leg) gets its own Trip ID later; the Power Apps ID issued for the allocation stays on the first trip
+      journeyPlanId: opts.split ? '' : alloc.tripId || '', tripIdSource: alloc.tripId && !opts.split ? (alloc.tripIdBy === 'powerapps' ? 'powerapps' : 'allocation') : '', waybill: '', returnWaybill: '', invoiceStatus: 'Not Invoiced', sellingPrice: null, vatTreatment: 'exclusive', quoteNo: '', soNo: '', manualInvoiceNo: '', paymentStatus: 'Not Paid', advance: null, note: opts.note || '',
       allocationId: alloc.id, requestId: alloc.requestId || r.id || '', requestReference: alloc.requestReference || r.reference || '', truckBatch: alloc.truckBatch || '', source: 'fleet-planning' };
   }
   /** One allocation → one trip. Returns the reason the link is refused, or '' when it is allowed. */

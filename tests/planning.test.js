@@ -178,6 +178,7 @@ test('a Trip Log entry is built entirely from the allocation and its request; on
   assert.equal(t.journeyPlanId, 'TRP-00555'); assert.equal(t.tripIdSource, 'powerapps'); assert.equal(t.allocationId, alloc.id); assert.equal(t.requestId, 'JAM-010'); assert.equal(t.requestReference, 'PO-778');
   assert.equal(t.sellingPrice, null); assert.equal(t.invoiceStatus, 'Not Invoiced'); assert.equal(t.waybill, '');
   assert.equal(P.tripFromAllocation({ ...alloc, tripId: '' }, null, {}).journeyPlanId, '', 'Trip ID stays pending when Power Apps has not issued it');
+  assert.equal(P.tripFromAllocation(alloc, null, { split: true }).journeyPlanId, '', 'a split second leg does not reuse the first trip\'s Trip ID');
   assert.equal(P.allocationLinkError(alloc, null), '');
   assert.ok(/already linked/.test(P.allocationLinkError({ ...alloc, tripLogId: 't-1' }, null)));
   assert.equal(P.allocationLinkError({ ...alloc, tripLogId: 't-1' }, 't-1'), '', 're-saving the linked trip is fine');

@@ -204,7 +204,7 @@ const routes = {
     const why = P.allocationLinkError(a, null, { split }); if (why) throw new HttpError(a ? 409 : 404, why, { code: 'linked', tripLogId: a && a.tripLogId });
     if (split) { requireAction(user, 'allocation.split'); if (!E.clean(body.reason)) throw new HttpError(400, 'A reason is required to split an allocation.', { code: 'invalid' }); }
     const request = store.doc('requests', a.requestId || '') || null; const ts = nowISO();
-    const next = P.tripFromAllocation(a, request, { dateDispatched: body && body.dateDispatched, note: split ? `Split from ${a.id}: ${E.clean(body.reason)}` : '' });
+    const next = P.tripFromAllocation(a, request, { dateDispatched: body && body.dateDispatched, split, note: split ? `Split from ${a.id}: ${E.clean(body.reason)}` : '' });
     next.id = 't-' + Date.now().toString(36) + '-' + crypto.randomBytes(3).toString('hex'); if (split) next.allocationSplit = true;
     const asset = E.assetFor(next.plate, store.list('assets')); if (asset) { next.assetCode = asset.assetCode; next.vehicleType = asset.vehicleType; next.vehicleCategory = asset.vehicleCategory; next.costCenter = asset.costCenter; } if (!next.truckBatch) next.truckBatch = E.batchOn(asset, next.dateDispatched);
     const errors = E.validateTrip(next, { assets: store.list('assets'), trips: next.journeyPlanId ? store.trips() : [], planning: store.doc('meta', 'planning') || {} }); if (errors.length) throw new HttpError(400, errors.join(' '), { code: 'invalid', errors });
