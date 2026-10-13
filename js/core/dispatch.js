@@ -110,7 +110,7 @@
   }
   /** Why a diesel issue / road payment cannot be recorded ('' when it can). Prevents duplicates and over-issue. */
   function issueError(d, kind, qty, supplementaryId) {
-    const st = dispatchStatus(d); if (!['Approved', 'Partly Dispatched'].includes(st)) return `Dispatch ${d.number} is ${st}; diesel and road expenses are issued only on an approved dispatch.`;
+    const st = dispatchStatus(d); if (!['Approved', 'Partly Dispatched', 'Dispatched'].includes(st)) return `Dispatch ${d.number} is ${st}; diesel and road expenses are issued only on an approved dispatch.`;
     qty = num(qty); if (!(qty > 0)) return 'Enter the quantity issued.';
     const t = approvedTotals(d); const list = kind === 'diesel' ? d.dieselIssues || [] : d.expensePayments || [];
     if (supplementaryId) { const s = (d.supplementary || []).find((x) => x.id === supplementaryId); if (!s || s.kind !== kind) return 'Supplementary request not found.'; if (s.status !== 'Approved') return 'That supplementary request is not approved.'; if (list.some((x) => x.supplementaryId === supplementaryId)) return 'That supplementary request has already been issued.'; if (qty > num(s.qty) + 0.005) return `Issue cannot exceed the approved supplementary ${kind === 'diesel' ? s.qty + ' L' : '₦' + s.qty}.`; return ''; }
