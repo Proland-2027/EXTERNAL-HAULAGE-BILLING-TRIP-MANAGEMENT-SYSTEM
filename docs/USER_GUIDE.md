@@ -3,6 +3,8 @@
 ## Signing in
 
 Open the demo link in Chrome (desktop, tablet or phone) and sign in with your individual account.
+
+**Two levels of access on the demo link.** The demo stores its data in the claude.ai page's shared database, so two things decide what you can do: (1) your claude.ai access to the page, granted by the page owner from the page's **Share** menu, and (2) the role of the application account you sign in with. A colleague who opens the link signed out of claude.ai, or who was given view-only access, can read everything but every save is refused, even as *admin*; the app shows a yellow *View-only access* notice in that case. To let a colleague edit: they sign in to claude.ai with their own account, and the page owner shares the page with them with edit (contributor) access. The role then governs what they may change. On your own server deployment (see `docs/DEPLOYMENT.md`) there is no claude.ai layer and the application login alone decides.
 Demo accounts (change the passwords in **Users & Roles** before real use):
 
 | Role | Username | Password | What the role can do |

@@ -43,7 +43,8 @@
     const btn = h('button', { class: 'btn primary', type: 'submit' }, 'Sign in'); form.append(btn);
     const demo = h('div', { class: 'demo-accounts' }, h('div', { class: 'label', text: 'Demo accounts (click to fill)' }), HB.DEMO_USERS.map((d) => h('button', { type: 'button', class: 'btn sm', onClick: () => { u.value = d.username; p.value = d.password; } }, `${E.ROLE_LABELS[d.role]} — ${d.username} / ${d.password}`)));
     const modeText = store.mode === 'shared' ? 'Shared database · changes are visible to every signed-in team member' : store.mode === 'server' ? 'Application server · central SQLite database' : 'Local demo mode · data stays in this browser';
-    root.append(h('div', { class: 'boot' }, h('div', { class: 'boot-card' }, h('div', { class: 'brand-mark', 'aria-hidden': 'true' }, 'HB'), h('h1', { text: 'Haulage Billing Desk' }), h('p', { class: 'muted small', text: 'Trip log, agreed client prices, invoicing and payments for the haulage operation.' }), form, demo, h('p', { class: 'tiny muted', text: modeText }))));
+    const viewOnly = store.mode === 'shared' && store.canWrite === false ? h('div', { class: 'notice warn small', text: 'View-only access: your claude.ai account can open this page but not change its shared data, whatever role you sign in with. Ask the page owner to share it with you with edit (contributor) access, then reload.' }) : null;
+    root.append(h('div', { class: 'boot' }, h('div', { class: 'boot-card' }, h('div', { class: 'brand-mark', 'aria-hidden': 'true' }, 'HB'), h('h1', { text: 'Haulage Billing Desk' }), h('p', { class: 'muted small', text: 'Trip log, agreed client prices, invoicing and payments for the haulage operation.' }), viewOnly, form, demo, h('p', { class: 'tiny muted', text: modeText }))));
   }
 
   function ctx() {
@@ -60,9 +61,10 @@
     const rail = h('aside', { class: 'rail', id: 'rail' }, h('div', { class: 'brand' }, h('div', { class: 'brand-mark' }, 'HB'), h('div', {}, h('div', { class: 'brand-title', text: 'Haulage Billing Desk' }), h('div', { class: 'brand-sub', text: store.state.settings.company || '' }))), navEl,
       h('div', { class: 'user-box' }, h('strong', { text: user.name }), h('span', { text: E.ROLE_LABELS[user.role] }), h('span', {}, h('span', { class: 'live-dot' + (store.live ? '' : ' off') }), store.mode === 'shared' ? 'Live · shared database' : store.mode === 'server' ? 'Live · server' : 'Local mode'), h('button', { class: 'btn sm', style: { justifySelf: 'start', color: 'inherit', borderColor: 'rgba(255,255,255,.4)', background: 'transparent' }, onClick: async () => { await store.logout(); location.hash = ''; showLogin(); } }, 'Sign out')));
     const title = h('h1', { id: 'view-title' });
+    const viewOnlyBar = store.mode === 'shared' && store.canWrite === false ? h('div', { class: 'notice warn small', style: { margin: '0', borderRadius: '0' }, text: `View-only: ${user.name} is signed in as ${E.ROLE_LABELS[user.role]}, but your claude.ai account only has view access to this page, so saves will be refused. Ask the page owner for edit (contributor) access.` }) : null;
     const topbar = h('header', { class: 'topbar' }, h('button', { class: 'btn menu-btn', 'aria-label': 'Menu', onClick: () => rail.classList.toggle('open') }, '☰'), title, h('span', { class: 'grow' }), h('span', { class: 'mode-pill', text: store.mode === 'shared' ? 'Shared database' : store.mode === 'server' ? 'Server' : 'Local demo' }), h('button', { class: 'btn sm ghost', title: 'Toggle light / dark', onClick: () => { const r = document.documentElement; const cur = r.getAttribute('data-theme'); const dark = cur ? cur === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; r.setAttribute('data-theme', dark ? 'light' : 'dark'); } }, '◐'));
     const content = h('div', { class: 'content', id: 'content' });
-    root.append(h('div', { class: 'shell' }, rail, h('div', { class: 'main' }, topbar, content)));
+    root.append(h('div', { class: 'shell' }, rail, h('div', { class: 'main' }, topbar, viewOnlyBar, content)));
     app.navEl = navEl; app.titleEl = title; app.contentEl = content; app.rail = rail;
     renderNav(); renderView();
     if (app.unsub) app.unsub();
