@@ -51,6 +51,9 @@
   view.recordForRequest = async function (ctx, request, counts, reason, kind, department, remarks) {
     const { store } = ctx; const dctx = store.dispatchCtx(); const rate = D.requestRate(request, dctx); const ls = D.lostSales(request, counts, rate.rate);
     const rec = { id: U.id('ls'), requestId: request.id, client: request.client, requestedTrucks: counts.requested, allocatedTrucks: counts.allocated, unfulfilledTrucks: ls.unfulfilled, agreedRate: rate.rate, rateSource: rate.source, estimatedLost: ls.lost, kind: kind || D.lostSalesKindFor(reason), reason, date: U.todayISO(), department: department || 'Fleet planning', remarks: remarks || '', loadingFrom: request.loadingFrom, destination: request.destination, originState: store.stateOf(request.loadingFrom), destState: store.stateOf(request.destination), vehicleType: request.vehicleType, tonnage: request.tonnage, routeId: request.routeId, loadingDate: request.loadingDate, recordedBy: store.user.username, status: 'cancelled' };
+    // one lost-sales record per request, reason and day: a repeated cancellation (double click, retry, second user) updates the existing record instead of adding another
+    const dup = store.state.lostsales.find((x) => x.requestId === request.id && x.reason === reason && x.date === rec.date && x.status === 'cancelled');
+    if (dup) { rec.id = dup.id; await store.saveDoc('lostsales', rec, { expectedVersion: dup.version, label: `${request.id} · ${rec.kind} · ${rec.unfulfilledTrucks} truck(s) · ${U.money(rec.estimatedLost)} (updated)` }); return rec; }
     await store.saveDoc('lostsales', rec, { label: `${request.id} · ${rec.kind} · ${rec.unfulfilledTrucks} truck(s) · ${U.money(rec.estimatedLost)}` });
     return rec;
   };

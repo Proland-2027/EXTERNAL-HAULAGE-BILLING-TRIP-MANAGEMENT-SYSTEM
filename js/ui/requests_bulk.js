@@ -13,13 +13,15 @@
       h('div', { class: 'form-grid' }, U.field('Cancellation reason', inp.reason), U.field('Lost-sales classification', inp.kind, { help: 'Confirmed lost sale, at risk, or a cancellation that is not lost revenue.' }), U.field('Responsible department', inp.department), U.field('Remarks', inp.remarks, { span2: true })),
       live.length ? h('label', { class: 'row small notice warn' }, inp.release, ` Release the ${live.length} allocated truck${live.length > 1 ? 's' : ''} (allocations ${live.map((a) => a.id).join(', ')} are cancelled). Requires confirmation below.`) : h('div', { class: 'small muted', text: 'No active allocations on the selected requests.' }));
     const m = U.modal({ title: 'Cancel selected requests', size: 'wide', body });
-    m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Keep requests'), h('button', { class: 'btn danger', id: 'btn-confirm-cancel', onClick: async () => {
+    m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Keep requests'), h('button', { class: 'btn danger', id: 'btn-confirm-cancel', onClick: async (ev) => {
+      const btn = ev.currentTarget; if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Cancelling…'; // one run per click: a second click while the first is saving must not cancel or record anything twice
       const reason = inp.reason.value; const release = inp.release.checked;
-      if (live.length && release && !(await U.confirm({ title: 'Release allocated trucks', message: `Cancel ${live.length} allocation(s) and free the trucks for other requests? This is recorded in the audit trail.`, okLabel: 'Release trucks', danger: true }))) return;
+      if (live.length && release && !(await U.confirm({ title: 'Release allocated trucks', message: `Cancel ${live.length} allocation(s) and free the trucks for other requests? This is recorded in the audit trail.`, okLabel: 'Release trucks', danger: true }))) { btn.disabled = false; btn.textContent = 'Cancel requests'; return; }
       let n = 0; const errors = [];
       for (const r of reqs) {
         try {
           const cur = store.state.requests.find((x) => x.id === r.id);
+          if (!cur || cur.status === 'Cancelled') { errors.push(`${r.id}: already cancelled`); continue; }
           if (release) for (const a of store.state.allocations.filter((x) => x.requestId === r.id && !['Cancelled', 'Completed'].includes(x.status))) await store.saveDoc('allocations', { id: a.id, status: 'Cancelled', cancelledAt: U.nowISO(), cancelledBy: store.user.username, cancelReason: `Request cancelled: ${reason}` }, { expectedVersion: a.version, label: `${a.id} released (request ${r.id} cancelled)` });
           await store.saveDoc('requests', { id: r.id, status: 'Cancelled', cancelledAt: U.nowISO(), cancelledBy: store.user.username, cancelReason: reason, cancelRemarks: E.clean(inp.remarks.value), lostSalesKind: inp.kind.value }, { expectedVersion: cur.version, label: `${r.id} cancelled: ${reason}` });
           if (r.counts.outstanding > 0 || inp.kind.value !== 'Not a lost sale') await HB.views.lostsales.recordForRequest(ctx, cur, r.counts, reason, inp.kind.value, inp.department.value, E.clean(inp.remarks.value));
