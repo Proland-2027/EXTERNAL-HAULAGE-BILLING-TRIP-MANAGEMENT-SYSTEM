@@ -7,11 +7,15 @@
   const col = (n) => { if (!cols.has(n)) cols.set(n, new Map()); return cols.get(n); };
   const clone = (v) => JSON.parse(JSON.stringify(v));
   const deepMerge = (base, patch) => { const out = Object.assign({}, base || {}); for (const [k, v] of Object.entries(patch || {})) { if (v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' && !Array.isArray(out[k])) out[k] = deepMerge(out[k], v); else if (v && typeof v === 'object' && v.__delete__) delete out[k]; else out[k] = clone(v); } return out; };
+  // writes are journaled in sessionStorage and replayed after the seed, so the mock survives page reloads (sign-out / sign-in)
+  const journal = (() => { try { return JSON.parse(sessionStorage.getItem('__mockDbOps') || '[]'); } catch (e) { return []; } })();
+  const record = (op) => { journal.push(op); try { sessionStorage.setItem('__mockDbOps', JSON.stringify(journal)); } catch (e) { /* full */ } };
+  const apply = (op) => { const c = col(op.n); if (op.t === 'set') c.set(op.id, clone(op.data)); else if (op.t === 'update') c.set(op.id, deepMerge(c.get(op.id), op.patch)); else c.delete(op.id); };
   const notify = (n, type, id) => { const data = col(n).get(id); for (const cb of subs.get(n) || []) setTimeout(() => cb({ docChanges: () => [{ type, doc: { id, data: () => (data === undefined ? undefined : clone(data)) } }] }), 0); };
   const docRef = (path) => { const [n, id] = path.split('/'); return {
-    async set(data) { const exists = col(n).has(id); col(n).set(id, clone(data)); notify(n, exists ? 'modified' : 'added', id); },
-    async update(patch) { if (!col(n).has(id)) { const e = new Error('No document to update'); e.code = 'invalid_argument'; throw e; } col(n).set(id, deepMerge(col(n).get(id), patch)); notify(n, 'modified', id); },
-    async delete() { col(n).delete(id); notify(n, 'removed', id); },
+    async set(data) { const exists = col(n).has(id); record({ t: 'set', n, id, data }); col(n).set(id, clone(data)); notify(n, exists ? 'modified' : 'added', id); },
+    async update(patch) { if (!col(n).has(id)) { const e = new Error('No document to update'); e.code = 'invalid_argument'; throw e; } record({ t: 'update', n, id, patch }); col(n).set(id, deepMerge(col(n).get(id), patch)); notify(n, 'modified', id); },
+    async delete() { record({ t: 'delete', n, id }); col(n).delete(id); notify(n, 'removed', id); },
   }; };
   let seeded = null;
   async function seed() {
@@ -27,6 +31,7 @@
     for (const r of rates || []) col('rates').set(r.id, r);
     for (const [n, list] of [['fleet', fleet], ['requests', requests], ['allocations', allocations]]) for (const d of list || []) col(n).set(d.id, Object.assign({ version: 1 }, d));
     // routes stay a static file in the artifact (see js/store/artifact.js); the collection starts empty
+    for (const op of journal) apply(op);
   }
   const db = {
     collection(n) { const q = { _n: n, _limit: 1000, _order: null, limit(k) { q._limit = k; return q; }, orderBy(f, dir) { q._order = [f, dir]; return q; },

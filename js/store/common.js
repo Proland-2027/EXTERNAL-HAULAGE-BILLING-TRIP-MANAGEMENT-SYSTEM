@@ -163,6 +163,8 @@
       const list = this.state[collection]; const current = list ? list.find((x) => x.id === doc.id) : null;
       this.checkConflict(current, opts.expectedVersion);
       const next = Object.assign({}, current || {}, doc); if (!next.id) next.id = U.id(collection.slice(0, 2));
+      // a truck is never promised to two requests over the same days (the server applies the same rule)
+      if (collection === 'allocations' && P && next.status !== 'Cancelled' && next.plannedLoadingDate && next.backOnGround && !opts.allowDoubleBooking) { const clash = P.bookingConflicts(next.plate, next.plannedLoadingDate, next.backOnGround, this.state.allocations, next.id); if (clash.length) { const err = new Error(`${next.plate} is already allocated to ${clash[0].client} (${clash[0].id}) over these days.`); err.code = 'double_booking'; err.conflicts = clash.map((x) => x.id); throw err; } }
       this.stamp(next, !current);
       await this.writeDoc(collection, next.id, next);
       if (!opts.silent) await this.writeAudit(this.auditEntry({ action: current ? 'update' : 'create', entity: collection, entityId: next.id, label: opts.label || next.name || next.number || next.id, changes: this.diff(current, next).filter((c) => !['hash', 'salt'].includes(c.field)) }));
