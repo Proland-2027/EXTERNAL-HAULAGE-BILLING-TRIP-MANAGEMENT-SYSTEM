@@ -21,6 +21,14 @@ external contractors**:
   month-over-month movement. Uses the logged billings when they exist and flags estimates when a
   billing has not been logged yet.
 
+## Spare parts sourcing & procurement (DARCO JMG)
+
+The repository also contains a second zero-install app, **`spare-parts/index.html`**: spare part
+requests with three camera photographs and automatic `DARCO-SP-00001` numbering, one-part RFQ PDFs
+shared via WhatsApp, a Chinese supplier database, quotations with price comparison, purchase orders,
+shipping tracking, procurement history and Excel import/export. See
+[docs/SPARE_PARTS.md](docs/SPARE_PARTS.md).
+
 ## Run it
 
 No build, no server required: open `index.html` in a modern browser (Chrome, Edge, Firefox, Safari).
@@ -71,8 +79,9 @@ js/store.js         localStorage persistence, import/export
 js/export.js        CSV / XLSX download
 js/charts.js        inline SVG charts
 js/app.js           UI
+spare-parts/        DARCO JMG spare parts sourcing & procurement app (see docs/SPARE_PARTS.md)
 tests/              engine tests: `npm test` (Node 18+)
-docs/               billing format and data model
+docs/               billing format, data model, spare parts system
 ```
 
 ## Assumptions made (adjust in Setup / Price Lists)

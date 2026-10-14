@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>DARCO JMG Spare Parts</title>
+  <meta name="description" content="DARCO JMG spare parts sourcing & procurement: part requests with photos, one-part RFQ PDFs, Chinese supplier database, quotations, price comparison, purchase orders, shipping and procurement history.">
+  <meta name="theme-color" content="#1c4d8c">
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="css/spares.css">
+  <!-- SheetJS for .xlsx import/export. When the CDN is unreachable the app falls back to CSV. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+</head>
+<body>
+  <header class="topbar no-print">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">⚙</span>
+      <div>
+        <div class="brand-title" id="brand-company">DARCO JMG</div>
+        <div class="brand-sub">Spare Parts Sourcing &amp; Procurement</div>
+      </div>
+    </div>
+    <nav class="tabs" id="nav" aria-label="Sections">
+      <button data-view="dashboard" class="tab">Dashboard</button>
+      <button data-view="requests" class="tab">Requests</button>
+      <button data-view="suppliers" class="tab">Suppliers</button>
+      <button data-view="quotes" class="tab">RFQs &amp; Quotes</button>
+      <button data-view="orders" class="tab">Purchase Orders</button>
+      <button data-view="shipping" class="tab">Shipping</button>
+      <button data-view="history" class="tab">History</button>
+      <button data-view="setup" class="tab">Setup</button>
+      <button data-view="data" class="tab">Data</button>
+    </nav>
+    <button class="btn ghost sm" id="theme-toggle" title="Toggle dark mode">Light / Dark</button>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <button class="fab no-print" id="fab" data-action="request-new" title="New spare part request" aria-label="New spare part request">+</button>
+
+  <dialog id="modal" class="modal">
+    <form method="dialog" id="modal-form" class="modal-form"></form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="tooltip" class="tooltip" hidden></div>
+
+  <script src="js/spares.js"></script>
+  <script src="js/pdf.js"></script>
+  <script src="js/documents.js"></script>
+  <script src="js/seed.js"></script>
+  <script src="js/photos.js"></script>
+  <script src="js/store.js"></script>
+  <script src="../js/export.js"></script>
+  <script src="../js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
