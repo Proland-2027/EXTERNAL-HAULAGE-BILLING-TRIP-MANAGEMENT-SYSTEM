@@ -11,7 +11,7 @@ const W = path.join(__dirname, '..', 'data', 'workbook');
 const read = (n) => JSON.parse(fs.readFileSync(path.join(W, n), 'utf8'));
 const planning = read('planning.json'), distances = read('distances.json'), fleet = read('fleet.json'), assets = read('assets.json'), allocations = read('allocations.json'), requests = read('requests.json'), routes = read('routes.json'), rates = read('rates.json'), zones = read('zones.json'), clients = read('clients.json'), locationMaster = read('locationmaster.json');
 const TODAY = '2026-10-12';
-const ctx = { planning, distances, fleet, assets, allocations, requests, routes, rates, zones, clients, trips: [], dispatches: [], lostsales: [], locationMaster, today: TODAY, now: TODAY + 'T12:00:00Z' };
+const ctx = { planning, distances, fleet, assets, allocations, requests, routes, rates, zones, clients, trips: [], dieselreqs: [], roadslips: [], extraexpenses: [], lostsales: [], locationMaster, today: TODAY, now: TODAY + 'T12:00:00Z' };
 
 test('location standardisation follows the brief examples and preserves the original text', () => {
   for (const [from, to] of [['Apapa', 'Lagos'], ['Gbagada', 'Lagos'], ['GBD', 'Lagos'], ['Ikotun', 'Lagos'], ['Ikeja', 'Lagos'], ['Lekki', 'Lagos'], ['Kano City', 'Kano'], ['Fagge', 'Kano'], ['Ilesa', 'Osun'], ['Osogbo', 'Osun'], ['Ibadan', 'Oyo'], ['Port Harcourt', 'Rivers'], ['Onitsha', 'Anambra'], ['Benin City', 'Edo'], ['Abuja', 'FCT'], ['PHC', 'Rivers'], ['ABUJJA', 'FCT'], ['Kastina', 'Katsina'], ['VI-Lekki-AJAH', 'Lagos'], ['Ibadan depot', 'Oyo'], ['Ajaokuta', 'Kogi']]) assert.equal(G.standardize(from).state, to, from);
@@ -52,29 +52,32 @@ test('brief example: Lagos to Kano and return, 2,200 km approved two-leg distanc
 
 test('distance resolution: approved master → unverified suggestion → route register → within state → missing', () => {
   const sug = D.resolveDistance({ originState: 'Lagos', destState: 'Kano' }, ctx); assert.equal(sug.source, 'suggested'); assert.equal(sug.verified, false); assert.equal(sug.oneWayKm, 990);
-  const reg = D.resolveDistance({ originState: 'Oyo', destState: 'Kano', routeId: 'R001' }, Object.assign({}, ctx, { distances: [] })); assert.equal(reg.source, 'route register'); assert.equal(reg.oneWayKm, 952);
+  const unapprovedRoutes = routes.map((r) => Object.assign({}, r, { status: 'Pending Approval', approvedAt: '' })); const reg = D.resolveDistance({ originState: 'Oyo', destState: 'Kano', routeId: 'R001' }, Object.assign({}, ctx, { distances: [], routes: unapprovedRoutes })); assert.equal(reg.source, 'route register'); const rm = D.resolveDistance({ originState: 'Oyo', destState: 'Kano', routeId: 'R001' }, Object.assign({}, ctx, { distances: [] })); assert.equal(rm.source, 'route master'); assert.equal(rm.verified, true, 'an approved Route Master entry is the approved distance'); assert.equal(reg.oneWayKm, 952);
   const within = D.resolveDistance({ originState: 'Lagos', destState: 'Lagos' }, Object.assign({}, ctx, { distances: [] })); assert.equal(within.source, 'within state');
   const miss = D.resolveDistance({ originState: 'Oyo', destState: 'Kano' }, Object.assign({}, ctx, { distances: [] })); assert.equal(miss.source, 'missing'); assert.equal(miss.totalKm, null);
-  const calc = D.dispatchCalc({ plate: 'T31702LA', loadingFrom: 'Ibadan', loadingTo: 'Kano' }, Object.assign({}, ctx, { distances: [] })); assert.ok(calc.issues.some((i) => /No approved route distance/.test(i))); assert.equal(calc.diesel, null); assert.ok(!calc.ready);
+  const calc = D.dispatchCalc({ plate: 'T31702LA', loadingFrom: 'Ibadan', loadingTo: 'Kano' }, Object.assign({}, ctx, { distances: [], routes: [] })); assert.ok(calc.issues.some((i) => /No approved route distance/.test(i))); assert.equal(calc.diesel, null); assert.ok(!calc.ready);
   const fromOtherStation = D.dispatchCalc({ plate: 'T31702LA', loadingFrom: 'Ibadan', loadingTo: 'Kano' }, ctx); assert.equal(fromOtherStation.originState, 'Oyo', 'a trip starting elsewhere does not default to Lagos');
 });
 
-test('dispatch status, approved totals, duplicate / over-issue prevention and supplementary requests', () => {
-  const d = { number: 'DSP-261013-01', budgetDiesel: 990, budgetRoad: 49500, approvedDiesel: 990, approvedRoad: 49500, financeRequired: false, dieselIssues: [], expensePayments: [], supplementary: [] };
-  assert.equal(D.dispatchStatus(d), 'Draft'); d.submittedAt = 'x'; assert.equal(D.dispatchStatus(d), 'Awaiting Approval');
-  assert.ok(/not approved|is Awaiting/.test(D.issueError(d, 'diesel', 100)) || D.issueError(d, 'diesel', 100));
-  d.opsApprovedAt = 'x'; assert.equal(D.dispatchStatus(d), 'Approved');
-  assert.ok(/exceeds the approved/.test(D.issueError(d, 'diesel', 1000)));
-  assert.equal(D.issueError(d, 'diesel', 990), '');
-  d.dieselIssues.push({ id: 'i1', litres: 990, type: 'initial' }); assert.equal(D.dispatchStatus(d), 'Partly Dispatched');
-  assert.ok(/already been issued/.test(D.issueError(d, 'diesel', 10)), 'a second initial issue is a duplicate');
-  d.supplementary.push({ id: 's1', kind: 'diesel', qty: 50, status: 'Pending' }); assert.ok(/not approved/.test(D.issueError(d, 'diesel', 50, 's1')));
-  d.supplementary[0].status = 'Approved'; assert.equal(D.approvedTotals(d).diesel, 1040); assert.equal(D.issueError(d, 'diesel', 50, 's1'), ''); assert.ok(/cannot exceed/.test(D.issueError(d, 'diesel', 60, 's1')));
-  d.dieselIssues.push({ id: 'i2', litres: 50, type: 'supplementary', supplementaryId: 's1' }); assert.ok(/already been issued/.test(D.issueError(d, 'diesel', 10, 's1')));
-  d.expensePayments.push({ id: 'p1', amount: 49500, type: 'initial' }); assert.equal(D.dispatchStatus(d), 'Dispatched');
-  const c = D.expenseControl(d); assert.equal(c.dieselIssued, 1040); assert.equal(c.approvedDiesel, 1040); assert.equal(c.dieselVariance, 0); assert.equal(c.supplementaryDiesel, 50); assert.ok(c.exceptions.includes('Supplementary diesel issued'));
-  const fin = { ...d, financeRequired: true, financeApprovedAt: '' }; assert.equal(D.dispatchStatus(fin), 'Awaiting Finance');
-  assert.equal(D.nextDispatchNumber('2026-10-13', [{ number: 'DSP-261013-01' }]), 'DSP-261013-02');
+test('diesel request and road slip: status, approved totals, duplicate / over-issue prevention and additional requests', () => {
+  const d = { kind: 'diesel', number: 'DSL-261013-01', budgetQty: 990, approvedQty: 990, financeRequired: false, issues: [], supplementary: [] };
+  assert.equal(D.slipStatus(d), 'Draft'); d.submittedAt = 'x'; assert.equal(D.slipStatus(d), 'Awaiting Approval');
+  assert.ok(/Awaiting Approval/.test(D.slipIssueError(d, 100)), 'nothing is issued before approval');
+  d.opsApprovedAt = 'x'; assert.equal(D.slipStatus(d), 'Approved');
+  assert.ok(/exceeds the approved/.test(D.slipIssueError(d, 1000)));
+  assert.equal(D.slipIssueError(d, 990), '');
+  d.issues.push({ id: 'i1', qty: 990, type: 'initial' }); assert.equal(D.slipStatus(d), 'Issued');
+  assert.ok(/already been issued/.test(D.slipIssueError(d, 10)), 'a second initial issue is a duplicate');
+  d.supplementary.push({ id: 's1', qty: 50, status: 'Pending' }); assert.ok(/not approved/.test(D.slipIssueError(d, 50, 's1'))); assert.equal(D.slipStatus(d), 'Issued', 'a pending additional request changes nothing');
+  d.supplementary[0].status = 'Approved'; assert.equal(D.slipTotals(d).approved, 1040); assert.equal(D.slipStatus(d), 'Partly Issued', 'an approved total above the issued quantity reopens the slip'); assert.equal(D.slipIssueError(d, 50, 's1'), ''); assert.ok(/Cannot exceed/.test(D.slipIssueError(d, 60, 's1')));
+  d.issues.push({ id: 'i2', qty: 50, type: 'supplementary', supplementaryId: 's1' }); assert.ok(/already been issued/.test(D.slipIssueError(d, 10, 's1'))); assert.equal(D.slipStatus(d), 'Issued');
+  const road = { kind: 'road', number: 'RXP-261013-01', budgetQty: 49500, approvedQty: 49500, financeRequired: true, submittedAt: 'x', opsApprovedAt: 'x', issues: [], supplementary: [] };
+  assert.equal(D.slipStatus(road), 'Awaiting Finance', 'road expenses above the threshold wait for finance'); road.financeApprovedAt = 'x'; assert.equal(D.slipStatus(road), 'Approved');
+  assert.equal(D.slipIssueError(road, 49500), ''); road.issues.push({ id: 'p1', qty: 49500, type: 'initial' }); assert.equal(D.slipStatus(road), 'Issued');
+  const c = D.tripExpenseControl({ id: 't1', journeyPlanId: 'JMG-TRP-2026-000001', plate: 'T1', client: 'C', loadingFrom: 'A', loadingTo: 'B' }, d, road, [{ status: 'Approved', approvedAmount: 20000 }, { status: 'Paid', approvedAmount: 5000 }, { status: 'Pending Approval', amountRequested: 1 }]);
+  assert.equal(c.dieselIssued, 1040); assert.equal(c.approvedDiesel, 1040); assert.equal(c.dieselVariance, 0); assert.equal(c.supplementaryDiesel, 50); assert.ok(c.exceptions.includes('Additional diesel issued')); assert.equal(c.roadPaid, 49500); assert.equal(c.extrasApproved, 25000); assert.equal(c.extrasPaid, 5000); assert.equal(c.extrasPending, 1);
+  assert.equal(D.nextSlipNumber('diesel', '2026-10-13', [{ number: 'DSL-261013-01' }]), 'DSL-261013-02'); assert.equal(D.nextSlipNumber('road', '2026-10-13', []), 'RXP-261013-01');
+  const diesel = { ...d, issues: [] }; const independent = D.slipStatus(diesel); assert.equal(independent, 'Approved'); assert.equal(D.slipStatus(road), 'Issued', 'diesel and road expenses keep independent statuses');
 });
 
 test('lost sales = unfulfilled trucks × agreed client rate, classified by reason', () => {
@@ -86,20 +89,20 @@ test('lost sales = unfulfilled trucks × agreed client rate, classified by reaso
 });
 
 test('assistant answers every management question in the brief from live records', () => {
-  const dispatches = [{ number: 'DSP-1', tripLogId: 't1', plate: 'T1', client: 'C', routeName: 'Lagos → Kano', category: 'Haulage 45T', budgetDiesel: 990, approvedDiesel: 990, approvedRoad: 49500, opsApprovedAt: 'x', dieselIssues: [], expensePayments: [], supplementary: [] }, { number: 'DSP-2', tripLogId: 't2', plate: 'T2', client: 'C', routeName: 'Lagos → Kano', category: 'Haulage 45T', budgetDiesel: 990, approvedDiesel: 990, approvedRoad: 49500, opsApprovedAt: 'x', dieselIssues: [{ id: 'a', litres: 1100, type: 'initial' }], expensePayments: [], supplementary: [] }];
-  const c = Object.assign({}, ctx, { dispatches });
+  const dieselreqs = [{ kind: 'diesel', number: 'DSL-1', tripLogId: 't1', plate: 'T1', client: 'C', routeName: 'Lagos → Kano', category: 'Haulage 45T', budgetQty: 990, approvedQty: 990, opsApprovedAt: 'x', issues: [], supplementary: [] }, { kind: 'diesel', number: 'DSL-2', tripLogId: 't2', plate: 'T2', client: 'C', routeName: 'Lagos → Kano', category: 'Haulage 45T', budgetQty: 990, approvedQty: 990, opsApprovedAt: 'x', issues: [{ id: 'a', qty: 1100, type: 'initial' }], supplementary: [] }];
+  const c = Object.assign({}, ctx, { dieselreqs, roadslips: [] });
   for (const q of D.QUESTIONS) { const a = D.assistant(q, c); assert.ok(a && a.answer && Array.isArray(a.rows), q); }
   assert.equal(D.assistant('Which trips are awaiting diesel dispatch?', c).rows.length, 1);
-  assert.equal(D.assistant('Which trucks have received diesel above the approved allowance?', c).rows[0].dispatch, 'DSP-2');
+  assert.equal(D.assistant('Which trucks have received diesel above the approved allowance?', c).rows[0].request, 'DSL-2');
   assert.ok(/Kano/.test(D.assistant('How much diesel is required for all planned Kano trips?', c).title));
   assert.equal(D.assistant('what is the meaning of life', c), null);
 });
 
 test('anomaly checks: duplicate routes, unmapped locations, implausible distances, bad categories, duplicate / over issues, missing distances', () => {
-  const dispatches = [{ number: 'DSP-9', plate: 'T1', routeName: 'Lagos → Kano', originState: 'Lagos', destState: 'Kano', approvedDiesel: 100, approvedRoad: 0, opsApprovedAt: 'x', distanceVerified: false, dieselIssues: [{ id: 'a', litres: 80, type: 'initial', ref: 'R1' }, { id: 'b', litres: 80, type: 'initial', ref: 'R1' }], expensePayments: [], supplementary: [] }];
-  const a = D.anomalies(Object.assign({}, ctx, { dispatches, distances: ctx.distances.concat([{ id: 'bad', routeName: 'Lagos (JMG Gbagada) → Kano', originState: 'Lagos', destState: 'Kano', oneWayKm: 2500 }, { id: 'low', routeName: 'x', originState: 'Lagos', destState: 'Borno', oneWayKm: 200 }]) }));
+  const dieselreqs = [{ kind: 'diesel', number: 'DSL-9', tripLogId: 'tX', plate: 'T1', routeName: 'Lagos → Kano', originState: 'Lagos', destState: 'Kano', approvedQty: 100, opsApprovedAt: 'x', distanceVerified: false, issues: [{ id: 'a', qty: 80, type: 'initial', ref: 'R1' }, { id: 'b', qty: 80, type: 'initial', ref: 'R1' }], supplementary: [] }, { kind: 'diesel', number: 'DSL-10', tripLogId: 'tX', plate: 'T1', approvedQty: 10, opsApprovedAt: 'x', distanceVerified: true, issues: [], supplementary: [] }];
+  const a = D.anomalies(Object.assign({}, ctx, { dieselreqs, trips: [{ journeyPlanId: 'JMG-TRP-2026-000001' }, { journeyPlanId: 'JMG-TRP-2026-000001' }], distances: ctx.distances.concat([{ id: 'bad', routeName: 'Lagos (JMG Gbagada) → Kano', originState: 'Lagos', destState: 'Kano', oneWayKm: 2500 }, { id: 'low', routeName: 'x', originState: 'Lagos', destState: 'Borno', oneWayKm: 200 }]) }));
   const kinds = new Set(a.map((x) => x.kind));
-  for (const k of ['Duplicate route', 'Duplicate route name', 'Unusually high distance', 'Unusually low distance', 'Vehicle consumption category', 'Duplicate diesel issue', 'Duplicate diesel request', 'Diesel above approved', 'Missing approved distance']) assert.ok(kinds.has(k), k);
+  for (const k of ['Duplicate route', 'Duplicate route name', 'Unusually high distance', 'Unusually low distance', 'Vehicle consumption category', 'Duplicate diesel issue', 'Duplicate diesel voucher', 'Duplicate diesel request', 'Diesel above approved', 'Missing approved distance', 'Duplicate Trip ID']) assert.ok(kinds.has(k), k);
 });
 
 test('dispatch dashboard figures come from live records', () => {

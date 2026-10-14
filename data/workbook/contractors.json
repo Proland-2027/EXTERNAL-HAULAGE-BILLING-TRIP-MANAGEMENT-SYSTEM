@@ -1,0 +1,63 @@
+[
+ {
+  "id": "ctr-heavylift",
+  "name": "HeavyLift Logistics Ltd",
+  "contact": "Emeka Udo",
+  "phone": "0803 000 1101",
+  "email": "ops@heavylift.example",
+  "equipment": [
+   "Lowbed",
+   "Crane-100T",
+   "Crane-150T"
+  ],
+  "rating": 4,
+  "active": true,
+  "notes": "Lowbed and crane specialist, Lagos / Abuja",
+  "version": 1,
+  "createdAt": "2026-10-12T00:00:00Z",
+  "createdBy": "crm",
+  "updatedAt": "2026-10-12T00:00:00Z",
+  "updatedBy": "crm"
+ },
+ {
+  "id": "ctr-northstar",
+  "name": "Northstar Haulage",
+  "contact": "Bala Musa",
+  "phone": "0805 000 2202",
+  "email": "dispatch@northstar.example",
+  "equipment": [
+   "Flatbed",
+   "40FT",
+   "20FT",
+   "25FT"
+  ],
+  "rating": 3,
+  "active": true,
+  "notes": "Container and flatbed trucks, Kano based",
+  "version": 1,
+  "createdAt": "2026-10-12T00:00:00Z",
+  "createdBy": "crm",
+  "updatedAt": "2026-10-12T00:00:00Z",
+  "updatedBy": "crm"
+ },
+ {
+  "id": "ctr-hiabworks",
+  "name": "Hiab Works Nigeria",
+  "contact": "Grace Peters",
+  "phone": "0807 000 3303",
+  "email": "hello@hiabworks.example",
+  "equipment": [
+   "Hiab",
+   "Crane-80T",
+   "Flatbed"
+  ],
+  "rating": 4,
+  "active": true,
+  "notes": "Self-loading trucks for site deliveries",
+  "version": 1,
+  "createdAt": "2026-10-12T00:00:00Z",
+  "createdBy": "crm",
+  "updatedAt": "2026-10-12T00:00:00Z",
+  "updatedBy": "crm"
+ }
+]

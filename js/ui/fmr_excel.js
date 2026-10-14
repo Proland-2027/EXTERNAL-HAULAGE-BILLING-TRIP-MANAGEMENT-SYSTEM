@@ -1,0 +1,64 @@
+/* FMR Excel round trip for the Tracking Team: download the current report or a blank update template, upload the
+ * completed sheet, validate it, preview every proposed change and import the approved updates. */
+(function () {
+  'use strict';
+  const U = HB.U, E = HB.engine, P = HB.planning, h = U.h;
+  const COLS = [['Asset Code', 'assetCode'], ['Registration', 'plate'], ['Driver', 'driver'], ['Operational Status', 'status'], ['Status Date/Time', 'statusAt'], ['Current Location', 'currentLocation'], ['Client', 'client'], ['Destination', 'destination'], ['Current Trip ID', 'tripId'], ['Loading Date', 'loadingDate'], ['Estimated Return', 'etaReturn'], ['Actual Return / Delivery', 'actualDelivery'], ['Workshop Release', 'workshopRelease'], ['Tracking Remarks', 'remarks']];
+  const ALIASES = { assetCode: ['asset code', 'asset'], plate: ['registration', 'reg', 'plate', 'plate number', 'truck', 'truck / reg', 'vehicle'], driver: ['driver'], status: ['operational status', 'status'], statusAt: ['status date/time', 'status date', 'date of this status', 'updated'], currentLocation: ['current location', 'location'], client: ['client'], destination: ['destination'], tripId: ['current trip id', 'trip id'], loadingDate: ['loading date', 'date loaded'], etaReturn: ['estimated return', 'eta return', 'expected return'], actualDelivery: ['actual return / delivery', 'actual return', 'actual delivery'], workshopRelease: ['workshop release', 'workshop release date'], remarks: ['tracking remarks', 'remarks', 'comments'] };
+  const DATE_KEYS = ['loadingDate', 'etaReturn', 'actualDelivery', 'workshopRelease'];
+  const excel = {};
+
+  excel.downloadCurrent = (ctx) => { const rows = HB.views.fleet.fleetRows(ctx.store); HB.exporter.xlsx([{ name: 'FMR', rows: [COLS.map((c) => c[0]).concat(['Availability category', 'Back on ground', 'Free from', 'Warnings']), ...rows.map((r) => COLS.map((c) => r.truck[c[1]] ?? '').concat([r.st.category, r.st.backOnGround, r.st.freeFrom, r.st.warnings.join(' | ')]))] }, instructions(ctx)], `FMR_Current_${U.todayISO()}.xlsx`); };
+  excel.downloadTemplate = (ctx) => { const rows = HB.views.fleet.fleetRows(ctx.store); HB.exporter.xlsx([{ name: 'FMR Update', rows: [COLS.map((c) => c[0]), ...rows.map((r) => [r.truck.assetCode || '', r.truck.plate, r.truck.driver || '', '', '', '', '', '', '', '', '', '', '', ''])] }, instructions(ctx)], `FMR_Update_Template_${U.todayISO()}.xlsx`); };
+  const instructions = (ctx) => ({ name: 'Instructions', rows: [['FMR update template'], ['Fill one row per truck. Trucks are matched by Asset Code or Registration; unknown trucks are rejected.'], ['Leave a cell blank to keep the current value. Dates: YYYY-MM-DD; Status Date/Time: YYYY-MM-DD HH:MM.'], ['Allowed statuses:'], ...P.statusList(ctx.store.state.planning).map((s) => [s.status, s.group]), ['Current Trip ID must be an existing Trip ID in the Trip Log (JMG-TRP-YYYY-NNNNNN).'], ['Upload the completed file with "Upload completed FMR" on the Fleet Movement Report; review the preview and confirm.']] });
+
+  function mapHeaders(headers) { const map = {}; headers.forEach((hd, i) => { const k = E.norm(hd); for (const [f, al] of Object.entries(ALIASES)) if (al.includes(k) && map[f] === undefined) map[f] = i; }); return map; }
+  const toDateTime = (v) => { if (v === null || v === undefined || v === '') return ''; if (v instanceof Date) return isNaN(v) ? null : v.toISOString(); if (typeof v === 'number') { const d = new Date(Math.round((v - 25569) * 86400 * 1000)); return isNaN(d) ? null : d.toISOString(); } const d = new Date(String(v).replace(' ', 'T')); return isNaN(d) ? null : d.toISOString(); };
+
+  excel.upload = function (ctx) {
+    const { store } = ctx; if (!ctx.can('fmr.update')) return U.toast('Only the tracking team updates the FMR.', 'bad');
+    const file = h('input', { type: 'file', accept: '.xlsx,.xls,.csv' }); const out = h('div', { class: 'stack' });
+    const m = U.modal({ title: 'Upload completed FMR (Excel)', size: 'wide', body: h('div', { class: 'stack' }, h('p', { class: 'small muted', text: 'Morning / afternoon fleet update: upload the completed template. Trucks are matched by Asset Code or Registration, statuses and dates are validated, duplicates and unknown trucks are rejected, and every proposed change is previewed before anything is written. Changes to trucks with active allocations or recorded trip milestones need explicit authorisation.' }), U.field('Excel file', file), out) });
+    m.setActions([h('button', { class: 'btn', onClick: () => m.close() }, 'Close')]);
+    file.addEventListener('change', async () => {
+      U.clear(out); const f = file.files[0]; if (!f) return;
+      try {
+        const wb = await HB.exporter.readWorkbook(f); const sheet = wb.sheets.find((s) => /fmr/i.test(s.name)) || wb.sheets[0]; const map = mapHeaders(sheet.headers);
+        if (map.plate === undefined && map.assetCode === undefined) { out.append(h('div', { class: 'notice bad', text: `No "Registration" or "Asset Code" column found in sheet ${sheet.name}. Columns: ${sheet.headers.filter(Boolean).join(', ')}` })); return; }
+        const planning = store.state.planning; const fleet = store.state.fleet; const trips = store.trips(); const tripIds = new Set(trips.map((t) => E.norm(t.journeyPlanId)).filter(Boolean));
+        const byCode = new Map(fleet.map((t) => [E.norm(t.assetCode), t])); const byPlate = new Map(fleet.map((t) => [P.plateKey(t.plate), t]));
+        const seen = new Set(); const items = [];
+        sheet.rows.forEach((row, i) => {
+          const g = (k) => (map[k] === undefined ? undefined : row[map[k]]); const code = E.clean(g('assetCode')), plate = E.clean(g('plate'));
+          const truck = (code && byCode.get(E.norm(code))) || (plate && byPlate.get(P.plateKey(plate))) || null; const errors = []; const changes = []; const patch = {};
+          if (!truck) { errors.push(`Unknown truck (${code || plate || 'no identifier'})`); items.push({ row: i + 2, code, plate, truck, errors, changes, patch }); return; }
+          if (seen.has(truck.id)) errors.push(`Duplicate row for ${truck.plate}`); seen.add(truck.id);
+          const st = E.clean(g('status')); if (st) { const canon = P.canonicalStatus(st, planning); if (!canon) errors.push(`Unknown status "${st}"`); else if (canon !== truck.status) { patch.status = canon; changes.push(['status', truck.status, canon]); } }
+          const at = g('statusAt'); if (at !== undefined && at !== null && at !== '') { const iso = toDateTime(at); if (!iso) errors.push('Invalid Status Date/Time'); else if (iso !== truck.statusAt) { patch.statusAt = iso; changes.push(['statusAt', truck.statusAt, iso]); } }
+          for (const k of DATE_KEYS) { const v = g(k); if (v === undefined || v === null || v === '') continue; const d = E.excelDateToISO(v); if (!d) errors.push(`Invalid date in ${k}`); else if (d !== (truck[k] || '')) { patch[k] = d; changes.push([k, truck[k] || '', d]); } }
+          for (const k of ['driver', 'currentLocation', 'client', 'destination', 'remarks']) { const v = g(k); if (v === undefined || v === null || v === '') continue; const c = E.clean(v); if (c !== (truck[k] || '')) { patch[k] = c; changes.push([k, truck[k] || '', c]); } }
+          const tid = E.clean(g('tripId')); if (tid) { if (!tripIds.has(E.norm(tid))) errors.push(`Trip ID ${tid} is not in the Trip Log`); else if (tid.toUpperCase() !== (truck.tripId || '')) { patch.tripId = tid.toUpperCase(); changes.push(['tripId', truck.tripId || '', tid.toUpperCase()]); } }
+          if (patch.status && !patch.statusAt) { patch.statusAt = U.nowISO(); }
+          const stx = P.truckStatus(truck, store.planningCtx()); const sensitive = (patch.status || patch.destination || patch.client) && (stx.activeAllocations.length > 0 || trips.some((t) => P.plateKey(t.plate) === P.plateKey(truck.plate) && t.opsStatus === 'Open' && t.milestones && Object.keys(t.milestones).length > 1));
+          items.push({ row: i + 2, code, plate, truck, errors, changes, patch, sensitive: !!sensitive, allocs: stx.activeAllocations.map((a) => a.id) });
+        });
+        const valid = items.filter((x) => !x.errors.length && x.changes.length), invalid = items.filter((x) => x.errors.length), unchanged = items.filter((x) => !x.errors.length && !x.changes.length), sensitive = valid.filter((x) => x.sensitive);
+        const auth = h('input', { type: 'checkbox' });
+        out.append(h('div', { class: 'row' }, h('span', { class: 'chip', text: `Rows: ${items.length}` }), h('span', { class: 'chip', text: `Trucks matched: ${items.filter((x) => x.truck).length}` }), h('span', { class: 'chip', text: `Changes: ${valid.length}` }), h('span', { class: 'chip', text: `Unchanged: ${unchanged.length}` }), h('span', { class: 'chip', text: `Rejected: ${invalid.length}` }), sensitive.length ? h('span', { class: 'chip', style: { background: 'var(--warn-bg)' }, text: `Need authorisation: ${sensitive.length}` }) : null));
+        if (invalid.length) out.append(h('div', { class: 'notice bad small' }, h('strong', {}, 'Rejected rows (not imported): '), invalid.slice(0, 10).map((x) => `row ${x.row} ${x.plate || x.code}: ${x.errors.join(', ')}`).join(' · ')));
+        if (sensitive.length) out.append(h('label', { class: 'row small notice warn' }, auth, ` ${sensitive.length} truck${sensitive.length > 1 ? 's have' : ' has'} active allocations or recorded trip milestones (${sensitive.map((x) => x.truck.plate).join(', ')}). Tick to confirm you are authorised to overwrite their operational status.`));
+        out.append(h('div', { class: 'table-frame short' }, h('table', { class: 'data', id: 'fmr-preview' }, h('thead', {}, h('tr', {}, ['Row', 'Truck', 'Proposed changes (current → new)', 'Result'].map((x) => h('th', { text: x })))), h('tbody', {}, items.slice(0, 200).map((x) => h('tr', {}, h('td', { text: x.row }), h('td', { text: x.truck ? x.truck.plate : (x.plate || x.code) }), h('td', { style: { whiteSpace: 'normal' } }, x.changes.length ? x.changes.map((c) => h('div', { class: 'diff' }, `${c[0]}: `, h('span', { class: 'from' }, String(c[1] || '—')), h('span', { class: 'to' }, String(c[2])))) : h('span', { class: 'muted small', text: x.errors.length ? '' : 'no change' })), h('td', {}, x.errors.length ? U.pill('Rejected', 'bad') : x.changes.length ? U.pill(x.sensitive ? 'Needs authorisation' : 'Will update', x.sensitive ? 'warn' : 'good') : U.pill('Unchanged', 'neutral'))))))));
+        const btn = h('button', { class: 'btn primary', id: 'btn-import-fmr', disabled: valid.length ? null : true, onClick: async () => {
+          const todo = valid.filter((x) => !x.sensitive || auth.checked); if (sensitive.length && !auth.checked && !(await U.confirm({ title: 'Skip protected trucks?', message: `${sensitive.length} truck(s) with active allocations or trip milestones will be skipped because the authorisation box is not ticked. Import the remaining ${todo.length} update(s)?`, okLabel: 'Import the rest' }))) return;
+          btn.disabled = true; btn.textContent = 'Importing…'; let n = 0; const errs = []; const now = U.nowISO();
+          for (const x of todo) { try { const cur = store.state.fleet.find((t) => t.id === x.truck.id); const d = Object.assign({ id: cur.id }, x.patch); if (x.patch.status || x.patch.statusAt) { d.statusBy = store.user.username; d.statusHistory = [...(cur.statusHistory || []), { at: x.patch.statusAt || cur.statusAt || now, status: x.patch.status || cur.status, by: store.user.username, destination: x.patch.destination || cur.destination, remarks: `FMR Excel upload ${f.name}` }].slice(-30); } d.fmrUploadAt = now; d.fmrUploadBy = store.user.username; await store.saveDoc('fleet', d, { expectedVersion: cur.version, label: `${cur.plate} · FMR upload (${x.changes.map((c) => c[0]).join(', ')})` }); n++; } catch (e) { errs.push(`${x.truck.plate}: ${e.message}`); } }
+          try { await store.savePlanning({ lastFmrUpdate: now, lastFmrUpdateBy: store.user.username, lastFmrUpdateRows: n, lastFmrUpdateFile: f.name }); } catch (e) { console.warn('could not stamp FMR update', e); }
+          await store.writeAudit(store.auditEntry({ action: 'import', entity: 'fleet', entityId: 'fmr-upload', label: `FMR Excel upload ${f.name}: ${n} trucks updated, ${invalid.length} rows rejected`, changes: [] }));
+          m.close(); HB.views.fleet.draw(); U.toast(`FMR updated for ${n} truck${n === 1 ? '' : 's'} from ${f.name}.`, 'good'); if (errs.length) U.toast(errs.join(' | '), 'bad');
+        } }, `Import ${valid.length} update${valid.length === 1 ? '' : 's'}`);
+        out.append(h('div', { class: 'row' }, btn));
+      } catch (e) { out.append(h('div', { class: 'notice bad', text: e.message })); }
+    });
+  };
+  HB.fmrExcel = excel;
+})();

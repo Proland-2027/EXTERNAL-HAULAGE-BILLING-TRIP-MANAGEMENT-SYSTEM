@@ -80,14 +80,17 @@ test('allocation planner ranks suitable trucks: earliest loading first, wrong si
 });
 
 test('request counts and status: requested, allocated, deployed, outstanding kept separate; cancelled allocations never count', () => {
-  const req = { id: 'Q-1', trucks: 3 };
+  const req = { id: 'Q-1', trucks: 3, routeApproved: true, plan: { approvedQty: 3, approvedAt: 'x' } };
   const allocs = [{ id: 'a', requestId: 'Q-1', status: 'Planned' }, { id: 'b', requestId: 'Q-1', status: 'Cancelled' }, { id: 'c', requestId: 'Q-1', status: 'Deployed' }];
   const c = P.requestCounts(req, allocs, []);
   assert.deepEqual([c.requested, c.allocated, c.deployed, c.outstanding], [3, 2, 1, 1]);
   assert.equal(P.requestStatus(req, c), 'In Progress');
   assert.equal(P.requestStatus(req, P.requestCounts(req, [allocs[0]], [])), 'Partially Allocated');
   assert.equal(P.requestStatus(req, P.requestCounts(req, [allocs[0], { id: 'd', requestId: 'Q-1', status: 'Planned' }, { id: 'e', requestId: 'Q-1', status: 'Planned' }], [])), 'Fully Allocated');
-  assert.equal(P.requestStatus(req, P.requestCounts(req, [], [])), 'New Request');
+  assert.equal(P.requestStatus(req, P.requestCounts(req, [], [])), 'Plan Approved');
+  assert.equal(P.requestStatus({ id: 'Q-2', trucks: 1, routeApproved: true }, P.requestCounts({ id: 'Q-2', trucks: 1 }, [], [])), 'Awaiting Planning', 'no plan yet: the Operations Manager must approve one');
+  assert.equal(P.requestStatus({ id: 'Q-3', trucks: 1, routeApproved: false, submittedAt: 'x' }, P.requestCounts({ id: 'Q-3', trucks: 1 }, [], [])), 'Pending Route Mapping');
+  assert.equal(P.requestStatus({ id: 'Q-4', trucks: 1, routeApproved: true, cancellationRequestedAt: 'x' }, P.requestCounts({ id: 'Q-4', trucks: 1 }, [], [])), 'Cancellation Requested');
   assert.equal(P.requestStatus({ ...req, status: 'Cancelled' }, c), 'Cancelled');
   assert.equal(P.requestStatus(req, P.requestCounts(req, [{ requestId: 'Q-1', status: 'Completed' }, { requestId: 'Q-1', status: 'Completed' }, { requestId: 'Q-1', status: 'Completed' }], [])), 'Completed');
 });
@@ -98,7 +101,8 @@ test('identifiers: Request IDs are CODE-NNN and Allocation IDs ALC-YYMMDD-NN, ne
   assert.equal(P.nextAllocationId('2026-10-13', [{ id: 'ALC-261013-01' }]), 'ALC-261013-02');
 });
 
-test('Trip IDs from Power Apps are validated, never generated, and duplicates are rejected', () => {
+test('Trip IDs are validated (generated JMG-TRP format or legacy pattern) and duplicates are rejected', () => {
+  assert.ok(E.tripIdValid('JMG-TRP-2026-000001', '^NEVER$'), 'the generated format is always accepted');
   assert.ok(E.tripIdValid('TRP-00123')); assert.ok(E.tripIdValid('JP12345')); assert.ok(!E.tripIdValid('hello world')); assert.ok(E.tripIdValid(''));
   assert.ok(E.tripIdValid('ABC-1', '^ABC-\\d+$')); assert.ok(!E.tripIdValid('XYZ-1', '^ABC-\\d+$'));
   const trips = [{ id: 't1', journeyPlanId: 'TRP-001', client: 'A', dateDispatched: '2026-10-01' }];
@@ -163,21 +167,22 @@ test('fleet and billing KPIs on the seeded data', () => {
   assert.equal(b.allocatedNotInTripLog, 1); assert.equal(b.allocatedAwaitingTripId, 2); assert.equal(b.tripsAwaitingWaybill, 1); assert.equal(b.completedNotInvoiced, 1); assert.equal(b.issuedNotSent, 1); assert.equal(b.sentAwaitingPayment, 1);
 });
 
-test('historical Journey Plan IDs that do not fit the Power Apps format can still be saved; only new or changed IDs are checked', () => {
+test('historical Journey Plan IDs that do not fit the Trip ID format can still be saved; only new or changed IDs are checked', () => {
   const current = { id: 'wb-1', client: 'A', plate: 'X', dateDispatched: '2024-03-01', journeyPlanId: 'OMOS AND SONS' };
   const trips = [current, { id: 'wb-2', journeyPlanId: 'OMOS AND SONS', client: 'A', dateDispatched: '2024-03-02' }];
   assert.deepEqual(E.validateTrip({ ...current, sellingPrice: 100 }, { trips, current }), [], 'unchanged legacy id passes');
-  assert.ok(E.validateTrip({ ...current, journeyPlanId: 'not valid!' }, { trips, current }).some((e) => /Power Apps format/.test(e)), 'a changed id is validated');
+  assert.ok(E.validateTrip({ ...current, journeyPlanId: 'not valid!' }, { trips, current }).some((e) => /not a valid Trip ID/.test(e)), 'a changed id is validated');
+  const gen = { id: 'g-1', client: 'A', plate: 'X', dateDispatched: '2026-10-01', journeyPlanId: 'JMG-TRP-2026-000004' }; assert.ok(E.validateTrip({ ...gen, journeyPlanId: 'JMG-TRP-2026-000009' }, { trips: [gen], current: gen }).some((e) => /cannot be overwritten/.test(e)), 'a generated Trip ID is never overwritten');
   assert.ok(E.validateTrip({ ...current, journeyPlanId: 'omos and sons ' }, { trips, current }).length === 0, 'case/space differences are not a change');
 });
 
 test('a Trip Log entry is built entirely from the allocation and its request; one allocation links to one trip unless split', () => {
   const alloc = { id: 'ALC-261020-01', requestId: 'JAM-010', requestReference: 'PO-778', client: 'Jamara', plate: 'T33073LA', assetCode: 'MVEH-000452', truckBatch: 'New Batch', loadingFrom: 'Lagos', destination: 'Kano', vehicleType: 'JUMBO', tonnage: '30T', plannedLoadingDate: '2026-10-20', plannedDeploymentDate: '2026-10-20', status: 'Planned', tripId: 'TRP-00555', tripIdBy: 'powerapps' };
-  const t = P.tripFromAllocation(alloc, { id: 'JAM-010', reference: 'PO-778' }, {});
+  const t = P.tripFromAllocation(alloc, { id: 'JAM-010', reference: 'PO-778' }, { tripId: 'JMG-TRP-2026-000555' });
   assert.equal(t.dateDispatched, '2026-10-20'); assert.equal(t.plate, 'T33073LA'); assert.equal(t.client, 'Jamara'); assert.equal(t.loadingFrom, 'Lagos'); assert.equal(t.loadingTo, 'Kano'); assert.equal(t.contractType, '30T'); assert.equal(t.truckBatch, 'New Batch');
-  assert.equal(t.journeyPlanId, 'TRP-00555'); assert.equal(t.tripIdSource, 'powerapps'); assert.equal(t.allocationId, alloc.id); assert.equal(t.requestId, 'JAM-010'); assert.equal(t.requestReference, 'PO-778');
+  assert.equal(t.journeyPlanId, 'JMG-TRP-2026-000555'); assert.equal(t.tripIdSource, 'generated'); assert.equal(t.serviceType, 'Internal Fleet'); assert.equal(t.opsStatus, 'Open'); assert.ok(t.milestones.allocatedAt); assert.equal(t.allocationId, alloc.id); assert.equal(t.requestId, 'JAM-010'); assert.equal(t.requestReference, 'PO-778');
   assert.equal(t.sellingPrice, null); assert.equal(t.invoiceStatus, 'Not Invoiced'); assert.equal(t.waybill, '');
-  assert.equal(P.tripFromAllocation({ ...alloc, tripId: '' }, null, {}).journeyPlanId, '', 'Trip ID stays pending when Power Apps has not issued it');
+  assert.equal(P.tripFromAllocation({ ...alloc, tripId: '' }, null, {}).journeyPlanId, '', 'without a generated ID the trip is pending');
   assert.equal(P.tripFromAllocation(alloc, null, { split: true }).journeyPlanId, '', 'a split second leg does not reuse the first trip\'s Trip ID');
   assert.equal(P.allocationLinkError(alloc, null), '');
   assert.ok(/already linked/.test(P.allocationLinkError({ ...alloc, tripLogId: 't-1' }, null)));
@@ -185,7 +190,7 @@ test('a Trip Log entry is built entirely from the allocation and its request; on
   assert.equal(P.allocationLinkError({ ...alloc, tripLogId: 't-1' }, null, { split: true }), '', 'authorised split allows a second trip');
   assert.ok(/cancelled/.test(P.allocationLinkError({ ...alloc, status: 'Cancelled' }, null)));
   assert.ok(E.can('billing', 'trip.fromPlanning') && !E.can('billing', 'trip.create') && !E.can('billing', 'allocation.split'), 'billing selects allocations but neither types trips nor splits allocations');
-  assert.ok(E.can('planning', 'allocation.split') && !E.can('tracking', 'trip.fromPlanning'));
+  assert.ok(E.can('operations', 'allocation.split') && !E.can('planning', 'allocation.split') && !E.can('tracking', 'trip.fromPlanning'));
 });
 
 test('credit note allocation applies oldest-first against the invoice trips and never exceeds the balance', () => {

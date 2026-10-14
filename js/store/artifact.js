@@ -15,7 +15,7 @@
     }
     async init(progress) {
       progress && progress('Loading shared records…');
-      const names = ['settings', 'meta', 'clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dispatches', 'tripchunks'];
+      const names = ['settings', 'meta', 'clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dieselreqs', 'roadslips', 'extraexpenses', 'contractors', 'quotes', 'tripchunks'];
       // The route register (524 workbook routes) ships as a static file; routes edited in the app are saved as documents and override it by id.
       try { const r = await fetch('data/workbook/routes.json'); if (r.ok) this.state.routes = await r.json(); } catch (e) { /* offline */ }
       const snaps = await Promise.all(names.map((n) => this.db.collection(n).limit(1000).get()));
@@ -40,6 +40,13 @@
     async login(username, password) { const u = await this.verifyLogin(username, password); if (!u) throw new Error('Wrong username or password.'); this.user = this.publicUser(u); U.storage.set('hb_session', { username: u.username }); return this.user; }
     async resume() { const s = U.storage.get('hb_session'); if (!s) return null; const u = this.state.users.find((x) => x.username === s.username && x.active !== false); this.user = this.publicUser(u); return this.user; }
     async logout() { this.user = null; U.storage.del('hb_session'); }
+    /** Trip ID sequence: a shared counter document (meta/tripseq) advanced with a merge write, seeded from the Trip Log; duplicates are still refused on save. */
+    async nextTripId(year) {
+      year = year || new Date().getUTCFullYear(); const key = 'y' + year; const counter = this.state.tripseq || {};
+      const n = Math.max(Number(counter[key] || 0), HB.engine.maxTripSeq([...this.state.trips.values()], year) + 1);
+      await this._merge('meta', 'tripseq', { id: 'tripseq', [key]: n + 1 }); this.state.tripseq = Object.assign({}, counter, { [key]: n + 1 });
+      return HB.engine.formatTripId(year, n);
+    }
 
     async _merge(collection, id, patch) {
       const ref = this.db.doc(collection + '/' + id);

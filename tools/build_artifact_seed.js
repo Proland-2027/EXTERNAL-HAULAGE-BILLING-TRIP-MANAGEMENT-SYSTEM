@@ -11,12 +11,13 @@ const DEMO_USERS = [
   { username: 'admin', name: 'Adaeze Okonkwo', role: 'admin', password: 'Admin@2026' }, { username: 'ops', name: 'Musa Bello', role: 'operations', password: 'Ops@2026' },
   { username: 'billing', name: 'Funke Adeyemi', role: 'billing', password: 'Billing@2026' }, { username: 'finance', name: 'Chidi Nwosu', role: 'finance', password: 'Finance@2026' }, { username: 'manager', name: 'Ibrahim Lawal', role: 'management', password: 'Manager@2026' },
   { username: 'tracking', name: 'Ngozi Eze', role: 'tracking', password: 'Tracking@2026' }, { username: 'planner', name: 'Tunde Bakare', role: 'planning', password: 'Planner@2026' },
+  { username: 'crm', name: 'Amaka Obi', role: 'crm', password: 'Crm@2026' }, { username: 'station', name: 'Yusuf Danjuma', role: 'station', password: 'Station@2026' },
 ];
 const only = process.argv[3] ? process.argv[3].split(',') : null; // e.g. "fleet,routes,requests,allocations,planning,users" for an incremental seed
 const want = (c) => !only || only.includes(c);
 fs.rmSync(out, { recursive: true, force: true });
 const manifest = [];
-for (const c of ['fleet', 'routes', 'requests', 'allocations', 'distances']) if (want(c) && fs.existsSync(path.join(ROOT, 'data', 'workbook', c + '.json'))) for (const d of read(c + '.json')) manifest.push(write(c, d.id, Object.assign({ version: 1 }, d)));
+for (const c of ['fleet', 'routes', 'requests', 'allocations', 'distances', 'contractors', 'quotes']) if (want(c) && fs.existsSync(path.join(ROOT, 'data', 'workbook', c + '.json'))) for (const d of read(c + '.json')) manifest.push(write(c, d.id, Object.assign({ version: 1 }, d)));
 if (want('locationmaster') && fs.existsSync(path.join(ROOT, 'data', 'workbook', 'locationmaster.json'))) manifest.push(write('meta', 'locationmaster', Object.assign({ version: 1 }, read('locationmaster.json'), { id: 'locationmaster' })));
 if (want('planning') && fs.existsSync(path.join(ROOT, 'data', 'workbook', 'planning.json'))) manifest.push(write('meta', 'planning', Object.assign({ version: 1 }, read('planning.json'), { id: 'planning' })));
 const chunks = new Map();

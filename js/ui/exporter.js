@@ -21,8 +21,14 @@
     await U.download(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
   }
   /** Reads an .xlsx/.csv file into { sheets: [{ name, headers, rows }] }. Picks the "Trip Log" sheet first when present. */
+  /** Minimal CSV parser (quoted fields, CRLF) used when the Excel library is unavailable or the file is a CSV. */
+  function parseCsv(text) { const rows = []; let row = [], cell = '', q = false; text = text.replace(/^\uFEFF/, ''); for (let i = 0; i < text.length; i++) { const c = text[i]; if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; } else if (c === '"') q = true; else if (c === ',') { row.push(cell); cell = ''; } else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; } else cell += c; } if (cell !== '' || row.length) { row.push(cell); rows.push(row); } return rows.map((r) => r.map((v) => (v === '' ? null : /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v))); }
   async function readWorkbook(file) {
-    if (typeof XLSX === 'undefined') throw new Error('The Excel library has not loaded. Check your connection and try again.');
+    if (typeof XLSX === 'undefined' || /\.csv$/i.test(file.name || '')) {
+      if (typeof XLSX === 'undefined' && !/\.csv$/i.test(file.name || '')) throw new Error('The Excel library has not loaded. Check your connection and try again, or upload the sheet as CSV.');
+      const aoa = parseCsv(await file.text()); const hi = aoa.findIndex((r) => r && r.filter((c) => c !== null && c !== '').length >= 3); const headers = hi >= 0 ? aoa[hi].map((h) => (h === null ? '' : String(h))) : [];
+      return { sheets: [{ name: file.name || 'CSV', headers, rows: hi >= 0 ? aoa.slice(hi + 1).filter((r) => r && r.some((c) => c !== null && c !== '')) : [] }] };
+    }
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array', cellDates: true });
     const sheets = wb.SheetNames.map((name) => { const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null }); const hi = aoa.findIndex((r) => r && r.filter((c) => c !== null && c !== '').length >= 5); const headers = hi >= 0 ? aoa[hi].map((h) => (h === null ? '' : String(h))) : []; return { name, headers, rows: hi >= 0 ? aoa.slice(hi + 1).filter((r) => r && r.some((c) => c !== null && c !== '')) : [] }; });

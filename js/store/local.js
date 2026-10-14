@@ -12,8 +12,8 @@
       if (saved) { this._load(saved); return; }
       progress && progress('Loading the workbook data…');
       try {
-        const [trips, assets, clients, locations, rates, zones, fleet, routes, requests, allocations, planning, distances, locationmaster] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones', 'fleet', 'routes', 'requests', 'allocations', 'planning', 'distances', 'locationmaster'].map((n) => fetch(`data/workbook/${n}.json`).then((r) => (r.ok ? r.json() : (n === 'zones' || n === 'planning' || n === 'locationmaster' ? {} : [])))));
-        this.state.distances = distances || []; this.state.locationMaster = locationmaster || {};
+        const [trips, assets, clients, locations, rates, zones, fleet, routes, requests, allocations, planning, distances, locationmaster, contractors, quotes] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones', 'fleet', 'routes', 'requests', 'allocations', 'planning', 'distances', 'locationmaster', 'contractors', 'quotes'].map((n) => fetch(`data/workbook/${n}.json`).then((r) => (r.ok ? r.json() : (n === 'zones' || n === 'planning' || n === 'locationmaster' ? {} : []))).catch(() => (n === 'zones' || n === 'planning' || n === 'locationmaster' ? {} : []))));
+        this.state.distances = distances || []; this.state.locationMaster = locationmaster || {}; this.state.contractors = contractors || []; this.state.quotes = quotes || [];
         for (const t of trips) this.state.trips.set(t.id, t);
         this.state.assets = assets.map((a) => Object.assign({ id: a.plate }, a));
         this.state.clients = clients; this.state.locations = locations; this.state.zones = zones || {};

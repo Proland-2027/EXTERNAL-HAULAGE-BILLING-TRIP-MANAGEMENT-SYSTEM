@@ -3,8 +3,8 @@
   'use strict';
   const U = HB.U, E = HB.engine, h = U.h;
   const NAV = [
-    { group: 'Operations' }, { key: 'dashboard', label: 'Management Dashboard', icon: '▦' }, { key: 'trips', label: 'Trip Log', icon: '☰' },
-    { group: 'Fleet' }, { key: 'fleet', label: 'Fleet Movement (FMR)', icon: '⛟' }, { key: 'planning', label: 'Requests & Allocation', icon: '⇄' }, { key: 'fleetdash', label: 'Fleet Planning Dashboard', icon: '◈' }, { key: 'dispatch', label: 'Dispatch & Diesel', icon: '⛽' }, { key: 'lostsales', label: 'Lost Sales', icon: '◔' },
+    { group: 'Operations' }, { key: 'dashboard', label: 'Management Dashboard', icon: '▦' }, { key: 'crm', label: 'Client Requests (CRM)', icon: '✎' }, { key: 'planning', label: 'Fleet Planning & Allocation', icon: '⇄' }, { key: 'tpl', label: '3PL Management', icon: '⊞' }, { key: 'trips', label: 'Trip Log', icon: '☰' },
+    { group: 'Fleet' }, { key: 'fleet', label: 'Fleet Movement (FMR)', icon: '⛟' }, { key: 'tat', label: 'Trip Tracking & TAT', icon: '◷' }, { key: 'fleetdash', label: 'Fleet Planning Dashboard', icon: '◈' }, { key: 'dispatch', label: 'Diesel & Road Expenses', icon: '⛽' }, { key: 'lostsales', label: 'Lost Sales', icon: '◔' },
     { group: 'Billing' }, { key: 'rates', label: 'Client Price List', icon: '₦' }, { key: 'invoices', label: 'Invoices', icon: '▤' }, { key: 'payments', label: 'Payments & Statements', icon: '◧' },
     { group: 'Insight' }, { key: 'reports', label: 'Reports', icon: '▥' }, { key: 'audit', label: 'Audit Trail', icon: '◷', need: 'audit.view' },
     { group: 'Setup' }, { key: 'clients', label: 'Clients', icon: '◉' }, { key: 'assets', label: 'Asset List', icon: '▣' }, { key: 'users', label: 'Users & Roles', icon: '◎', need: 'user.manage' }, { key: 'settings', label: 'Settings', icon: '⚙' },
@@ -44,7 +44,7 @@
     const demo = h('div', { class: 'demo-accounts' }, h('div', { class: 'label', text: 'Demo accounts (click to fill)' }), HB.DEMO_USERS.map((d) => h('button', { type: 'button', class: 'btn sm', onClick: () => { u.value = d.username; p.value = d.password; } }, `${E.ROLE_LABELS[d.role]} — ${d.username} / ${d.password}`)));
     const modeText = store.mode === 'shared' ? 'Shared database · changes are visible to every signed-in team member' : store.mode === 'server' ? 'Application server · central SQLite database' : 'Local demo mode · data stays in this browser';
     const viewOnly = store.mode === 'shared' && store.canWrite === false ? h('div', { class: 'notice warn small', text: 'View-only access: your claude.ai account can open this page but not change its shared data, whatever role you sign in with. Ask the page owner to share it with you with edit (contributor) access, then reload.' }) : null;
-    root.append(h('div', { class: 'boot' }, h('div', { class: 'boot-card' }, h('div', { class: 'brand-mark', 'aria-hidden': 'true' }, 'HB'), h('h1', { text: 'Haulage Billing Desk' }), h('p', { class: 'muted small', text: 'Trip log, agreed client prices, invoicing and payments for the haulage operation.' }), viewOnly, form, demo, h('p', { class: 'tiny muted', text: modeText }))));
+    root.append(h('div', { class: 'boot' }, h('div', { class: 'boot-card' }, h('div', { class: 'brand-mark', 'aria-hidden': 'true' }, 'HB'), h('h1', { text: 'JMG Transport Management System' }), h('p', { class: 'muted small', text: 'Client requests, route validation, fleet planning and allocation, automatic Trip IDs, tracking and TAT, diesel and road expense documents, invoicing and payments.' }), viewOnly, form, demo, h('p', { class: 'tiny muted', text: modeText }))));
   }
 
   function ctx() {
@@ -58,7 +58,7 @@
     const hash = (location.hash || '').replace('#', ''); if (HB.views[hash]) app.view = hash;
     const root = document.getElementById('app'); U.clear(root);
     const navEl = h('nav', { class: 'nav', 'aria-label': 'Sections' });
-    const rail = h('aside', { class: 'rail', id: 'rail' }, h('div', { class: 'brand' }, h('div', { class: 'brand-mark' }, 'HB'), h('div', {}, h('div', { class: 'brand-title', text: 'Haulage Billing Desk' }), h('div', { class: 'brand-sub', text: store.state.settings.company || '' }))), navEl,
+    const rail = h('aside', { class: 'rail', id: 'rail' }, h('div', { class: 'brand' }, h('div', { class: 'brand-mark' }, 'HB'), h('div', {}, h('div', { class: 'brand-title', text: 'JMG Transport Management' }), h('div', { class: 'brand-sub', text: store.state.settings.company || '' }))), navEl,
       h('div', { class: 'user-box' }, h('strong', { text: user.name }), h('span', { text: E.ROLE_LABELS[user.role] }), h('span', {}, h('span', { class: 'live-dot' + (store.live ? '' : ' off') }), store.mode === 'shared' ? 'Live · shared database' : store.mode === 'server' ? 'Live · server' : 'Local mode'), h('button', { class: 'btn sm', style: { justifySelf: 'start', color: 'inherit', borderColor: 'rgba(255,255,255,.4)', background: 'transparent' }, onClick: async () => { await store.logout(); location.hash = ''; showLogin(); } }, 'Sign out')));
     const title = h('h1', { id: 'view-title' });
     const viewOnlyBar = store.mode === 'shared' && store.canWrite === false ? h('div', { class: 'notice warn small', style: { margin: '0', borderRadius: '0' }, text: `View-only: ${user.name} is signed in as ${E.ROLE_LABELS[user.role]}, but your claude.ai account only has view access to this page, so saves will be refused. Ask the page owner for edit (contributor) access.` }) : null;
