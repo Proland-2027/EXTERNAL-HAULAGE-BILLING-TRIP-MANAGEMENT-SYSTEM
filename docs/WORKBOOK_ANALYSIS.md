@@ -174,3 +174,54 @@ No new workbook accompanied this brief; the rules below were designed from the b
 | KPIs | `managementKpis()` feeds dashboard section 4 *Workflow KPIs* | `js/core/dispatch.js`, `js/ui/reports.js` |
 
 Decisions: (1) the Power Apps integration and its endpoint were removed; (2) tracking may move the dispatch date to the actual loading date when a truck loads earlier than planned, so milestones and the Trip Log agree; (3) the seed upgrades the existing routes to approved Route Master entries (`tools/build_brief5_seed.js`) so historical requests keep working, while one request (LEB-001) is left unmapped to demonstrate the validation.
+
+# Phase 6 — Setup_Haulage workbook (asset, staff, LOB, KPI, accounts, items, rate card, Route Master, suppliers, 3PL rate cards)
+
+Extracted with `tools/extract_setup.py` (cached values only) and turned into masters by `tools/build_setup_masters.js`; the full report is `data/workbook/setup_report.json` and the *Import report* tab of Master Data.
+
+| Sheet | Rows | Becomes | Notes |
+|---|---|---|---|
+| Asset Code | 124 | `assets` (merged: 57 existing vehicles updated, 67 added, 3 Haulage-sheet assets kept and flagged) | asset code, plate, name, tonnage, body size, type, cost center and name; plates normalised (T2404LA = T-2404LA); batch classification unknown for the 67 new vehicles (*Unclassified*) |
+| Driver Mapping On Each Vehicle | 67 | `assets` / `fleet` driver, staff ID, station officer, operations manager | 7 driver-mapped vehicles missing from the FMR added without a status |
+| Staffs List | 131 | `staff` | employee ID (6 digits), position, department, cost center, branch, category, joining date, manager |
+| LOB | 6 | `lob` | Haulage, Port Operations, Hiab, Vans, Crane & Heavy Lifts, 3PL |
+| KPI | 17 | `meta/planning.dispatch.dieselRates`, `meta/planning.kpi`, `meta/planning.portExpenses` | 300 km/day, 1 day loading and offloading, diesel L/km per category, port-operation expense table |
+| Expense Account | 23 | `accounts` + `meta/accountmap` | GL numbers, expense types and the module rule; two accounts have no number yet (CNG, tracking) |
+| Item List | 726 | `items` | part name, make, model, category, group, subgroup, class, cost (475 priced); no stock, unit, part number, reorder level or inventory account in the sheet |
+| Supplier | 55 | `suppliers` | account, terms, division, scope per equipment / service |
+| Rate Card for costing | 67 | `ratecard` | consumption, maintenance budget, trips and km per month, planned days, fixed cost and selling fixed per day, maintenance / tyre / road cost per km |
+| All Routes | 823 | `routes` (Route Master) | contract, client, loading point and state, corrected destination and state, region, delivery type, zone, stops, leg km, source; 395 existing routes re-mapped (390 with different km, previous values in `kmHistory`), 428 new lanes, 10 unlocated lanes pending approval, 130 legacy routes kept, 48 duplicate lanes flagged |
+| KM from … / Internal Zones / Zone Areas / Spelling Corrections / Method & Notes | 437 / 46 / 361 / 106 / 14 | `meta/routezones` | zone centres and far ends per depot, areas per zone, the spelling corrections applied, the workbook's own method notes |
+| 3PL Rate Card – Internal / Interstate | 46 / 303 | `tplrates` | every rate blank, as instructed |
+
+**Missing data (left empty, never invented)**
+* Cost center budgets are not in the workbook (budgetMonthly is null); the "cost centers exceeding budget" question answers "no budget set" until Finance enters budgets.
+* 67 vehicles from the Asset Code sheet have no New Batch / Old Batch classification in any workbook (shown as "Unclassified" until an administrator sets it).
+* Acquisition information (purchase date, cost) is not in the workbook; the asset master carries the fields empty.
+* 7 driver-mapped vehicles were not on the Truck Planning FMR; they are added without an operational status (shown as status unconfirmed until the tracking team updates them).
+* Expense accounts without a general-ledger number in the workbook: CNG Expense, Tracking System, Insurance, GIT, License and Permit, Salaries Local and Expat, Rent, Depreciation. They are listed as pending; postings to them are held as "account number pending" until Finance supplies the number.
+* No revenue (sales) account numbers were supplied; revenue postings carry the LOB and cost center but an empty GL account until Finance adds revenue accounts to the Chart of Accounts.
+* Item list: stock quantities, units of measure, part numbers, reorder levels and inventory accounts are not in the workbook (unit defaults to EA, stock starts at 0 and is flagged "stock not supplied", 251 items have no unit cost). Expense account defaults: tyres → 6102028, everything else → 6102010 (Hiab jobs post to 6102009 by the job card's vehicle).
+* 3PL rate cards (internal zones and interstate lanes) are imported with every rate blank, as instructed; Station Supervisors enter contractor rates per request until management finalises the card.
+* 428 Route Master lanes have no approved client price in any workbook (price null); the price list and request pricing fall back to the client price list.
+
+**Conflicts between the supplied files**
+* Asset Code sheet: T1590LA carries cost center CC039 with the name "Closed Body Logistics" while CC039 is Hiabs Logistics elsewhere; CC039 = Hiabs Logistics is kept and the asset keeps its code.
+* Asset T-2422LA (MVEH-000282) is in the Haulage Billing asset list but not in the Setup_Haulage Asset Code sheet; kept and flagged.
+* Asset T8115LA (MVEH-000338) is in the Haulage Billing asset list but not in the Setup_Haulage Asset Code sheet; kept and flagged.
+* Asset THIRD-PARTYHAULAGE (THIRD-PARTYHAULAGE) is in the Haulage Billing asset list but not in the Setup_Haulage Asset Code sheet; kept and flagged.
+* Rate Card road expense per km differs by division (25 / 36 / 38 / 40 / 49 / 59 / 80 ₦/km) while the Expense Account sheet fixes the driver road allowance at ₦25/km; the payment slip keeps ₦25/km (operational standard) and costing uses the rate card value.
+* 48 Route Master rows repeat a contract + loading point + destination already listed (different stop sequences or duplicated entries); both are kept and flagged duplicateLane for the administrator to retire one.
+* Contracts in the Truck Planning route register that the Setup_Haulage Route Master does not list (kept as legacy routes): BAJAJ-30T-NBL-DSL-JUMBO (57), ATLANTIC PVC-45T-NBL-DSL-JUMBO (72), ORCA-3PL-LOWBED (1).
+* 390 existing routes had different kilometres in the Truck Planning register than in the Route Master; the Route Master values are now operational and the previous values are kept in each route's kmHistory.
+* Diesel KPI: the brief's initial assumption for Jumbo 30T / 102 CBM is 0.45 L/km but the supplied KPI master says 0.42 L/km; the KPI master overrides, as instructed (the matrix stays editable in Settings).
+
+**Assumptions (documented and editable in the masters)**
+* Default LOB per cost center: CC059 Haulage and CC046 Flat Trucks → Haulage, CC039 Hiabs → Hiab, CC047 Closed Body → Vans; overhead, workshop and stores cost centers carry no LOB. The planner can change the LOB on every allocation.
+* Suggested expense account per additional-expense category (editable): extra diesel → 6103013, road / accommodation → 6101027, labour and pushing → 6101030, police / community → 6105061, tolls, tickets, demurrage, other → 6105047, repairs on the road → 6102010, towing → 6105040, port expenses → 6105051.
+* Rate Card for costing: "Actual Fixed Cost" and "Selling Fixed" are read as amounts per planned working day (the sheet gives Project Number of Day / Planned days per asset), "KM" as planned kilometres per month; MTC, tyre and road costs are per km as given. Diesel cost in costing uses the diesel price in Settings (₦ per litre, editable) because the workbook has no diesel price.
+* Port operations KPI table (APMT / ESS-Libra / Ikorodu lanes): the sheet header lists five columns for four value columns ("Additional Diesel" and "Passing Truck Express" share one column); values are kept as Port expenses, Driver road expenses, Additional diesel / passing truck, Dropping empty, pending confirmation.
+* Delivery-time bands come from the brief, not the workbook; the operational delivery leg is counted from loading completion (driving days at 300 km/day), so the loading allowance is not double counted against the OTD target; local deliveries ≤ 100 km use one 24-hour window including handling.
+* Diesel cost in costing and in the P&L uses the diesel price in Settings → Fleet planning (the workbooks have none); approved allowances are never costs until issued or paid.
+* No revenue account numbers, cost-center budgets, preventive maintenance schedule or opening stock were supplied; the screens show these as pending and Finance / the Storekeeper complete them.
+* The official JMG logo file was not included in this upload; the invoice PDF keeps the logo already configured in Settings.
