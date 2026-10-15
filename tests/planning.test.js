@@ -158,8 +158,8 @@ test('runway marks each truck day as free, planned, on trip, down or unknown and
 
 test('fleet and billing KPIs on the seeded data', () => {
   const k = P.fleetKpis(ctx);
-  assert.equal(k.totalFleet, 62); assert.equal(k.available + k.onTrip + k.inWorkshop + k.breakdown + fleet.filter((t) => !t.status || /Unavailable/.test(t.status)).length, 62);
-  assert.equal(k.byCategory.reduce((s, c) => s + c.count, 0), 62);
+  assert.equal(k.totalFleet, 69); assert.equal(k.available + k.onTrip + k.inWorkshop + k.breakdown + fleet.filter((t) => !t.status || /Unavailable/.test(t.status)).length, 69);
+  assert.equal(k.byCategory.reduce((s, c) => s + c.count, 0), 69);
   assert.equal(k.openRequests, requests.filter((r) => !['Completed', 'Cancelled'].includes(P.requestStatus(r, P.requestCounts(r, allocations, [])))).length);
   assert.ok(k.outstandingTrucks <= k.trucksRequested);
   const trips = [{ id: 't1', waybill: '', dateDispatched: '2026-10-01', invoiceId: '' }, { id: 't2', waybill: 'W', waybillReceivedAt: 'x', invoiceId: 'i1', paymentStatus: 'Not Paid', dateDispatched: '2026-10-01' }];

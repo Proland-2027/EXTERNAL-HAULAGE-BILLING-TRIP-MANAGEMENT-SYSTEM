@@ -28,7 +28,36 @@
     { status: 'Unavailable', group: 'Unavailable' },
   ];
   /** Workbook spellings map onto the configured list. */
-  const STATUS_ALIASES = { 'available': 'Available', 'on standby / held': 'Allocated / Planned', 'loading at bay': 'Loading', 'laden': 'Loaded', 'outbound': 'Outbound / In Transit', 'in transit': 'Outbound / In Transit', 'at client destination': 'At Destination', 'offloading at client': 'Offloading', 'inbound (returning)': 'Inbound / Returning', 'in workshop': 'In Workshop', 'transit breakdown (offsite)': 'Breakdown in Transit', 'breakdown': 'Breakdown in Transit' };
+  const STATUS_ALIASES = { 'available': 'Available', 'on standby / held': 'Allocated / Planned', 'loading at bay': 'Loading', 'laden': 'Loaded', 'outbound': 'Outbound / In Transit', 'in transit': 'Outbound / In Transit', 'at client destination': 'At Destination', 'offloading at client': 'Offloading', 'inbound (returning)': 'Inbound / Returning', 'in workshop': 'In Workshop', 'transit breakdown (offsite)': 'Breakdown in Transit', 'breakdown': 'Breakdown in Transit',
+    // Setup brief status names
+    'available but unplanned': 'Available', 'allocated': 'Allocated / Planned', 'at loading point': 'At Loading Point', 'in transit': 'Outbound / In Transit', 'at destination': 'At Destination', 'offloading': 'Offloading', 'returning': 'Inbound / Returning', 'workshop': 'In Workshop', 'unavailable': 'Unavailable', 'loading': 'Loading', 'loaded': 'Loaded' };
+  /** Journey-planning and on-time-delivery KPIs (Setup_Haulage KPI sheet + delivery-time bands); overridable in meta/planning.kpi. */
+  const DEFAULT_KPI = { drivingKmPerDay: 300, loadingDays: 1, offloadingDays: 1, localIncludesHandlingKm: 100, otdBands: [{ maxKm: 100, hours: 24 }, { maxKm: 250, hours: 36 }, { maxKm: 500, hours: 48 }, { maxKm: 1000, hours: 72 }, { maxKm: 1500, hours: 96 }] };
+  const kpiOf = (planning) => Object.assign({}, DEFAULT_KPI, (planning && planning.kpi) || {});
+  /** A. Contractual / management OTD target from the approved distance band (one-way km). Above the last band no target is assumed. */
+  function otdTarget(oneWayKm, kpi, route) {
+    kpi = kpiOf(kpi && kpi.otdBands ? { kpi } : kpi); const km = num(oneWayKm);
+    if (route && num(route.approvedOtdHours) !== null) return { hours: num(route.approvedOtdHours), band: 'Route-specific approved KPI', approved: true, localIncludesHandling: km !== null && km <= kpi.localIncludesHandlingKm };
+    if (km === null) return { hours: null, band: 'No approved distance', approved: false, localIncludesHandling: false };
+    const band = kpi.otdBands.find((b) => km <= b.maxKm);
+    if (!band) return { hours: null, band: `Above ${kpi.otdBands[kpi.otdBands.length - 1].maxKm} km — specific approved KPI required`, approved: false, localIncludesHandling: false };
+    const lo = kpi.otdBands[kpi.otdBands.indexOf(band) - 1]; return { hours: band.hours, band: `${lo ? lo.maxKm + 1 : 0}–${band.maxKm} km → ${band.hours} h`, approved: true, localIncludesHandling: km <= kpi.localIncludesHandlingKm };
+  }
+  /** B. Operational journey-planning duration: 300 km per driver day each way plus the loading and offloading allowances; local (≤ 100 km) deliveries are one 24-hour window that already includes handling. */
+  function journeyPlan(oneWayKm, kpi, returnKm) {
+    kpi = kpiOf(kpi && kpi.otdBands ? { kpi } : kpi); const km = num(oneWayKm); if (km === null) return { local: false, drivingDaysOut: null, drivingDaysBack: null, loadingDays: kpi.loadingDays, offloadingDays: kpi.offloadingDays, totalDays: null, deliveryHours: null, totalHours: null };
+    const back = num(returnKm) === null ? km : num(returnKm);
+    if (km <= kpi.localIncludesHandlingKm) return { local: true, drivingDaysOut: 0, drivingDaysBack: 0, loadingDays: 0, offloadingDays: 0, totalDays: 1, deliveryHours: 24, totalHours: 24, note: `Local delivery (≤ ${kpi.localIncludesHandlingKm} km): the 24-hour window covers driving, loading and offloading; allowances are not added again` };
+    const out = Math.max(1, Math.ceil(km / kpi.drivingKmPerDay)), ret = Math.max(1, Math.ceil(back / kpi.drivingKmPerDay));
+    const totalDays = out + ret + kpi.loadingDays + kpi.offloadingDays; const deliveryHours = out * 24; // delivery leg from loading completion to arrival; the loading allowance is before departure
+    return { local: false, drivingDaysOut: out, drivingDaysBack: ret, loadingDays: kpi.loadingDays, offloadingDays: kpi.offloadingDays, totalDays, deliveryHours, totalHours: totalDays * 24, note: `${kpi.drivingKmPerDay} km per driver day: ${out} day${out > 1 ? 's' : ''} out + ${ret} back + ${kpi.loadingDays} loading + ${kpi.offloadingDays} offloading` };
+  }
+  /** The two values side by side; a scheduling conflict is flagged when the operational delivery duration exceeds the OTD target (Operations Manager review). */
+  function routeKpi(route, planning) {
+    const kpi = kpiOf(planning); const km = route ? num(route.kmOneWay) : null; const otd = otdTarget(km, kpi, route); const plan = journeyPlan(km, kpi, route ? route.kmReturn : null);
+    const conflict = otd.hours !== null && plan.deliveryHours !== null && plan.deliveryHours > otd.hours;
+    return { oneWayKm: km, otd, plan, conflict, conflictNote: conflict ? `Operational delivery duration ${plan.deliveryHours} h exceeds the approved OTD target of ${otd.hours} h — Operations Manager review required` : '' };
+  }
   const DEFAULT_SETUP = { defaultTAT: 7, buffer: 0, idleDays: 3, repoDefault: 3, repoSame: 0, runwayDays: 92, trackingOverdueHours: 48, returnSoonDays: 3, tripIdPattern: E.DEFAULT_TRIP_ID_PATTERN, waybillVerification: true, dieselPrice: 1100 };
   // Request lifecycle. Stage 1 (CRM): Draft → Pending Route Mapping / Submitted. Stage 2 (Operations Manager): Awaiting Planning →
   // Plan Approved. Stage 3 (Station Manager): Partially / Fully Allocated → In Progress → Completed. 3rd-party requests follow the
@@ -320,8 +349,11 @@
     else if (elapsedHours > targetHours) status = 'Overdue';
     else if (elapsedHours >= targetHours * 0.8) status = 'Approaching Target';
     else status = 'Within Target';
-    const nextKey = MILESTONES.find((x) => !m[x.key]); 
-    return { start, segments: segs, totalHours, totalDays: totalHours === null ? null : E.round2(totalHours / 24), elapsedHours, elapsedDays: elapsedHours === null ? null : E.round2(elapsedHours / 24), targetHours, targetDays: targetDays ? Number(targetDays) : null, variance, varianceDays: variance === null ? null : E.round2(variance / 24), remainingHours: remaining, status, done, next: nextKey ? nextKey.label : '', delays: (trip.events || []).filter((e) => /delay|breakdown/i.test(e.type || '')) };
+    const nextKey = MILESTONES.find((x) => !m[x.key]);
+    // On-time delivery (contractual band): local trips measure allocation → offloaded (handling included), others loading → arrival at client
+    const otdHours = num(trip.otdTargetHours); const local = !!trip.otdLocal; const deliveryHours = local ? hoursBetween(start, m.offloadedAt) : hoursBetween(m.loadedAt, m.arrivedClientAt);
+    const otdStatus = otdHours === null ? 'No approved OTD KPI' : deliveryHours === null ? (cancelled ? 'Cancelled' : 'Delivery pending') : deliveryHours <= otdHours ? 'On Time' : 'Late';
+    return { start, segments: segs, otdTargetHours: otdHours, deliveryHours, otdVarianceHours: otdHours !== null && deliveryHours !== null ? E.round2(deliveryHours - otdHours) : null, otdStatus, totalHours, totalDays: totalHours === null ? null : E.round2(totalHours / 24), elapsedHours, elapsedDays: elapsedHours === null ? null : E.round2(elapsedHours / 24), targetHours, targetDays: targetDays ? Number(targetDays) : null, variance, varianceDays: variance === null ? null : E.round2(variance / 24), remainingHours: remaining, status, done, next: nextKey ? nextKey.label : '', delays: (trip.events || []).filter((e) => /delay|breakdown/i.test(e.type || '')) };
   }
   /** Milestone order rule: every milestone must be at or after the previous one. Returns an error string or ''. */
   function milestoneError(milestones, key, at) {
@@ -342,6 +374,7 @@
     const segLate = (key, thresholdH) => rows.filter((x) => { const sgm = x.tat.segments.find((g) => g.key === key); return sgm && sgm.hours !== null && sgm.hours > thresholdH; }).length;
     return {
       rows, active: rows.filter((x) => !x.tat.done && x.tat.status !== 'Cancelled').length, overdue: rows.filter((x) => x.tat.status === 'Overdue').length, approaching: rows.filter((x) => x.tat.status === 'Approaching Target').length, completedLate: rows.filter((x) => x.tat.status === 'Completed Late').length,
+      otdPct: (() => { const d = rows.filter((x) => ['On Time', 'Late'].includes(x.tat.otdStatus)); return d.length ? E.round2((d.filter((x) => x.tat.otdStatus === 'On Time').length / d.length) * 100) : null; })(), otdLate: rows.filter((x) => x.tat.otdStatus === 'Late').length, otdOnTime: rows.filter((x) => x.tat.otdStatus === 'On Time').length,
       exceedingRouteDays: rows.filter((x) => ['Overdue', 'Completed Late'].includes(x.tat.status)).length, compliancePct: completed.length ? E.round2((completed.filter((x) => x.tat.variance <= 0).length / completed.length) * 100) : null,
       byRoute: group((x) => (x.route ? `${x.route.loadingPoint} → ${x.route.destination}` : `${x.trip.loadingFrom} → ${x.trip.loadingTo}`)), byTruck: group((x) => x.trip.plate), byClient: group((x) => x.trip.client),
       loadingDelays: segLate('allocToLoad', 24), offloadingDelays: segLate('clientToOffload', 24), returnDelays: rows.filter((x) => x.tat.status === 'Overdue' && x.trip.milestones && x.trip.milestones.leftClientAt).length,
@@ -375,8 +408,10 @@
     return { dateDispatched: opts.dateDispatched || alloc.plannedDeploymentDate || alloc.plannedLoadingDate || todayISO(), dateDelivered: '', plate: alloc.plate, assetCode: alloc.assetCode || '', client: alloc.client, contractType: alloc.tonnage || r.tonnage || '', loadingFrom: alloc.loadingFrom || r.loadingFrom || '', loadingTo: alloc.destination || r.destination || '',
       // the Trip ID is generated by the system when the allocation is converted (opts.tripId); a split second leg gets its own
       journeyPlanId: opts.tripId || '', tripIdSource: opts.tripId ? 'generated' : '', waybill: '', returnWaybill: '', invoiceStatus: 'Not Invoiced', sellingPrice: null, vatTreatment: 'exclusive', quoteNo: '', soNo: '', manualInvoiceNo: '', paymentStatus: 'Not Paid', advance: null, note: opts.note || '',
-      allocationId: alloc.id, requestId: alloc.requestId || r.id || '', requestReference: alloc.requestReference || r.reference || '', truckBatch: alloc.truckBatch || '', source: 'fleet-planning', serviceType: 'Internal Fleet', driver: alloc.driver || '', routeMasterId: alloc.routeId || r.routeMasterId || r.routeId || '', tatTargetDays: target, opsStatus: 'Open', milestones: { allocatedAt: alloc.createdAt || opts.now || new Date().toISOString() }, events: [] };
+      allocationId: alloc.id, requestId: alloc.requestId || r.id || '', requestReference: alloc.requestReference || r.reference || '', truckBatch: alloc.truckBatch || '', source: 'fleet-planning', serviceType: 'Internal Fleet', driver: alloc.driver || '', lob: alloc.lob || opts.lob || '', routeMasterId: alloc.routeId || r.routeMasterId || r.routeId || '', tatTargetDays: target, otdTargetHours: route ? otdTarget(route.kmOneWay, kpiOf(opts.planning), route).hours : null, opsStatus: 'Open', finStatus: 'Open', milestones: { allocatedAt: alloc.createdAt || opts.now || new Date().toISOString() }, events: [] };
   }
+  /** LOB is mandatory before an allocation becomes a trip (chosen by the planner / station on the allocation). */
+  function allocationLobError(alloc, lobs) { const v = alloc && String(alloc.lob || '').trim(); if (!v) return `Allocation ${alloc ? alloc.id : ''} has no Line of Business; the planner must select the LOB before the trip is created.`; if (lobs && lobs.length && !lobs.some((l) => (l.active !== false) && norm(l.name) === norm(v))) return `LOB "${v}" is not in the LOB master.`; return ''; }
   /** One allocation → one trip. Returns the reason the link is refused, or '' when it is allowed. */
   function allocationLinkError(alloc, tripId, opts) {
     opts = opts || {};
@@ -472,7 +507,7 @@
 
   return {
     DEFAULT_STATUSES, STATUS_ALIASES, DEFAULT_SETUP, REQUEST_STATUSES, TPL_STATUSES, LEGACY_REQUEST_STATUS, ROUTE_STATUSES, TPL_EQUIPMENT, MILESTONES, EXTRA_EVENTS, DELAY_REASONS, ALLOCATION_STATUSES, PRIORITIES, WAYBILL_STATUSES, INVOICE_STATUS_AUTO, INVOICE_DOC_STATUSES, AVAILABILITY_CATEGORIES, DEFAULT_BODY_RUNS, CHAIN_STAGES, chainStage, requestBilling, tripFromAllocation, allocationLinkError,
-    isTpl, normRequestStatus, routeFor, routeStatus, routeValidation, routeMaster, allocationGuard, allocationSubstitutionError, tatCalc, milestoneError, tatDashboard,
+    isTpl, normRequestStatus, routeFor, routeStatus, routeValidation, routeMaster, allocationGuard, allocationSubstitutionError, allocationLobError, tatCalc, milestoneError, tatDashboard, DEFAULT_KPI, kpiOf, otdTarget, journeyPlan, routeKpi,
     todayISO, addDays, diffDays, maxDate, plateKey, setupOf, statusList, statusInfo, canonicalStatus, repoDays, routeTiming, routeLabel, findRoute, routeCost, fits, bodyRuns,
     truckStatus, overlappingAllocations, allocationDates, bookingConflicts, planForRequest, requestCounts, requestStatus, nextRequestId, nextAllocationId, allocationChain,
     waybillStatus, invoiceAutoStatus, paymentLabel, tripIdValid, runway, fleetKpis, billingKpis,

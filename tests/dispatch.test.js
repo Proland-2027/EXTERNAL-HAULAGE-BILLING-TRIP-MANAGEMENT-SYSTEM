@@ -31,20 +31,23 @@ test('seeded Location Master covers the data: every exact match approved, the re
 
 test('vehicle category and consumption matrix', () => {
   const s = D.setupOf(planning);
-  assert.equal(D.vehicleCategory({ vehicleType: 'HAULAGE' }, { bodyType: '102', tonnage: '45T' }), 'Haulage 45T');
-  assert.equal(D.vehicleCategory({ vehicleType: 'HAULAGE' }, { bodyType: '102', tonnage: '30T' }), 'Jumbo 30T / 102 CBM');
+  assert.equal(D.vehicleCategory({ vehicleType: 'HAULAGE' }, { bodyType: '102', tonnage: '45T' }), 'Haulage 45T / 102 CBM');
+  assert.equal(D.vehicleCategory({ vehicleType: 'HAULAGE' }, { bodyType: '102', tonnage: '30T' }), 'Haulage 30T / 102 CBM');
+  assert.equal(D.vehicleCategory({ vehicleType: 'HIAB', assetType: 'Hiab', bodySize: 'SELF-LOADER' }, null), 'Hiab');
+  assert.equal(D.vehicleCategory({ vehicleType: 'HAULAGE' }, { bodyType: '102', tonnage: '45T' }, { division: 'NBL-CNG' }), 'CNG Truck', 'rate card division marks CNG trucks');
+  assert.equal(D.vehicleCategory({ vehicleType: 'Closed Body Logistics', tonnage: '3T' }, null), '16 CBM Truck'); assert.equal(D.vehicleCategory({ vehicleType: 'Closed Body Logistics', tonnage: '8T' }, null), '30 CBM Truck');
   assert.equal(D.vehicleCategory({ vehicleType: 'Flat Trucks Logistics' }, { bodyType: 'FLAT', tonnage: '30T' }), 'Flatbed');
   assert.equal(D.vehicleCategory({ vehicleType: 'HAULAGE' }, { bodyType: 'FLAT-CONTAINER', tonnage: '' }), 'Flatbed');
-  assert.equal(D.vehicleCategory({ vehicleType: 'Closed Body Logistics' }, { bodyType: 'Pallatized Body', tonnage: '' }), 'Other');
-  assert.equal(D.consumptionRate('Haulage 45T', s), 0.5); assert.equal(D.consumptionRate('Jumbo 30T / 102 CBM', s), 0.45); assert.equal(D.consumptionRate('Flatbed', s), 0.42);
-  assert.equal(D.consumptionRate('Haulage 45T', D.setupOf({ dispatch: { dieselRates: { 'Haulage 45T': 0.55 } } })), 0.55, 'administrator can change a rate');
+  assert.equal(D.vehicleCategory({ vehicleType: 'Closed Body Logistics' }, { bodyType: 'Pallatized Body', tonnage: '' }), '30 CBM Truck');
+  assert.equal(D.consumptionRate('Haulage 45T / 102 CBM', s), 0.5); assert.equal(D.consumptionRate('Haulage 30T / 102 CBM', s), 0.42, 'KPI master overrides the 0.45 assumption'); assert.equal(D.consumptionRate('Flatbed', s), 0.42); assert.equal(D.consumptionRate('Hiab', s), 0.42); assert.equal(D.consumptionRate('CNG Truck', s), 0.75); assert.equal(D.consumptionRate('Jumbo 30T / 102 CBM', s), 0.42, 'legacy category name still resolves');
+  assert.equal(D.consumptionRate('Haulage 45T / 102 CBM', D.setupOf({ dispatch: { dieselRates: { 'Haulage 45T / 102 CBM': 0.55 } } })), 0.55, 'administrator can change a rate');
 });
 
 test('brief example: Lagos to Kano and return, 2,200 km approved two-leg distance', () => {
   const c = Object.assign({}, ctx, { distances: [{ id: 'lk', originState: 'Lagos', destState: 'Kano', oneWayKm: 1100, returnKm: 1100, verified: true }] });
   const calc = (truck) => D.dispatchCalc({ plate: truck.plate, loadingFrom: 'Gbagada', loadingTo: 'Kano City' }, Object.assign({}, c, { fleet: [truck], assets: [{ plate: truck.plate, vehicleType: 'HAULAGE' }] }));
-  const h = calc({ plate: 'A1', bodyType: '102', tonnage: '45T' }); assert.equal(h.category, 'Haulage 45T'); assert.equal(h.distance.totalKm, 2200); assert.equal(h.diesel, 1100); assert.equal(h.road, 55000); assert.equal(h.dieselOut, 550); assert.equal(h.dieselReturn, 550); assert.equal(h.distance.source, 'approved'); assert.ok(h.ready); assert.ok(h.financeRequired);
-  const j = calc({ plate: 'A2', bodyType: '102', tonnage: '30T' }); assert.equal(j.diesel, 990); assert.equal(j.road, 55000);
+  const h = calc({ plate: 'A1', bodyType: '102', tonnage: '45T' }); assert.equal(h.category, 'Haulage 45T / 102 CBM'); assert.equal(h.distance.totalKm, 2200); assert.equal(h.diesel, 1100); assert.equal(h.road, 55000); assert.equal(h.dieselOut, 550); assert.equal(h.dieselReturn, 550); assert.equal(h.distance.source, 'approved'); assert.ok(h.ready); assert.ok(h.financeRequired);
+  const j = calc({ plate: 'A2', bodyType: '102', tonnage: '30T' }); assert.equal(j.diesel, 924, '2,200 km × 0.42 (KPI master)'); assert.equal(j.road, 55000);
   const f = calc({ plate: 'A3', bodyType: 'FLAT', tonnage: '30T' }); assert.equal(f.diesel, 924); assert.equal(f.road, 55000);
   // return along another approved route may differ
   const alt = D.resolveDistance({ originState: 'Lagos', destState: 'Kano' }, Object.assign({}, c, { distances: [{ id: 'lk2', originState: 'Lagos', destState: 'Kano', oneWayKm: 1100, returnKm: 1250, verified: true }] })); assert.equal(alt.totalKm, 2350);
@@ -52,7 +55,7 @@ test('brief example: Lagos to Kano and return, 2,200 km approved two-leg distanc
 
 test('distance resolution: approved master → unverified suggestion → route register → within state → missing', () => {
   const sug = D.resolveDistance({ originState: 'Lagos', destState: 'Kano' }, ctx); assert.equal(sug.source, 'suggested'); assert.equal(sug.verified, false); assert.equal(sug.oneWayKm, 990);
-  const unapprovedRoutes = routes.map((r) => Object.assign({}, r, { status: 'Pending Approval', approvedAt: '' })); const reg = D.resolveDistance({ originState: 'Oyo', destState: 'Kano', routeId: 'R001' }, Object.assign({}, ctx, { distances: [], routes: unapprovedRoutes })); assert.equal(reg.source, 'route register'); const rm = D.resolveDistance({ originState: 'Oyo', destState: 'Kano', routeId: 'R001' }, Object.assign({}, ctx, { distances: [] })); assert.equal(rm.source, 'route master'); assert.equal(rm.verified, true, 'an approved Route Master entry is the approved distance'); assert.equal(reg.oneWayKm, 952);
+  const unapprovedRoutes = routes.map((r) => Object.assign({}, r, { status: 'Pending Approval', approvedAt: '' })); const reg = D.resolveDistance({ originState: 'Oyo', destState: 'Kano', routeId: 'R001' }, Object.assign({}, ctx, { distances: [], routes: unapprovedRoutes })); assert.equal(reg.source, 'route register'); const rm = D.resolveDistance({ originState: 'Oyo', destState: 'Kano', routeId: 'R001' }, Object.assign({}, ctx, { distances: [] })); assert.equal(rm.source, 'route master'); assert.equal(rm.verified, true, 'an approved Route Master entry is the approved distance'); assert.equal(reg.oneWayKm, 876);
   const within = D.resolveDistance({ originState: 'Lagos', destState: 'Lagos' }, Object.assign({}, ctx, { distances: [] })); assert.equal(within.source, 'within state');
   const miss = D.resolveDistance({ originState: 'Oyo', destState: 'Kano' }, Object.assign({}, ctx, { distances: [] })); assert.equal(miss.source, 'missing'); assert.equal(miss.totalKm, null);
   const calc = D.dispatchCalc({ plate: 'T31702LA', loadingFrom: 'Ibadan', loadingTo: 'Kano' }, Object.assign({}, ctx, { distances: [], routes: [] })); assert.ok(calc.issues.some((i) => /No approved route distance/.test(i))); assert.equal(calc.diesel, null); assert.ok(!calc.ready);

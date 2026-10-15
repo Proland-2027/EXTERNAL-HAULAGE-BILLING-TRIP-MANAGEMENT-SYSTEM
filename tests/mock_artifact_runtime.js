@@ -23,6 +23,7 @@
   async function seed() {
     const get = async (f) => { const r = await fetch('data/workbook/' + f); return r.ok ? r.json() : null; };
     const [trips, assets, clients, locations, rates, zones, fleet, routes, requests, allocations, planning, distances, locationmaster, contractors, quotes] = await Promise.all(['trips', 'assets', 'clients', 'locations', 'rates', 'zones', 'fleet', 'routes', 'requests', 'allocations', 'planning', 'distances', 'locationmaster', 'contractors', 'quotes'].map((n) => get(n + '.json')));
+    const [jobcards, stockmoves, accountmap, routezones] = await Promise.all(['jobcards', 'stockmoves', 'accountmap', 'routezones'].map((n) => get(n + '.json'))); for (const d of jobcards || []) col('jobcards').set(d.id, Object.assign({ version: 1 }, d)); for (const d of stockmoves || []) col('stockmoves').set(d.id, Object.assign({ version: 1 }, d)); if (accountmap) col('meta').set('accountmap', Object.assign({ version: 1 }, accountmap, { id: 'accountmap' })); if (routezones) col('meta').set('routezones', Object.assign({ version: 1 }, routezones, { id: 'routezones' }));
     for (const d of distances || []) col('distances').set(d.id, d); if (locationmaster) col('meta').set('locationmaster', Object.assign({ version: 1 }, locationmaster, { id: 'locationmaster' }));
     const chunks = {}; for (const t of trips || []) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; (chunks[m] = chunks[m] || {})[t.id] = t; }
     for (const [m, ts] of Object.entries(chunks)) col('tripchunks').set(m, { month: m, trips: ts });

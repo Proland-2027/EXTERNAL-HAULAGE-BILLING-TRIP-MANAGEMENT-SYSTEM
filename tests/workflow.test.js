@@ -31,7 +31,7 @@ test('route validation blocks an unmapped route from submission, planning, alloc
   assert.match(P.allocationGuard(unmapped, null, null, ctx), /Route Not Mapped/);
   const pending = routes.map((r) => (r.id === mapped.routeId ? Object.assign({}, r, { status: 'Pending Approval' }) : r));
   assert.equal(P.routeValidation(mapped, pending).ok, false, 'a route that exists but is not approved does not pass');
-  const rm = P.routeMaster(routes.find((r) => r.id === 'R001'), () => 'Oyo'); assert.equal(rm.originState, 'Oyo'); assert.equal(rm.destState, 'Kano'); assert.equal(rm.totalKm, 1904); assert.equal(rm.tatDays, 8); assert.equal(rm.status, 'Approved');
+  const rm = P.routeMaster(routes.find((r) => r.id === 'R001'), () => 'Oyo'); assert.equal(rm.originState, 'Oyo'); assert.equal(rm.destState, 'Kano'); assert.equal(rm.totalKm, 1752, 'Setup_Haulage Route Master distance (register said 1904)'); assert.equal(rm.tatDays, 8); assert.equal(rm.status, 'Approved');
 });
 
 test('three stages: CRM request → Operations Manager plan approval → Station Manager allocation within the approved quantity and category', () => {

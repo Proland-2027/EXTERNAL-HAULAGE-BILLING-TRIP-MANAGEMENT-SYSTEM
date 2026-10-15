@@ -13,16 +13,17 @@
   const num = E.num, norm = E.norm, clean = E.clean, round2 = E.round2;
 
   // ------------------------------------------------------------- settings
-  const CATEGORIES = ['Haulage 45T', 'Jumbo 30T / 102 CBM', 'Flatbed', 'Other'];
+  const CATEGORIES = ['Haulage 45T / 102 CBM', 'Haulage 30T / 102 CBM', 'Flatbed', 'Hiab', 'CNG Truck', '16 CBM Truck', '30 CBM Truck', 'Other'];
+  const LEGACY_CATEGORY = { 'Haulage 45T': 'Haulage 45T / 102 CBM', 'Jumbo 30T / 102 CBM': 'Haulage 30T / 102 CBM' };
   const DEFAULT_DISPATCH = {
-    dieselRates: { 'Haulage 45T': 0.5, 'Jumbo 30T / 102 CBM': 0.45, 'Flatbed': 0.42, 'Other': 0.45 },
+    dieselRates: { 'Haulage 45T / 102 CBM': 0.5, 'Haulage 30T / 102 CBM': 0.42, 'Flatbed': 0.42, 'Hiab': 0.42, 'CNG Truck': 0.75, '16 CBM Truck': 0.15, '30 CBM Truck': 0.35, 'Other': 0.42, 'Haulage 45T': 0.5, 'Jumbo 30T / 102 CBM': 0.42 },
     roadRatePerKm: 25, financeApprovalAbove: 50000, withinStateKm: 40, highDistanceKm: 1700, originStation: 'JMG Gbagada, Lagos', originState: 'Lagos',
   };
   const setupOf = (planning) => Object.assign({}, DEFAULT_DISPATCH, (planning && planning.dispatch) || {}, { dieselRates: Object.assign({}, DEFAULT_DISPATCH.dieselRates, (planning && planning.dispatch && planning.dispatch.dieselRates) || {}) });
   /** Status of a diesel request or road expense slip. */
   const SLIP_STATUSES = ['Draft', 'Awaiting Approval', 'Awaiting Finance', 'Approved', 'Partly Issued', 'Issued', 'Closed', 'Rejected'];
   const SLIP_KINDS = { diesel: { collection: 'dieselreqs', prefix: 'DSL', title: 'Diesel Request Form', unit: 'L', qtyField: 'litres', issuedWord: 'issued', paidWord: 'Issued' }, road: { collection: 'roadslips', prefix: 'RXP', title: 'Road Expense Payment Slip', unit: '₦', qtyField: 'amount', issuedWord: 'paid', paidWord: 'Paid' } };
-  const EXPENSE_CATEGORIES = ['Extra diesel', 'Road expenses', 'Loading / offloading labour', 'Police / checkpoint', 'Toll / levy', 'Repairs on the road', 'Accommodation / feeding', 'Towing', 'Demurrage', 'Other'];
+  const EXPENSE_CATEGORIES = ['Extra diesel', 'Road expenses', 'Loading / offloading labour', 'Manual pushing', 'Police / checkpoint', 'Community settlement', 'Toll / levy', 'Tickets and stickers', 'Port expenses', 'Repairs on the road', 'Accommodation / feeding', 'Towing', 'Demurrage', 'CNG allowance', 'Other'];
   const EXPENSE_STATUSES = ['Pending Approval', 'Approved', 'Rejected', 'Paid'];
   const PAYMENT_METHODS = ['Cash', 'Bank transfer', 'Mobile money', 'Fuel card', 'Driver float'];
   const LOST_KINDS = ['Confirmed lost sale', 'At risk', 'Not a lost sale'];
@@ -36,15 +37,18 @@
 
   // ------------------------------------------------------- vehicle category
   /** Consumption category from the asset master and the FMR truck record (body type / tonnage). */
-  function vehicleCategory(asset, truck) {
-    const body = norm((truck && truck.bodyType) || ''); const ton = E.normContract((truck && truck.tonnage) || ''); const vt = norm((asset && asset.vehicleType) || '');
+  function vehicleCategory(asset, truck, rateCard) {
+    const body = norm((truck && truck.bodyType) || (asset && asset.bodySize) || ''); const ton = E.normContract((truck && truck.tonnage) || (asset && asset.tonnage) || ''); const vt = norm([asset && asset.vehicleType, asset && asset.assetType, asset && asset.costCenterName].filter(Boolean).join(' '));
+    if (rateCard && /cng/i.test(rateCard.division || '')) return 'CNG Truck';
+    if (/hiab|self loader/.test(body) || /hiab/.test(vt)) return 'Hiab';
     if (/flat/.test(body) || /flat/.test(vt)) return 'Flatbed';
-    if (ton === '45' || /sided/.test(body) && ton !== '30') return 'Haulage 45T';
-    if (body === '102' || ton === '30' || /jumbo|102/.test(body)) return 'Jumbo 30T / 102 CBM';
-    if (/haulage/.test(vt)) return 'Haulage 45T';
+    if (/closed body|canter|box/.test(vt) || /pallat|box|cbm/.test(body)) return ['1', '2', '3'].includes(ton) ? '16 CBM Truck' : '30 CBM Truck';
+    if (ton === '45' || /sided/.test(body) && ton !== '30') return 'Haulage 45T / 102 CBM';
+    if (body === '102' || ton === '30' || ton === '40' || /jumbo|102/.test(body)) return 'Haulage 30T / 102 CBM';
+    if (/haulage/.test(vt)) return 'Haulage 45T / 102 CBM';
     return 'Other';
   }
-  const consumptionRate = (category, setup) => { const s = setup || DEFAULT_DISPATCH; const v = num(s.dieselRates && s.dieselRates[category]); return v === null ? null : v; };
+  const consumptionRate = (category, setup) => { const s = setup || DEFAULT_DISPATCH; const c = LEGACY_CATEGORY[category] || category; const v = num(s.dieselRates && (s.dieselRates[c] !== undefined ? s.dieselRates[c] : s.dieselRates[category])); return v === null ? null : v; };
 
   // ---------------------------------------------------------- distances
   const distanceId = (originState, destState, originStation) => `${G.key(originStation || originState)}__${G.key(destState)}`.replace(/\s+/g, '-');
@@ -73,7 +77,7 @@
     const originName = trip.loadingFrom || '', destName = trip.loadingTo || trip.destination || '';
     const o = G.standardize(originName, master), d = G.standardize(destName, master);
     const asset = E.assetFor(trip.plate, ctx.assets); const truck = (ctx.fleet || []).find((t) => P.plateKey(t.plate) === P.plateKey(trip.plate)) || null;
-    const category = vehicleCategory(asset, truck); const rate = consumptionRate(category, setup);
+    const category = vehicleCategory(asset, truck, (ctx.ratecard || []).find((r) => asset && r.assetCode === asset.assetCode)); const rate = consumptionRate(category, setup);
     const originState = o.state || (truck && truck.homeStation ? G.standardize(truck.homeStation, master).state : '') || setup.originState;
     const dist = resolveDistance({ originState, destState: d.state, originStation: originName, routeId: trip.routeMasterId || trip.routeId }, ctx);
     const dieselOut = dist.oneWayKm === null || rate === null ? null : round2(dist.oneWayKm * rate);
@@ -302,5 +306,5 @@
     };
   }
 
-  return { CATEGORIES, DEFAULT_DISPATCH, SLIP_STATUSES, SLIP_KINDS, EXPENSE_CATEGORIES, EXPENSE_STATUSES, PAYMENT_METHODS, LOST_KINDS, CANCEL_REASONS, TPL_ASSIGNMENT, QUOTE_STATUSES, QUESTIONS, setupOf, vehicleCategory, consumptionRate, distanceId, resolveDistance, dispatchCalc, nextSlipNumber, slipTotals, slipStatus, slipIssueError, slipFromCalc, tripExpenseControl, nextExpenseId, expenseRequestError, expenseTransitionError, lostSalesKindFor, requestRate, lostSales, lostSalesSummary, tplMargin, tplProfitability, assistant, anomalies, dashboard, managementKpis };
+  return { CATEGORIES, LEGACY_CATEGORY, DEFAULT_DISPATCH, SLIP_STATUSES, SLIP_KINDS, EXPENSE_CATEGORIES, EXPENSE_STATUSES, PAYMENT_METHODS, LOST_KINDS, CANCEL_REASONS, TPL_ASSIGNMENT, QUOTE_STATUSES, QUESTIONS, setupOf, vehicleCategory, consumptionRate, distanceId, resolveDistance, dispatchCalc, nextSlipNumber, slipTotals, slipStatus, slipIssueError, slipFromCalc, tripExpenseControl, nextExpenseId, expenseRequestError, expenseTransitionError, lostSalesKindFor, requestRate, lostSales, lostSalesSummary, tplMargin, tplProfitability, assistant, anomalies, dashboard, managementKpis };
 });
