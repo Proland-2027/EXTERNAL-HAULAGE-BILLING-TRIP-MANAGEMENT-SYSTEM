@@ -1,0 +1,72 @@
+{
+ "source": "Setup_Haulage_original.xlsx",
+ "importDate": "2026-10-15",
+ "missing": [
+  "Cost center budgets are not in the workbook (budgetMonthly is null); the \"cost centers exceeding budget\" question answers \"no budget set\" until Finance enters budgets.",
+  "67 vehicles from the Asset Code sheet have no New Batch / Old Batch classification in any workbook (shown as \"Unclassified\" until an administrator sets it).",
+  "Acquisition information (purchase date, cost) is not in the workbook; the asset master carries the fields empty.",
+  "7 driver-mapped vehicles were not on the Truck Planning FMR; they are added without an operational status (shown as status unconfirmed until the tracking team updates them).",
+  "Expense accounts without a general-ledger number in the workbook: CNG Expense, Tracking System, Insurance, GIT, License and Permit, Salaries Local and Expat, Rent, Depreciation. They are listed as pending; postings to them are held as \"account number pending\" until Finance supplies the number.",
+  "No revenue (sales) account numbers were supplied; revenue postings carry the LOB and cost center but an empty GL account until Finance adds revenue accounts to the Chart of Accounts.",
+  "Item list: stock quantities, units of measure, part numbers, reorder levels and inventory accounts are not in the workbook (unit defaults to EA, stock starts at 0 and is flagged \"stock not supplied\", 251 items have no unit cost). Expense account defaults: tyres → 6102028, everything else → 6102010 (Hiab jobs post to 6102009 by the job card's vehicle).",
+  "3PL rate cards (internal zones and interstate lanes) are imported with every rate blank, as instructed; Station Supervisors enter contractor rates per request until management finalises the card.",
+  "428 Route Master lanes have no approved client price in any workbook (price null); the price list and request pricing fall back to the client price list."
+ ],
+ "conflicts": [
+  "Asset Code sheet: T1590LA carries cost center CC039 with the name \"Closed Body Logistics\" while CC039 is Hiabs Logistics elsewhere; CC039 = Hiabs Logistics is kept and the asset keeps its code.",
+  "Asset T-2422LA (MVEH-000282) is in the Haulage Billing asset list but not in the Setup_Haulage Asset Code sheet; kept and flagged.",
+  "Asset T8115LA (MVEH-000338) is in the Haulage Billing asset list but not in the Setup_Haulage Asset Code sheet; kept and flagged.",
+  "Asset THIRD-PARTYHAULAGE (THIRD-PARTYHAULAGE) is in the Haulage Billing asset list but not in the Setup_Haulage Asset Code sheet; kept and flagged.",
+  "Rate Card road expense per km differs by division (25 / 36 / 38 / 40 / 49 / 59 / 80 ₦/km) while the Expense Account sheet fixes the driver road allowance at ₦25/km; the payment slip keeps ₦25/km (operational standard) and costing uses the rate card value.",
+  "48 Route Master rows repeat a contract + loading point + destination already listed (different stop sequences or duplicated entries); both are kept and flagged duplicateLane for the administrator to retire one.",
+  "Contracts in the Truck Planning route register that the Setup_Haulage Route Master does not list (kept as legacy routes): BAJAJ-30T-NBL-DSL-JUMBO (57), ATLANTIC PVC-45T-NBL-DSL-JUMBO (72), ORCA-3PL-LOWBED (1).",
+  "390 existing routes had different kilometres in the Truck Planning register than in the Route Master; the Route Master values are now operational and the previous values are kept in each route's kmHistory.",
+  "Diesel KPI: the brief's initial assumption for Jumbo 30T / 102 CBM is 0.45 L/km but the supplied KPI master says 0.42 L/km; the KPI master overrides, as instructed (the matrix stays editable in Settings)."
+ ],
+ "assumptions": [
+  "Default LOB per cost center: CC059 Haulage and CC046 Flat Trucks → Haulage, CC039 Hiabs → Hiab, CC047 Closed Body → Vans; overhead, workshop and stores cost centers carry no LOB. The planner can change the LOB on every allocation.",
+  "Suggested expense account per additional-expense category (editable): extra diesel → 6103013, road / accommodation → 6101027, labour and pushing → 6101030, police / community → 6105061, tolls, tickets, demurrage, other → 6105047, repairs on the road → 6102010, towing → 6105040, port expenses → 6105051.",
+  "Rate Card for costing: \"Actual Fixed Cost\" and \"Selling Fixed\" are read as amounts per planned working day (the sheet gives Project Number of Day / Planned days per asset), \"KM\" as planned kilometres per month; MTC, tyre and road costs are per km as given. Diesel cost in costing uses the diesel price in Settings (₦ per litre, editable) because the workbook has no diesel price.",
+  "Port operations KPI table (APMT / ESS-Libra / Ikorodu lanes): the sheet header lists five columns for four value columns (\"Additional Diesel\" and \"Passing Truck Express\" share one column); values are kept as Port expenses, Driver road expenses, Additional diesel / passing truck, Dropping empty, pending confirmation."
+ ],
+ "counts": {
+  "assets": {
+   "setup": 124,
+   "merged": 57,
+   "added": 67,
+   "keptLegacy": 3,
+   "unclassifiedBatch": 67
+  },
+  "fleet": {
+   "trucks": 69,
+   "driversUpdated": 60,
+   "addedWithoutStatus": 7
+  },
+  "staff": 131,
+  "accounts": 23,
+  "items": {
+   "items": 726,
+   "withCost": 475,
+   "duplicateIds": 0
+  },
+  "suppliers": {
+   "suppliers": 55,
+   "tpl": 24
+  },
+  "ratecard": 67,
+  "tplrates": {
+   "lanes": 349,
+   "withRates": 0
+  },
+  "routes": {
+   "setupLanes": 823,
+   "matchedExisting": 395,
+   "kmChanged": 390,
+   "newLanes": 428,
+   "pendingApproval": 10,
+   "legacyUnmatched": 130,
+   "duplicateLanesInMaster": 48,
+   "total": 953
+  }
+ }
+}

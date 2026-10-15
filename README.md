@@ -1,86 +1,83 @@
-# External Haulage Billing & Trip Management System
+# JMG Transport Management System
 
-A complete, zero-install billing system for haulage operations that run **both an in-house fleet and
-external contractors**:
+Web conversion of the **Haulage Billing Sheet (September R2)**, the **June Price List**, the **Truck Planning Management** and the **Setup_Haulage** workbooks (asset list with cost centers, staff, LOB, Diesel KPI, Route Master, expense accounts, item list, rate card, suppliers, 3PL rate cards) into one integrated Transport Management System: CRM client requests → Operations Manager fleet-plan approval → Station Manager allocation → generated Trip IDs (`JMG-TRP-YYYY-NNNNNN`) → trip tracking and turnaround time → diesel request forms, road expense slips and additional trip expenses → document-controlled invoicing → payments, with a 3rd Party Contractor (3PL) module, a centralised Route Master, FMR Excel upload, lost-sales tracking, role-based accounts and a full audit trail.
 
-* **Trip log** — every load: date, waybill, haulier (internal or contractor), vehicle, route, product,
-  quantity, km and (for the internal fleet) actual diesel litres.
-* **Price lists with MOQ** — one tariff per party per year, e.g. *Billing Price List 2026 (Internal)*
-  and one per contractor. Every line is keyed by route + vehicle class and carries a **Minimum Order
-  Quantity**: loads under the MOQ are billed at the MOQ.
-  * Contractor lines: rate per tonne / litre / pallet / CBM, or a flat rate per trip.
-  * Internal lines: **Fixed cost**, **Variable cost per km**, **Fixed-variable cost** and standard
-    **Diesel litres**, with the diesel price per litre on the price-list header.
-* **Billing format** — one billing per party per month, generated from the unbilled trips and the
-  active price list, with MOQ adjustments, cost-component breakdown, levies, VAT, totals and signature
-  blocks. Printable, exportable to Excel/CSV, with a DRAFT → APPROVED → PAID → VOID lifecycle.
-  See [docs/BILLING_FORMAT.md](docs/BILLING_FORMAT.md).
-* **Monthly comparison report (In-house Analysis)** — for any month: internal vs contractor cost,
-  cost per tonne by route, the in-house saving against contractor rates, the outsourcing premium,
-  the internal fixed / variable / fixed-variable / diesel structure, MOQ top-ups paid, and
-  month-over-month movement. Uses the logged billings when they exist and flags estimates when a
-  billing has not been logged yet.
+**Live demo:** https://claude.ai/artifact/4DDZWqX8UmbSfrnwx6yF5G (shared database; demo accounts in [docs/USER_GUIDE.md](docs/USER_GUIDE.md)).
 
-## Run it
+## What is in the box
 
-No build, no server required: open `index.html` in a modern browser (Chrome, Edge, Firefox, Safari).
-
-Optionally serve it (`npm start`, or `python3 -m http.server 8080`) and open <http://localhost:8080>.
-
-Data lives in the browser's local storage. Use **Data → Export backup** regularly and to move the
-dataset to another computer; **Import backup** restores it. **Reset to demo data** reloads the sample
-dataset (Ghana routes from Tema, two contractors, August–October 2026 trips, logged August and
-September billings).
-
-Excel export uses SheetJS from a CDN; when offline the same data downloads as CSV files.
-
-## Monthly workflow
-
-1. **Trips** → log each completed trip (or import a backup produced elsewhere). Quantity below the
-   price-list MOQ is fine; the billing applies the MOQ.
-2. **Price Lists & MOQ** → make sure each party has an `ACTIVE` list covering the month. Edit rates,
-   MOQ, cost components and the diesel price inline; *Duplicate for next year* creates next year's draft.
-3. **Billing** → pick the party and month, *Preview*, check the MOQ flags and any “no tariff line”
-   errors, then *Save & log billing*. Do this once for each contractor and once for the internal fleet.
-4. **Comparison Report** → choose the month (and optionally a single contractor). Export to Excel or print.
-5. Approve / mark paid billings as they move through finance. Void and regenerate if a trip was wrong.
-
-## How amounts are calculated
-
-| | Formula |
+| Area | Delivered |
 |---|---|
-| Billable quantity | `max(actual qty, MOQ)` — `TRIP` lines are flat and ignore MOQ |
-| Contractor amount | `billable qty × rate per unit` (or the flat trip rate) |
-| Internal trip cost | `Fixed + Variable/km × km + Fixed-variable + Diesel litres × Diesel price` |
-| Internal cost per unit | `trip cost ÷ billable qty` |
-| Levies / VAT | `subtotal × levy %`, then `(subtotal + levies) × VAT %`; internal billing untaxed by default |
-| In-house saving | internal trips re-priced at the contractor tariff − internal cost |
-| Outsourcing premium | contractor billing − the same trips priced at the internal cost model |
+| Workbook analysis | [docs/WORKBOOK_ANALYSIS.md](docs/WORKBOOK_ANALYSIS.md) — every sheet, formula, validation and the ambiguities found; [docs/COLUMN_MAPPING.md](docs/COLUMN_MAPPING.md) — Excel column → database field |
+| Data | 3,708 historical trips, 60 vehicles, 56 clients and 491 locations imported from the workbook; selling prices untouched; original file kept in `data/workbook/` |
+| Trip Log | Spreadsheet-style grid, frozen headings/columns, inline editing with explicit Save, filters, search, sort, Excel import (duplicate detection) and export |
+| Agreed Client Price | The actual June Price List (242 lanes, 12 clients) loaded; lookup by client (incl. aliases) + origin + destination (zones and zone lists) + vehicle type + contract type/tonnage on the trip date; documented priority rule; "No Agreed Rate Found"; manual pick when rates tie; VAT-inclusive list prices converted to the trip's basis |
+| Selling Price | Manual entry only; VAT, billing and balances computed from it; variance ₦ and % with green/red/neutral display |
+| Invoices | Workbook Invoice Generator rules; **Invoice Price Type** (Price Excluding VAT adds 7.5 %, Price Including VAT extracts it) saved per invoice and trip; client-code + date numbering with manual override and duplicate protection; Draft → Sent → Paid / Void; JMG-branded A4 PDF (logo, company details, TIN/RC) regenerated from saved figures |
+| Truck Batch | New Batch / Old Batch per vehicle with effective dates; snapshotted on each trip; **Select Truck Batch** filter on Trip Log, dashboard and every report; **Sales Performance by Truck Batch** dashboard with KPI table, monthly New vs Old, contribution % and top trucks; net (excl. VAT) vs gross (incl. VAT) basis selector |
+| Payments | Receipts allocated to trips oldest-first (Paid / Advance exactly as the workbook formulas), ledger, client statements (PDF/Excel), outstanding balances |
+| Reports | Four-section Management Dashboard (Fleet Operations, Fleet Planning, Billing & Documentation, Financial Performance), Client Summary, Statement, Monthly Sales Summary, Sales by Vehicle, Price Variance, Unpaid trips, Outstanding waybills, Trip-to-billing pipeline; all exportable |
+| Fleet Movement Report | Live truck statuses with configurable status groups, back-on-ground / committed-until / free-from dates ported from the FMR formulas, Tracking Update Overdue, delivery and return verification flags, double-booking detection, six availability categories |
+| Master data | Asset list with cost centers, tonnage, body and drivers (124 vehicles), staff list with cost centers (131), Line of Business master, Diesel KPI matrix (Hiab / Flatbed / Haulage 30T 0.42, Haulage 45T 0.50, CNG 0.75, 16 CBM 0.15, 30 CBM 0.35 L/km), Expense Account master mapped to the modules, Item list and categories (726 parts), Rate Card for costing (67 assets), supplier register (55), the authoritative Route Master (823 lanes merged into 953 routes with km history and legacy flags) and the blank 3PL rate cards (349 lanes). Missing data is left empty and listed in the import report, never invented |
+| Cost centers & chart of accounts | Every diesel issue, road payment, additional expense, contractor payment and workshop cost carries expense type, GL account (suggested from the category mapping), cost center (from the truck), LOB, Trip ID, asset, date, amount and approval reference; requested / approved / paid stages are separate records; Finance posts only paid amounts with complete mappings; posted entries are immutable; accounting export |
+| Rate card, costing & Trip P&L | Three independent commercial values (approved client price, calculated costing from the rate card, actual selling price that is never overwritten) with price variance and expected margin; Trip P&L per Trip ID: invoiced net revenue less credit notes, actual recorded costs, allocated maintenance / tyre / fixed costs labelled as such, contribution and operating profit; reports by trip, truck, client, route, batch, station and LOB |
+| Workshop & inventory | Defect report → inspection → job card → parts requirement → Workshop Manager approval → Storekeeper parts issue (approved job only, duplicates and negative stock refused) → repair → quality inspection → release; stock = opening + receipts − issues + returns ± adjustments; job costs (labour + parts + external) post to the truck cost center; reports: trucks in workshop, downtime, repeat repairs, preventive share, cost by truck, parts by category, breakdown types, warranty returns, availability |
+| OTD & journey planning | Delivery-time bands by one-way distance (≤100 km 24 h, 101–250 36 h, 251–500 48 h, 501–1000 72 h, 1001–1500 96 h; above that an approved route KPI is required) kept apart from the operational journey plan (300 km per driver day + loading and offloading allowances; local deliveries one 24-hour window); scheduling conflicts flagged for the Operations Manager; OTD % and late deliveries in tracking |
+| Closure | Operational closure (tracking / operations) and financial closure (Finance, with a reason while billing is open) are independent statuses |
+| Workflow stages | **CRM** logs client requests (mandatory *Transport Service Type*: Internal Fleet or 3rd Party Contractor); the **Operations Manager** reviews requirements, FMR and route and approves the fleet plan (quantity, category, station); the **Station Manager** allocates the registration and driver within the approved plan (no substitution without authorisation, double allocation blocked, partial allocations stay open); converting an allocation generates the Trip ID. Statuses: Draft → Pending Route Mapping / Awaiting Planning → Plan Approved → Partially / Fully Allocated → In Progress → Completed, Cancellation Requested, Cancelled |
+| Trip ID | `JMG-TRP-2026-000001` generated by the system when an approved allocation becomes a trip: one per truck movement, sequential per year, unique at database level (counter + unique index on the server, `meta/tripseq` counter in the shared database), never typed, overwritten, blanked or reused; cancelled trips keep their ID; chain Request → Plan → Allocation → Trip ID → Trip Log → Invoice |
+| Route Master | Centralised routes with standardised origin / destination state (AI standardisation, approval required), detailed locations, approved outbound / return / two-leg km, approved turnaround days, status (Pending Approval / Approved / Retired), approver and date. An unmapped or unapproved route shows **Route Not Mapped — Route Approval Required.**, keeps the request as *Pending Route Mapping* and blocks submission, planning approval, allocation and Trip ID generation |
+| 3PL module | 3rd Party Contractor requests (equipment list: Lowbed, Flatbed, Crane-100T/150T/80T, 20FT/25FT/40FT containers, Hiab; job, cargo, dimensions, special handling, client selling price) → contractor register → quotation requests and recorded quotes → contractor selection → Operations Manager cost approval with margin preview → assignment creates one trip per unit with generated Trip IDs, contractor plate and approved cost → execution, POD, client invoicing and receivables like any trip; contractor invoice and payment tracking; no JMG diesel or road allowances; 3PL revenue, cost and gross margin reporting |
+| Trip tracking & TAT | Six mandatory milestones (allocated, loaded, arrived at client, offloaded, left client, arrived back) plus extra events with delay reasons and comments; segment durations, total turnaround and variance against the approved route TAT; statuses Within Target / Approaching / Overdue / Completed Within Target / Completed Late; elapsed and remaining time for active trips; incomplete trips are never auto-completed; the tracking team closes a trip operationally; TAT dashboard (average by route / truck / client, delayed trucks, compliance %, loading / offloading / return delays) |
+| FMR Excel | Tracking team downloads the current FMR or a blank update template, uploads the completed sheet (Excel or CSV): trucks matched by asset code or registration, statuses and dates validated, duplicates and unknown trucks rejected, every change previewed before import, upload time and user recorded; trucks with active allocations or trip milestones need explicit authorisation; *Last FMR update* on the dashboard |
+| Diesel, road and extra expenses | Separate **Diesel Request Form** (DSL-…, Diesel = approved km × 0.50 / 0.45 / 0.42 L/km) and **Road Expense Payment Slip** (RXP-…, ₦25/km) per Trip ID with independent statuses, approvals, issue / payment records and PDFs; nothing counts as issued or paid because it was calculated; **Additional Trip Expense Requests** (AEX-…) raised by planners / station supervisors while the trip is open, approved by the Operations Manager only, paid by finance, linked to the trip cost; duplicates and requests on closed trips refused |
+| Invoicing with document control | **Select Open Trips for Invoicing** with tabs Ready / Pending Documents / Draft Invoices / Issued-Sent; waybill, POD, signed delivery confirmation (when required) and client-specific documents are mandatory before issue; override only with Operations Manager **and** Finance approval, recorded with the reason; automatic invoice statuses; JMG-branded PDF with VAT inclusive / exclusive |
+| Requests & allocation | Client transport requests with generated Request IDs and Requested / Allocated / Deployed / Still Required counts; allocation planner ranking suitable trucks by availability, repositioning, body/tonnage fit and existing commitments; allocate / reassign / cancel with audit; double allocation blocked; Allocation IDs; route register with turnaround and margin |
+| Fleet Planning Dashboard | KPIs, category/status charts, trucks needing attention, daily and weekly Fleet Availability Runway |
+| Trip integration | **Select from Fleet Planning** (Billing, Operations, Planning, Station; searchable; linked allocations reopen their trip; one allocation → one trip with an authorised split) creates Trip Log entries from allocations with generated Trip IDs (Request ID → Allocation ID → Trip ID → Trip → Invoice chain); waybill-later workflow with document upload and automated waybill statuses; automated invoice statuses (Draft → Issued → Sent → Voided, Internal Client) with separate issue/sent dates; payment status separate; credit notes for authorised corrections |
+| Dispatch & diesel | Location Master (locations standardised to Nigerian states, originals kept), Route Distance Master (road distances from JMG Gbagada, admin-verified), diesel consumption matrix (0.50 / 0.45 / 0.42 L/km) and ₦25/km road expenses, Trip Dispatch Authorization Forms with calculation breakdown, operations / finance approval, separate diesel and road-expense issuance with duplicate and over-issue prevention, supplementary requests, PDF, Trip Expense Control, assistant for the management questions with automatic anomaly checks, Dispatch & Diesel Planning dashboard |
+| Lost sales | Bulk cancellation of client requests with reason and truck release; lost sales = unfulfilled trucks × agreed rate, classified confirmed / at risk / not lost; reports by client, route, month, station, vehicle type, reason |
+| Users | Administrator, CRM, Operations Manager, Fleet Planner, Station Manager, Station Supervisor, Tracking Officer, 3PL Coordinator, Billing, Finance, Workshop Manager, Storekeeper, Management; stage-ownership permissions (who may request, approve plans, allocate, approve expenses, issue, override) and field-level permissions on trips; audit trail with old/new values |
+| Management KPIs | Open requests, awaiting route mapping / planning / allocation, available unplanned trucks, active trips, trucks exceeding TAT, diesel pending approval / approved not issued, road slips pending payment, additional expenses pending, completed trips ready for invoicing, trips awaiting POD / waybill, draft invoices, issued not sent, confirmed lost sales, at-risk sales, internal fleet revenue, 3PL revenue and gross margin, New vs Old Batch analysis |
+| Back ends | Shared claude.ai database (demo), Node 22 + SQLite server with server-side permissions, or local browser mode |
 
-Tariff line lookup: exact route + vehicle class first, then the route's `ANY` class line. Trips with no
-matching line are flagged on the preview and block saving until the price list is fixed.
+## Run it yourself
+
+```bash
+node server/seed.js          # one-off: load workbook data + demo accounts into data/haulage.db
+node server/server.js        # http://localhost:8080
+npm test                     # engine tests (totals reconcile to the workbook to the cent)
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for HTTPS hosting and backups, and [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for the team guide.
 
 ## Project layout
 
 ```
-index.html          application shell
-css/styles.css      light/dark theme, billing document, print stylesheet
-js/pricing.js       billing engine (MOQ, pricing, billing totals, comparison report) — also runs in Node
-js/seed.js          demo dataset
-js/store.js         localStorage persistence, import/export
-js/export.js        CSV / XLSX download
-js/charts.js        inline SVG charts
-js/app.js           UI
-tests/              engine tests: `npm test` (Node 18+)
-docs/               billing format and data model
+index.html              application shell (published as the demo page)
+css/app.css             theme (light/dark), grid, forms, invoice document
+js/core/engine.js       trip, billing, Trip ID and permission rules — shared by browser, server and tests
+js/core/planning.js     FMR availability, requests, plans, allocations, Route Master validation, TAT
+js/core/dispatch.js     diesel / road slips, additional expenses, lost sales, 3PL margin, management KPIs
+js/core/finance.js      chart-of-accounts mapping, derived ledger and postings, rate-card costing, trip P&L, financial closure
+js/core/workshop.js     job cards, parts issues, stock levels, workshop reports
+js/core/geo.js          Nigerian state gazetteer and location standardisation
+js/core/sample_rates.js illustrative agreed rates (demo only)
+js/store/               storage adapters: common, local, api (server), artifact (shared db)
+js/ui/                  views: crm, planning (plans, allocation, Route Master), tpl (3PL), fleet (FMR) + fmr_excel, tat, dispatch (diesel / road / extra expenses), lostsales, trips, rates, invoices, payments, reports (+dashboard), admin, app shell
+server/server.js        Node + SQLite API with sessions, RBAC, audit and change feed
+server/seed.js          database seeding
+tools/                  workbook extraction (openpyxl), Setup_Haulage master import (extract_setup.py, build_setup_masters.js) and seed builders
+data/workbook/          original workbook + extracted JSON
+tests/                  engine, planning, dispatch and workflow unit tests; tests/e2e.acceptance.js browser acceptance run (17 workflow scenarios)
+docs/                   analysis, mapping, user guide, deployment
 ```
 
-## Assumptions made (adjust in Setup / Price Lists)
+## Known limitations
 
-* Currency GHS, VAT 15 %, levies 6 %, internal billing not taxed.
-* MOQ is per trip and expressed in the line's unit. A monthly volume commitment is not modelled.
-* “Fixed-variable” is treated as a semi-variable cost **per trip** (tolls, maintenance, allowances).
-  If you prefer it per km, enter it as part of *Variable / km* instead.
-* Internal diesel uses actual litres when logged on the trip, otherwise the line's standard litres.
-* Per-unit comparisons assume the same unit (e.g. tonnes) on a route for both parties; a flat `TRIP`
-  line reports cost per trip in those columns.
+* In the shared-database demo, permissions are applied by the application (the browser store enforces the same per-collection and per-field rules as the server: who may change which records, dispatch approvals and issues, double booking, Trip ID format); anyone the artifact owner gives write access to could, in principle, write to the database directly. The Node server enforces every rule server-side and is the recommended production path.
+* Trip IDs are generated by this system (the Power Apps dependency was removed). In the shared-database demo the counter is a document (`meta/tripseq`) updated with a duplicate check, which is best-effort under simultaneous conversions; the server uses a transaction and a unique index.
+* Route standardisation and the planning/dispatch "AI" are deterministic rules so every result is reproducible and auditable; an LLM can be plugged in front of the same functions.
+* The FMR demo data is the workbook snapshot re-dated to the import day (docs/WORKBOOK_ANALYSIS.md, Phase 3).
+* Excel/PDF generation uses browser libraries loaded from a CDN; when offline, exports fall back to CSV and PDF is unavailable.
+* Invoice PDF layout is a clean standard document; company logo/letterhead can be added in `js/ui/exporter.js`.
