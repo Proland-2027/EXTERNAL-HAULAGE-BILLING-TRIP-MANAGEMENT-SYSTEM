@@ -21,6 +21,10 @@
       // reference masters ship as static files too (large, rarely edited); documents saved in the app override them by id
       for (const n of ['staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates']) { try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[n] = await r.json(); } catch (e) { /* offline */ } }
       for (const n of ['accountmap', 'routezones']) { try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[n] = await r.json(); } catch (e) { /* offline */ } }
+      // the Asset List (127 assets with cost centers) and the FMR fleet register (69 trucks) ship as static files as well; documents saved in the app are merged over them by id
+      try { const r = await fetch('data/workbook/assets.json'); if (r.ok) this.state.assets = (await r.json()).map((x) => { const id = String(x.plate || '').replace(/[^A-Za-z0-9_-]+/g, '-'); const tb = x.vehicleCategory === 'New Batch' ? 'New Batch' : x.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; return Object.assign({ id, truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] }, x); }); } catch (e) { /* offline */ }
+      try { const r = await fetch('data/workbook/fleet.json'); if (r.ok) this.state.fleet = await r.json(); } catch (e) { /* offline */ }
+      this.staticBase = {}; for (const n of ['routes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'assets', 'fleet']) this.staticBase[n] = new Map((this.state[n] || []).map((x) => [x.id, x]));
       const snaps = await Promise.all(names.map((n) => this.db.collection(n).limit(1000).get()));
       names.forEach((n, i) => { for (const d of snaps[i].docs) { this.known.add(n + '/' + d.id); this.applyDoc(n, d.id, d.data()); } });
       if (this.viewer) { try { this.viewerId = await this.viewer.id(); this.canWrite = await this.viewer.can('data.write'); } catch (e) { /* ignore */ } }
@@ -39,6 +43,11 @@
         }, (err) => { console.warn('subscription ended', n, err); if (err && err.code === 'revoked') { this.live = false; this.emit({ type: 'revoked' }); } });
         this.unsubs.push(unsub);
       }
+    }
+    /** A document saved in the app overrides the static master with the same id; fields the document never carried (e.g. the cost center imported later) are kept from the static file. */
+    applyDoc(collection, id, data) {
+      const base = this.staticBase && this.staticBase[collection] && this.staticBase[collection].get(id);
+      return super.applyDoc(collection, id, base && data && !data._del ? Object.assign({}, base, data) : data);
     }
     async login(username, password) { const u = await this.verifyLogin(username, password); if (!u) throw new Error('Wrong username or password.'); this.user = this.publicUser(u); U.storage.set('hb_session', { username: u.username }); return this.user; }
     async resume() { const s = U.storage.get('hb_session'); if (!s) return null; const u = this.state.users.find((x) => x.username === s.username && x.active !== false); this.user = this.publicUser(u); return this.user; }

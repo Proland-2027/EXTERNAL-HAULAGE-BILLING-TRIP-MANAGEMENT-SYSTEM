@@ -27,7 +27,7 @@
     for (const d of distances || []) col('distances').set(d.id, d); if (locationmaster) col('meta').set('locationmaster', Object.assign({ version: 1 }, locationmaster, { id: 'locationmaster' }));
     const chunks = {}; for (const t of trips || []) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; (chunks[m] = chunks[m] || {})[t.id] = t; }
     for (const [m, ts] of Object.entries(chunks)) col('tripchunks').set(m, { month: m, trips: ts });
-    for (const a of assets || []) { const id = a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'); const tb = a.vehicleCategory === 'New Batch' ? 'New Batch' : a.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; col('assets').set(id, Object.assign({ id, version: 1 }, a, { truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] })); }
+    for (const a of assets || []) { const id = a.plate.replace(/[^A-Za-z0-9_-]+/g, '-'); const tb = a.vehicleCategory === 'New Batch' ? 'New Batch' : a.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; const doc = Object.assign({ id, version: 1 }, a, { truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] }); delete doc.costCenter; delete doc.costCenterName; col('assets').set(id, doc); } // like the live database: asset documents predate the cost-center import, the static file supplies it
     for (const c of clients || []) col('clients').set(c.id, Object.assign({ version: 1 }, c));
     col('meta').set('locations', { list: locations || [] }); col('meta').set('zones', { map: zones || {} });
     if (planning) col('meta').set('planning', Object.assign({ version: 1 }, planning, { id: 'planning' }));
