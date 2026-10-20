@@ -6,7 +6,8 @@
     { group: 'Operations' }, { key: 'dashboard', label: 'Management Dashboard', icon: '▦' }, { key: 'crm', label: 'Client Requests (CRM)', icon: '✎' }, { key: 'planning', label: 'Fleet Planning & Allocation', icon: '⇄' }, { key: 'tpl', label: '3PL Management', icon: '⊞' }, { key: 'trips', label: 'Trip Log', icon: '☰' },
     { group: 'Fleet' }, { key: 'fleet', label: 'Fleet Movement (FMR)', icon: '⛟' }, { key: 'tat', label: 'Trip Tracking & TAT', icon: '◷' }, { key: 'fleetdash', label: 'Fleet Planning Dashboard', icon: '◈' }, { key: 'workshop', label: 'Workshop & Maintenance', icon: '⚒' }, { key: 'dispatch', label: 'Diesel & Road Expenses', icon: '⛽' }, { key: 'lostsales', label: 'Lost Sales', icon: '◔' },
     { group: 'Billing' }, { key: 'rates', label: 'Client Price List', icon: '₦' }, { key: 'invoices', label: 'Invoices', icon: '▤' }, { key: 'payments', label: 'Payments & Statements', icon: '◧' }, { key: 'finance', label: 'Finance: Ledger & P&L', icon: '∑', need: 'costing.view' },
-    { group: 'Insight' }, { key: 'reports', label: 'Reports', icon: '▥' }, { key: 'audit', label: 'Audit Trail', icon: '◷', need: 'audit.view' },
+    { group: 'Insight' }, { key: 'reports', label: 'Reports', icon: '▥' },
+    { group: 'Audit & Control' }, { key: 'commercial', label: 'Commercial Audit & Control', icon: '⚖', need: 'commercial.view' }, { key: 'audit', label: 'Audit Trail', icon: '◷', need: 'audit.view' },
     { group: 'Setup' }, { key: 'clients', label: 'Clients', icon: '◉' }, { key: 'assets', label: 'Asset List', icon: '▣' }, { key: 'masters', label: 'Master Data', icon: '▤' }, { key: 'users', label: 'Users & Roles', icon: '◎', need: 'user.manage' }, { key: 'settings', label: 'Settings', icon: '⚙' },
   ];
   const app = { store: null, user: null, view: 'dashboard', params: {} };

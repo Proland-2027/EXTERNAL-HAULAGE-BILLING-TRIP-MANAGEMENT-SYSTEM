@@ -225,3 +225,53 @@ Extracted with `tools/extract_setup.py` (cached values only) and turned into mas
 * Diesel cost in costing and in the P&L uses the diesel price in Settings → Fleet planning (the workbooks have none); approved allowances are never costs until issued or paid.
 * No revenue account numbers, cost-center budgets, preventive maintenance schedule or opening stock were supplied; the screens show these as pending and Finance / the Storekeeper complete them.
 * The official JMG logo file was not included in this upload; the invoice PDF keeps the logo already configured in Settings.
+
+
+# Phase 7 — Audit & Control brief: Client_Rate_Comparison_2026 (9).xlsx and the updated Setup_Haulage (1).xlsx
+
+## Setup_Haulage (1).xlsx vs the copy imported in Phase 6
+
+Every sheet is identical to the Phase 6 copy except two: the **Asset Code** sheet only renumbers its external-workbook reference (`[3]Budgets 2027` → `[2]Budgets 2027`, the budget link is still not resolvable), and the empty **Sheet1** is replaced by a **TripLog** sheet (1,788 rows, 29 columns, 2 Jan – 20 Oct 2026). The masters imported in Phase 6 therefore stand; nothing was re-imported.
+
+### TripLog sheet → application Trip Log (`tools/build_audit_data.js`, report `data/workbook/triplog_reconciliation.json`)
+
+| Result | Rows |
+|---|---|
+| Matched exactly (date, truck, client, loading point, destination, selling price) | 1413 |
+| Matched by date + truck + client (the sheet flattens the loading point) | 321 |
+| New trips, appended to the Trip Log as history (`source: "setup-triplog"`, ids `tl-NNNN`) | 54 (2026-10-02 – 2026-10-20) |
+| Application trips absent from the sheet | 0 |
+
+- The sheet collapses the NBL depot loading points (Ama Brewery, Kudenda, Ota, Ijebu Ode, Aba, Idimu, NGB4/5/8 …) to "IBADAN" on 317 rows. The application keeps the depot so route comparisons stay at the level the rate comparison workbook itself used (Ama, Kaduna (Kudenda), Ijebu Ode, Ota …).
+- 4 October rows carry a different selling price in the sheet than in the application (wb-3697 MEGA MANU ₦2,020,000 vs ₦1,925,581.4; wb-3705 MEGA MANU ₦2,850,000 vs ₦3,079,069.77; wb-3706 ABBA ABASS ₦1,520,000 vs ₦1,413,953.49; wb-3709 ABBA ABASS ₦1,520,000 vs ₦1,413,953.49). Historical selling prices are never changed by an import; the differences are listed in **Audit & Control → Workbook Baseline** for management to resolve in the Trip Log.
+- Eight canter rows store the selling price as text ("₦139,534.88"); they are parsed. The helper columns "Eligible (helper)" (133 rows flagged 1 across all vehicle types) and "Match Rank (helper)" (one row) have no documented meaning and are not used.
+- Historical rows never become FMR statuses, CRM requests or allocations; the operational demo keeps its clean request and FMR environment (acceptance test C16).
+
+## Client_Rate_Comparison_2026 (9).xlsx
+
+| Sheet | Content | Use in the application |
+|---|---|---|
+| Summary | Narrative: ₦2391.1M achieved, ₦118.9M (+5.0%) at the best-paying client's average, ₦178.3M (+7.5%) at the highest rate; key findings per client | Frozen baseline text (Workbook Baseline tab) |
+| Achieved vs Best Rate | By client and by month: trips, revenue achieved, revenue at best rate, at best client average | Baseline headline and by-client / by-month reconciliation |
+| Client Rate Ranking | Rank, rate level (client avg ÷ best client avg), verdict (At top rate ≥ 99.9%, Close to top ≥ 95%, Below peers ≥ 80%, Well below peers), revenue lost, lost if priced at highest, trips and revenue on compared routes, routes with the biggest gaps | Methodology of `HB.audit.clientRanking`; the workbook label is shown next to the brief's verdicts |
+| Rate Gaps by Route | Quarter × route × vehicle × client: trips, average rate, best-paying client and its trips, best average, rate level, revenue lost = MAX(0, best avg − avg) × trips, highest rate, lost if at highest | `HB.audit.routeGaps` (same formulas; thin benchmarks additionally flagged) |
+| Turnaround Table | 197 one-leg day values (drop point → loading bay, key = UPPER(from)>UPPER(to)) | `data/workbook/turnaround.json` → `meta/turnaround`, editable in the Control policy; planned truck-days = 2 × one-leg days when no approved Route Master turnaround exists |
+| Truck Requirement | Operating days per truck per month (26), default one-leg days (2), trips per truck per month = MAX(1, INT(26 ÷ round-trip days)), trucks needed per client per month (rounded up per client; shared-fleet total), own trucks actually used (35–40 per month) | `HB.audit.truckRequirement` and the Revenue per Truck-Day tab |
+| Order Planner / Revenue Planner | Trucks needed and revenue per truck-day for a client's monthly request at a given price; market average and highest price Jul–Sep from Route Prices | Revenue per truck-day = price ÷ round-trip days; the pre-allocation audit shows truck-days required and the benchmark |
+| Truck Req by Route | 317 client × loading area × destination rows with the turnaround key used and how it was matched (Exact, Reverse, Nearest bay, Lagos bay used, Not in table) | Matching order reproduced in `HB.audit.turnaroundLookup` |
+| Client List | 60 client names for dropdowns | Not needed (the application has a client master) |
+| Route Prices | 99 turnaround keys → trip-log route names with 2026 trips, averages and highest Jul–Sep prices | Reference baseline |
+
+### Methodology reproduced, and where the web result differs
+
+- Scope: trips 2 Jan – 30 Sep 2026, selling price excl. VAT, haulage and flat trucks as one class, closed-body / canter and Hiab excluded, 3rd-party trucks included, quarters, only routes with 2+ clients in the same quarter.
+- The workbook snapshot predates 17 September trips (Sep 124 → 141 in the application), so achieved revenue is ₦31.8M higher in the web result and the Q3 benchmarks move slightly (Jamara 88.9% → 87.7%, MEGA MANU 89.6% → 91.8%); Lacasera (64.6%, ₦14.2M) and JUBAILI AGROTEC (₦5.7M) reproduce exactly.
+- Routes are keyed by the application's loading-area and destination normalisation (`HB.audit.loadingArea`, `destName`, aliases such as PHG/PHC → Port Harcourt) instead of the workbook's manual grouping; KD & SONS (Kaduna → Ibadan) therefore falls into a different group than NBL's Kudenda brewery trips and is not compared.
+- The brief's stricter rule (never compare 45T haulage with 30T jumbo or Hiab) is available as the "strict" vehicle grouping in the Control policy; the default keeps the workbook grouping so the baseline reconciles.
+- Benchmarks resting on fewer than 3 trips of the best-paying client are flagged ("thin benchmark"), and the highest observed price is labelled an aggressive benchmark that is not assumed achievable for every client.
+
+### Assumptions recorded in the default control policy (`data/workbook/auditpolicy.json`)
+
+- Below-approved-rate and below-cost prices block invoice issue until a commercial exception is approved; a **missing** Client Rate Card entry does not block (93% of the historical Trip Log has no rate card entry) — it is flagged "Approved Rate Missing" for commercial review. Both switches are configurable.
+- Approval matrix: every exception is reviewed by the Operations Manager; below-approved, missing-rate and override exceptions are approved by Management or Finance; below-cost and exceptional-arrangement exceptions by Management only. Nobody reviews or approves their own request.
+- Estimated trip cost before a truck is known = median Rate Card parameters of the matching vehicle class (45T haulage, 30T, flatbed …) on the approved route distance and turnaround.

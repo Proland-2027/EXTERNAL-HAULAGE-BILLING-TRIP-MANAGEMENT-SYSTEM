@@ -94,5 +94,18 @@
     await U.download(doc.output('blob'), `Statement-${client.replace(/[^A-Za-z0-9]+/g, '_')}.pdf`);
   }
 
-  HB.exporter = { TRIP_COLUMNS, tripsToRows, xlsx, csvBlob, readWorkbook, invoicePdf, statementPdf };
+  /** Generic management report PDF: sections = [{ heading, note, cols: [{ key, title, w, align }], rows: [{...}] }]. */
+  async function reportPdf(title, subtitle, sections, settings, filename) {
+    const doc = pdfDoc(); let y = 50;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text((settings && settings.company) || 'JMG', 40, y); doc.setFontSize(11); doc.text(title, 555, y, { align: 'right' }); y += 16;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); for (const line of doc.splitTextToSize(subtitle || '', 515)) { doc.text(line, 40, y); y += 12; } doc.text('Generated: ' + U.dateTime(U.nowISO()), 40, y); y += 16;
+    for (const sec of sections) {
+      if (y > 720) { doc.addPage(); y = 50; }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text(sec.heading, 40, y); y += 6; doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      if (sec.note) { for (const line of doc.splitTextToSize(sec.note, 515)) { y += 10; doc.text(line, 40, y); } y += 4; }
+      y = table(doc, 40, y + 4, sec.cols, sec.rows.slice(0, sec.limit || 60)) + 16;
+    }
+    await U.download(doc.output('blob'), filename || 'report.pdf');
+  }
+  HB.exporter = { TRIP_COLUMNS, tripsToRows, xlsx, csvBlob, readWorkbook, invoicePdf, statementPdf, reportPdf, money };
 })();

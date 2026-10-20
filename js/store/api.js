@@ -19,7 +19,8 @@
       const d = await this.req('GET', '/api/bootstrap');
       this.state.settings = Object.assign({}, HB.DEFAULT_SETTINGS, d.settings || {});
       for (const c of HB.COLLECTIONS) this.state[c] = d[c] || [];
-      this.state.locations = d.locations || []; this.state.zones = d.zones || {}; this.state.planning = d.planning || {}; this.state.locationMaster = d.locationMaster || {}; this.state.accountmap = d.accountmap || {}; this.state.routezones = d.routezones || {}; this.state.trips = new Map((d.trips || []).map((t) => [t.id, t])); this.seq = d.seq || 0;
+      this.state.locations = d.locations || []; this.state.zones = d.zones || {}; this.state.planning = d.planning || {}; this.state.locationMaster = d.locationMaster || {}; this.state.accountmap = d.accountmap || {}; this.state.routezones = d.routezones || {}; this.state.turnaround = d.turnaround || {}; this.state.auditpolicy = d.auditpolicy || {};
+      for (const [n, key] of [['ratecomparison', 'ratecomparison'], ['triplog_reconciliation', 'triplogReconciliation']]) { if (this.state[key]) continue; try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[key] = await r.json(); } catch (e) { /* offline */ } } this.state.trips = new Map((d.trips || []).map((t) => [t.id, t])); this.seq = d.seq || 0;
       this.live = true; this.emit({ type: 'bootstrap' }); this.startPolling();
     }
     startPolling() { this.stopPolling(); this.timer = setInterval(() => this.poll().catch(() => {}), 4000); }

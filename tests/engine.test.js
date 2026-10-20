@@ -9,7 +9,7 @@ const assets = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'wo
 const clients = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'workbook', 'clients.json'), 'utf8'));
 const validation = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'workbook', 'validation.json'), 'utf8'));
 const settings = { vatRate: 0.075, paymentTermsDays: 7 };
-const computed = trips.map((t) => E.computeTrip(t, { settings, assets, rates: [] }));
+const computed = trips.filter((t) => t.source !== 'setup-triplog').map((t) => E.computeTrip(t, { settings, assets, rates: [] })); // the Setup_Haulage TripLog adds October rows after the workbook snapshot
 const close = (a, b, eps = 0.02) => assert.ok(Math.abs(a - b) <= eps, `${a} != ${b}`);
 
 test('VAT and billing formulas reproduce the workbook totals', () => {

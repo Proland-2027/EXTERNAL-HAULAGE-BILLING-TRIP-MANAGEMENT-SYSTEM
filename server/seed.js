@@ -42,7 +42,7 @@ try {
   for (const c of ['fleet', 'routes', 'requests', 'allocations', 'distances', 'contractors', 'quotes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'jobcards', 'stockmoves']) if (!store.list(c).length && exists(c + '.json')) for (const d of read(c + '.json')) store.putDoc(c, Object.assign({ version: 1 }, d));
   if (!store.doc('meta', 'locationmaster') && exists('locationmaster.json')) store.putDoc('meta', Object.assign({ version: 1 }, read('locationmaster.json'), { id: 'locationmaster' }));
   if (!store.doc('meta', 'planning') && exists('planning.json')) store.putDoc('meta', Object.assign({ version: 1 }, read('planning.json'), { id: 'planning' }));
-  for (const m of ['accountmap', 'routezones']) if (!store.doc('meta', m) && exists(m + '.json')) store.putDoc('meta', Object.assign({ version: 1 }, read(m + '.json'), { id: m }));
+  for (const m of ['accountmap', 'routezones', 'turnaround', 'auditpolicy']) if (!store.doc('meta', m) && exists(m + '.json')) store.putDoc('meta', Object.assign({ version: 1 }, read(m + '.json'), { id: m }));
   store.audit({ id: 'a-seed-' + Date.now().toString(36), ts: new Date().toISOString(), user: 'system', userName: 'Seed script', role: '', action: 'import', entity: 'workbook', entityId: 'Haulage_Billing_Sheet_September_R2', label: 'Workbook data loaded', changes: [] });
   db.exec('COMMIT');
 } catch (e) { db.exec('ROLLBACK'); throw e; }

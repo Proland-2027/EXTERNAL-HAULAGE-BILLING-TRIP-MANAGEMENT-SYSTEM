@@ -87,6 +87,9 @@
     finance: ['trip.edit', 'payment.manage', 'report.view', 'export', 'dispatch.finance', 'dispatch.issue', 'expense.pay', 'tpl.pay', 'invoice.override.finance', 'finance.post', 'finance.close', 'costing.view', 'pnl.view'],
     management: ['report.view', 'variance.review', 'export', 'audit.view', 'rate.view', 'costing.view', 'pnl.view'],
   };
+  // Audit & Control brief: commercial visibility, register management, and the separated raise / review / approve duties of rate exceptions
+  const COMMERCIAL_ACTIONS = { 'commercial.view': ['admin', 'operations', 'planning', 'crm', 'billing', 'finance', 'management'], 'commercial.manage': ['admin', 'operations', 'finance', 'management'], 'exception.raise': ['admin', 'crm', 'planning', 'billing', 'operations'], 'exception.review': ['admin', 'operations'], 'exception.approve': ['admin', 'management', 'finance'] };
+  for (const [a, roles] of Object.entries(COMMERCIAL_ACTIONS)) for (const r of roles) if (!ROLE_ACTIONS[r].includes(a)) ROLE_ACTIONS[r].push(a);
 
 
   const TRIP_FIELDS = [

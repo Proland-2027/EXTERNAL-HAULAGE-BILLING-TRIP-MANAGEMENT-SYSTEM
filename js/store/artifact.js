@@ -15,12 +15,13 @@
     }
     async init(progress) {
       progress && progress('Loading shared records…');
-      const names = ['settings', 'meta', 'clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dieselreqs', 'roadslips', 'extraexpenses', 'contractors', 'quotes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'jobcards', 'stockmoves', 'postings', 'tripchunks'];
+      const names = ['settings', 'meta', 'clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dieselreqs', 'roadslips', 'extraexpenses', 'contractors', 'quotes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'jobcards', 'stockmoves', 'postings', 'rateexceptions', 'auditfindings', 'tripchunks'];
       // The route register (524 workbook routes) ships as a static file; routes edited in the app are saved as documents and override it by id.
       try { const r = await fetch('data/workbook/routes.json'); if (r.ok) this.state.routes = await r.json(); } catch (e) { /* offline */ }
       // reference masters ship as static files too (large, rarely edited); documents saved in the app override them by id
       for (const n of ['staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates']) { try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[n] = await r.json(); } catch (e) { /* offline */ } }
-      for (const n of ['accountmap', 'routezones']) { try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[n] = await r.json(); } catch (e) { /* offline */ } }
+      for (const n of ['accountmap', 'routezones', 'turnaround', 'auditpolicy', 'ratecomparison']) { try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[n] = await r.json(); } catch (e) { /* offline */ } }
+      try { const r = await fetch('data/workbook/triplog_reconciliation.json'); if (r.ok) this.state.triplogReconciliation = await r.json(); } catch (e) { /* offline */ }
       // the Asset List (127 assets with cost centers) and the FMR fleet register (69 trucks) ship as static files as well; documents saved in the app are merged over them by id
       try { const r = await fetch('data/workbook/assets.json'); if (r.ok) this.state.assets = (await r.json()).map((x) => { const id = String(x.plate || '').replace(/[^A-Za-z0-9_-]+/g, '-'); const tb = x.vehicleCategory === 'New Batch' ? 'New Batch' : x.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; return Object.assign({ id, truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] }, x); }); } catch (e) { /* offline */ }
       try { const r = await fetch('data/workbook/fleet.json'); if (r.ok) this.state.fleet = await r.json(); } catch (e) { /* offline */ }

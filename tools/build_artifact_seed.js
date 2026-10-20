@@ -20,7 +20,7 @@ const manifest = [];
 for (const c of ['fleet', 'routes', 'requests', 'allocations', 'distances', 'contractors', 'quotes', 'jobcards', 'stockmoves']) if (want(c) && fs.existsSync(path.join(ROOT, 'data', 'workbook', c + '.json'))) for (const d of read(c + '.json')) manifest.push(write(c, d.id, Object.assign({ version: 1 }, d)));
 if (want('locationmaster') && fs.existsSync(path.join(ROOT, 'data', 'workbook', 'locationmaster.json'))) manifest.push(write('meta', 'locationmaster', Object.assign({ version: 1 }, read('locationmaster.json'), { id: 'locationmaster' })));
 if (want('planning') && fs.existsSync(path.join(ROOT, 'data', 'workbook', 'planning.json'))) manifest.push(write('meta', 'planning', Object.assign({ version: 1 }, read('planning.json'), { id: 'planning' })));
-for (const m of ['accountmap', 'routezones']) if (want(m) && fs.existsSync(path.join(ROOT, 'data', 'workbook', m + '.json'))) manifest.push(write('meta', m, Object.assign({ version: 1 }, read(m + '.json'), { id: m })));
+for (const m of ['accountmap', 'routezones', 'turnaround', 'auditpolicy']) if (want(m) && fs.existsSync(path.join(ROOT, 'data', 'workbook', m + '.json'))) manifest.push(write('meta', m, Object.assign({ version: 1 }, read(m + '.json'), { id: m })));
 const chunks = new Map();
 if (want('trips')) for (const t of read('trips.json')) { const m = (t.dateDispatched || '').slice(0, 7) || 'undated'; if (!chunks.has(m)) chunks.set(m, {}); const c = { ...t }; delete c.history; chunks.get(m)[t.id] = c; }
 for (const [m, trips] of chunks) manifest.push(write('tripchunks', m, { month: m, trips }));
