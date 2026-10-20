@@ -275,3 +275,34 @@ Every sheet is identical to the Phase 6 copy except two: the **Asset Code** shee
 - Below-approved-rate and below-cost prices block invoice issue until a commercial exception is approved; a **missing** Client Rate Card entry does not block (93% of the historical Trip Log has no rate card entry) — it is flagged "Approved Rate Missing" for commercial review. Both switches are configurable.
 - Approval matrix: every exception is reviewed by the Operations Manager; below-approved, missing-rate and override exceptions are approved by Management or Finance; below-cost and exceptional-arrangement exceptions by Management only. Nobody reviews or approves their own request.
 - Estimated trip cost before a truck is known = median Rate Card parameters of the matching vehicle class (45T haulage, 30T, flatbed …) on the approved route distance and turnaround.
+
+
+# Phase 8 — Client_Contracts_And_Rate_Cards_cleaned_3.xlsx (the approved Client Rate Card)
+
+| Sheet | Content | Use |
+|---|---|---|
+| Client Route And Contracts | 927 contract lanes: supervisor, truck size, division, tonnage, client, loading point, destination (standardised), state, KM, total KM, diesel issuance, road expenses, price | The approved Client Rate Card (`data/workbook/rates.json`) and Route Master prices (`tools/build_client_rates.js`) |
+| NEW-DSL JMR | 602-lane costing model (Jamara, JMG, Lacasera, Niger Biscuit): fixed / MTC / tyre / diesel / road costs from external links, selling build-up, discount, approved client price, contractor price, status | Cross-check only: 7 lanes where the model's approved price differs from the card are listed in the report; 104 contractor prices are not imported (3PL rates stay blank per the Setup brief) |
+| Name Changes | 416 original → standardised destination names with state and notes | Location Master (160 approved entries added) |
+| Sheet1 | empty | — |
+
+## Import result (`data/workbook/client_rates_report.json`)
+
+| Result | Count |
+|---|---|
+| Lanes whose price equals the rate already on the card (record kept, confirmed by the contract card) | 118 |
+| Lanes with a different price (new record effective 2026-10-20; previous rate expires 2026-10-19) | [object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object] (43 records expired) |
+| Lanes new to the card (effective 2026-01-01 — assumption, the card carries no dates) | 744 |
+| Rows without a price (skipped, nothing invented) | 5: JUBAILI AGROTEC Ibadan → Yola 45T; MEGA MANU Lagos → Ilorin 30T; ABBA ABASS Ogere → Lafia 45T; WALTER & HIFY RESOURCES Port Harcourt → Benin City 30T; LEBRUNI AGRO LTD Ibadan → Idiroko 40T |
+| Duplicate lanes with two prices (both kept; the Trip Log asks the user to pick) | 5: Jamara Ibadan 8T 25CBM ₦235,970 / ₦141,582; Jamara Ibadan 3T 16CBM ₦148,299 / ₦88,980; MEGA MANU Ibadan 45T JUMBO ₦850,000 / ₦828,000; I'HS IKM 30T FLATBED ₦330,000 / ₦440,000; I'HS Epe 30T FLATBED ₦970,000 / ₦740,000 |
+| Card lanes whose equipment differs from the June rate on the same lane (both kept, review) | 14 (JMG and I'HS 30T flatbed lanes vs June rates typed as haulage) |
+| Route Master lanes that had no approved price and now carry the card price | 144 |
+| Route Master prices changed by the card (previous price kept in priceHistory) | 20 |
+| Lanes added to the Route Master as Pending Approval (card KM, not road-routed) | 318 |
+| Card KM differing from the road-routed Route Master KM by more than 5 km (Route Master kept) | 368 |
+
+Client names on the card are mapped to the client master: JAMARA → Jamara, Mega Manu / Mega Manu-Local → MEGA MANU, JAT → JUBAILI AGROTEC, VANDERA → VENDARA, NIGER BISCUIT → NIGER BISCUITS, Lebruni → LEBRUNI AGRO LTD, Orca → ORCA DECO LIMITED, WALTER & Hiffy → WALTER & HIFY RESOURCES, Givanas → GIVANAS, Interstyle → INTERSTYLE, and **ABBA SALEH → ABBA ABASS (assumption: its Ogere → Lafia lane matches that client's Nasarawa ↔ Ogere trips — confirm)**. Prices are read as VAT-exclusive (120 lanes equal the June price list to the naira). Vehicle type comes from Division / Truck Size (NBL-DSL → haulage, FLATBED → flat trucks, CANTER → closed body, Hiabs Logistics → Hiab).
+
+Natural Beauty's two June rates were recorded as VAT-inclusive; the card restates the same figures (Lagos → Kano ₦4,450,000) and ₦5,820,000 for Maiduguri, so they are now carried as VAT-exclusive like every other lane on the card — the previous inclusive records expire on 2026-10-19 and stay in the history.
+
+Coverage after the import: 2026 trips with an approved rate found rise from 245 to 390, 76 trips match two card prices (size variants) and wait for the user's pick, 1,322 still have no card lane (mostly NBL, ORCA DECO, AB-INBEV, SASO upcountry lanes not on this card).

@@ -25,7 +25,9 @@
       // the Asset List (127 assets with cost centers) and the FMR fleet register (69 trucks) ship as static files as well; documents saved in the app are merged over them by id
       try { const r = await fetch('data/workbook/assets.json'); if (r.ok) this.state.assets = (await r.json()).map((x) => { const id = String(x.plate || '').replace(/[^A-Za-z0-9_-]+/g, '-'); const tb = x.vehicleCategory === 'New Batch' ? 'New Batch' : x.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; return Object.assign({ id, truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] }, x); }); } catch (e) { /* offline */ }
       try { const r = await fetch('data/workbook/fleet.json'); if (r.ok) this.state.fleet = await r.json(); } catch (e) { /* offline */ }
-      this.staticBase = {}; for (const n of ['routes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'assets', 'fleet']) this.staticBase[n] = new Map((this.state[n] || []).map((x) => [x.id, x]));
+      // the Client Rate Card (contract card import, 1,000+ lanes) ships as a static file; rates edited in the app are documents merged over it by id
+      try { const r = await fetch('data/workbook/rates.json'); if (r.ok) this.state.rates = await r.json(); } catch (e) { /* offline */ }
+      this.staticBase = {}; for (const n of ['routes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'assets', 'fleet', 'rates']) this.staticBase[n] = new Map((this.state[n] || []).map((x) => [x.id, x]));
       const snaps = await Promise.all(names.map((n) => this.db.collection(n).limit(1000).get()));
       names.forEach((n, i) => { for (const d of snaps[i].docs) { this.known.add(n + '/' + d.id); this.applyDoc(n, d.id, d.data()); } });
       if (this.viewer) { try { this.viewerId = await this.viewer.id(); this.canWrite = await this.viewer.can('data.write'); } catch (e) { /* ignore */ } }

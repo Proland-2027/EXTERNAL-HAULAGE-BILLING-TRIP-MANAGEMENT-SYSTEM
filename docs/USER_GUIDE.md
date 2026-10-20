@@ -198,6 +198,8 @@ In **Requests & Allocation**, tick requests (or *Select all visible*) and use **
 
 ## Client Price List
 
+The list is the approved Client Rate Card imported from *Client_Contracts_And_Rate_Cards* (927 contract lanes, truck size and tonnage, contract kilometres, diesel issuance and road expenses per lane) on top of the June price list; a lane whose price changed keeps the old rate with an expiry date so earlier trips still compare against the rate that applied. The import report (added, changed, expired, skipped, duplicate and equipment-mismatch lanes) is in `data/workbook/client_rates_report.json`.
+
 The actual **June Price List** is loaded: 242 lanes for Jamara, Mega Manu (45T long-haul plus 30T/40T/45T local lanes), SASO, Natural Beauty (June and August prices), Vendara, Ilera Agro, K&D, Interstyle, I'HS, JMG, Lacasera (palletised 45T) and JAT (Jubaili Agrotec). Rows marked *Price Not Approved* were not imported; the Lacasera per-case (35cl/60cl) tariff was not imported because it is priced per case, not per trip.
 
 How a trip finds its rate: client (name, code or alias such as "Mega Manu-Local"), loading origin and destination (exact, by zone such as GBAGADA → Lagos, or as a member of a zone list such as "VI-Lekki-AJAH"), the rate in force on the dispatch date, and the contract type / tonnage ("45" on a trip matches "45T"). When the trip has no contract type and several tonnages exist for the lane, the trip shows **Multiple rates — choose**. Prices listed including VAT (SASO's "PLIST INL VAT") are converted to the trip's VAT basis before comparison.
