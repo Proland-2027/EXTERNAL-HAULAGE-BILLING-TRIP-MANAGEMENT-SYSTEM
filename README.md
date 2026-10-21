@@ -1,5 +1,7 @@
 # External Haulage Billing & Trip Management System
 
+> **Also in this repository:** [`production-planning/`](production-planning/README.md) – the **Production Planning** WordPress plugin (Genset & Canopy production planning, scheduling, WIP, productivity and BOM costing). See its README and [DEPLOYMENT.md](production-planning/DEPLOYMENT.md); the installable package is `dist/production-planning.zip`.
+
 A complete, zero-install billing system for haulage operations that run **both an in-house fleet and
 external contractors**:
 
