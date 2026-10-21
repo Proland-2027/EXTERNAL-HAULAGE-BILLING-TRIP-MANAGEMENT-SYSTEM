@@ -1,0 +1,7 @@
+.git
+node_modules
+data/ppm.sqlite*
+data/backups
+data/uploads
+tests
+screenshots

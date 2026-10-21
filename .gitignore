@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+*.log
+screenshots/
+data/ppm.sqlite*
+data/backups/
+data/uploads/

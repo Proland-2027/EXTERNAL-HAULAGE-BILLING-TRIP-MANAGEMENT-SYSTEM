@@ -1,0 +1,22 @@
+# Render.com blueprint: one web service with a persistent disk for the SQLite database and backups.
+services:
+  - type: web
+    name: proland-production-planning
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    disk:
+      name: ppm-data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: WP_SSO_SECRET
+        generateValue: true
+      - key: SEED_DEMO_USERS
+        value: "1"

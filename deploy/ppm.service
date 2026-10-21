@@ -1,0 +1,14 @@
+# systemd unit for a VPS (Ubuntu/Debian): copy to /etc/systemd/system/ppm.service
+[Unit]
+Description=Proland Production Planning
+After=network.target
+[Service]
+User=ppm
+WorkingDirectory=/opt/ppm
+Environment=NODE_ENV=production PORT=8080 DATA_DIR=/var/lib/ppm COOKIE_SECURE=1
+EnvironmentFile=-/etc/ppm.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target

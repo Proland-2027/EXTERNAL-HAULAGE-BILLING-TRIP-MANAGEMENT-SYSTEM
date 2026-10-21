@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports: ["8080:8080"]
+    environment:
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin@2026}
+      - WP_SSO_SECRET=${WP_SSO_SECRET:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-0}   # set to 1 behind HTTPS
+      - SEED_DEMO_USERS=${SEED_DEMO_USERS:-1}
+    volumes:
+      - ppm-data:/data
+    restart: unless-stopped
+volumes:
+  ppm-data:
