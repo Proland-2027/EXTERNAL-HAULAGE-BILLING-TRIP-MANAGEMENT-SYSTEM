@@ -10,7 +10,7 @@ window.JMG = (function () {
   const S = { settings: {}, calendar: {}, priceEdits: {}, capEdits: {}, sectionEdits: {}, overrides: {}, requests: {}, orders: {}, logs: {}, alerts: {}, audit: [] };
   E.S = S;
 
-  E.DEFAULTS = { work_start: '08:00', work_end: '17:00', break_minutes: 60, net_minutes: 480, shifts_per_day: 1, working_days: [1, 2, 3, 4, 5], transfer_rule: 'next_day', capacity_basis: 'current', inventory_enabled: 0, currency: 'NGN', include_overheads: 1, cost_basis: 'unit_cost', horizon_days: 400, company_name: '', plan_lead_days: 1 };
+  E.DEFAULTS = { work_start: '08:00', work_end: '17:00', break_minutes: 60, net_minutes: 480, shifts_per_day: 1, working_days: [1, 2, 3, 4, 5], transfer_rule: 'next_day', capacity_basis: 'current', inventory_enabled: 1, backflush_enabled: 1, allow_negative_stock: 0, default_warehouse: 'MAIN', currency: 'NGN', include_overheads: 1, cost_basis: 'unit_cost', horizon_days: 400, company_name: '', plan_lead_days: 1 };
   E.setting = (k) => (S.settings && S.settings[k] != null ? S.settings[k] : E.DEFAULTS[k]);
 
   E.loadMasters = function (masters, bom) {
@@ -105,11 +105,14 @@ window.JMG = (function () {
         const child = { code, description: r.description, parent, level: r.level, qty_per_parent: q, qty_per_unit: per, total_qty: per * qty, unit: r.unit, cost_group: r.cost_group, family: E.family(code, r.cost_group), unit_cost: r.unit_cost, erp_cost: r.erp_cost_per_unit, kind: 'material', children: [], ops: [], materials: [], overheads: [] };
         if (calc === 'BOM') {
           const key = parent + '>' + code; if (visited[key]) { return; } visited[key] = true;
-          const sub = BOM.walk(fin, code, per, level + 1, by, components, issues, visited, qty, inventory);
+          // stock allocated to the sub-assembly needs neither materials nor operations: explode the balance only
+          const avail = Number(inventory[code] || 0); const inv = Math.min(avail, child.total_qty); if (inv > 0) { inventory[code] = avail - inv; }
+          child.inventory_qty = inv; child.qty_to_make = Math.max(0, child.total_qty - inv);
+          const subQty = child.total_qty > 0 ? qty * child.qty_to_make / child.total_qty : qty;
+          const sub = BOM.walk(fin, code, per, level + 1, by, components, issues, visited, subQty, inventory);
           Object.assign(child, { children: sub.children, ops: sub.ops, materials: sub.materials, overheads: sub.overheads });
           if (!by[code]) { child.kind = 'purchased_assembly'; child.bom_incomplete = 1; issues.push('Sub-assembly ' + code + ' (' + r.description + ') has no component rows in the BOM; treated as a purchased/kitted item and flagged for the administrator.'); }
           else { child.kind = sub.ops.length ? 'assembly' : 'purchased_assembly'; }
-          const inv = Number(inventory[code] || 0); child.inventory_qty = inv; child.qty_to_make = Math.max(0, child.total_qty - inv);
           components.push(BOM.strip(child)); node.children.push(child);
         } else { node.materials.push(child); components.push(BOM.strip(child)); }
       });

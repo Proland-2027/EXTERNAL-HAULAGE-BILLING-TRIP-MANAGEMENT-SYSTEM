@@ -311,8 +311,35 @@ class JMG_DB {
   unit_cost decimal(18,4) DEFAULT NULL,
   ext_cost decimal(18,2) DEFAULT NULL,
   cost_pending tinyint(1) NOT NULL DEFAULT 0,
+  qty_issued decimal(18,4) NOT NULL DEFAULT 0,
+  qty_received decimal(18,4) NOT NULL DEFAULT 0,
   status varchar(20) NOT NULL DEFAULT 'PENDING',
   PRIMARY KEY  (id),
+  KEY order_id (order_id)
+) $charset;";
+
+		$sql[] = "CREATE TABLE {$p}stock_txns (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  txn_date date NOT NULL,
+  item_code varchar(80) NOT NULL,
+  description varchar(255) DEFAULT '',
+  warehouse varchar(40) NOT NULL DEFAULT 'MAIN',
+  txn_type varchar(20) NOT NULL,
+  qty decimal(18,4) NOT NULL DEFAULT 0,
+  unit varchar(20) DEFAULT '',
+  unit_cost decimal(18,4) DEFAULT NULL,
+  reference varchar(160) DEFAULT '',
+  order_id bigint(20) unsigned DEFAULT NULL,
+  order_no varchar(30) DEFAULT '',
+  op_id bigint(20) unsigned DEFAULT NULL,
+  reason varchar(255) DEFAULT '',
+  is_system tinyint(1) NOT NULL DEFAULT 0,
+  created_by bigint(20) DEFAULT NULL,
+  created_at datetime DEFAULT NULL,
+  PRIMARY KEY  (id),
+  KEY item_code (item_code),
+  KEY item_wh (item_code, warehouse),
+  KEY txn_date (txn_date),
   KEY order_id (order_id)
 ) $charset;";
 
@@ -473,7 +500,7 @@ class JMG_DB {
 
 	/** Names of all plugin tables (without prefix). */
 	public static function all_tables() {
-		return array( 'products', 'bom_lines', 'prices', 'sections', 'capacities', 'machine_times', 'cutting_files', 'series', 'stage_map', 'capacity_overrides', 'calendar', 'requests', 'orders', 'order_components', 'order_ops', 'op_schedule', 'daily_logs', 'alerts', 'data_issues', 'audit_log', 'settings', 'import_log' );
+		return array( 'products', 'bom_lines', 'prices', 'sections', 'capacities', 'machine_times', 'cutting_files', 'series', 'stage_map', 'capacity_overrides', 'calendar', 'requests', 'orders', 'order_components', 'order_ops', 'op_schedule', 'daily_logs', 'alerts', 'data_issues', 'audit_log', 'settings', 'import_log', 'stock_txns' );
 	}
 
 	/** Multi-row insert helper. */

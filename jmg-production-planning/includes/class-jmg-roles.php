@@ -11,6 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
  *  jmg_track  - record daily production for assigned sections
  *  jmg_manage - approve rescheduling, acknowledge alerts, management reports
  *  jmg_cost   - maintain material prices, labour and processing rates
+ *  jmg_stock  - post stock receipts, issues, adjustments, transfers, counts
  *  jmg_admin  - masters, capacities, calendar, users, import, backup, settings
  */
 class JMG_Roles {
@@ -18,15 +19,16 @@ class JMG_Roles {
 	public static function roles() {
 		return array(
 			'jmg_sales'      => array( 'name' => 'Sales',              'caps' => array( 'jmg_view', 'jmg_sales' ) ),
-			'jmg_planner'    => array( 'name' => 'Production Planner', 'caps' => array( 'jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track' ) ),
+			'jmg_planner'    => array( 'name' => 'Production Planner', 'caps' => array( 'jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track', 'jmg_stock' ) ),
 			'jmg_supervisor' => array( 'name' => 'Section Supervisor', 'caps' => array( 'jmg_view', 'jmg_track' ) ),
-			'jmg_manager'    => array( 'name' => 'Production Manager', 'caps' => array( 'jmg_view', 'jmg_plan', 'jmg_track', 'jmg_manage' ) ),
+			'jmg_manager'    => array( 'name' => 'Production Manager', 'caps' => array( 'jmg_view', 'jmg_plan', 'jmg_track', 'jmg_manage', 'jmg_stock' ) ),
 			'jmg_costing'    => array( 'name' => 'Costing / Finance',  'caps' => array( 'jmg_view', 'jmg_cost' ) ),
+			'jmg_store'      => array( 'name' => 'Store Keeper',       'caps' => array( 'jmg_view', 'jmg_stock' ) ),
 		);
 	}
 
 	public static function all_caps() {
-		return array( 'jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track', 'jmg_manage', 'jmg_cost', 'jmg_admin' );
+		return array( 'jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track', 'jmg_manage', 'jmg_cost', 'jmg_stock', 'jmg_admin' );
 	}
 
 	public static function register() {

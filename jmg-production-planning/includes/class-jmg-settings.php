@@ -14,7 +14,10 @@ class JMG_Settings {
 			'working_days'      => array( 1, 2, 3, 4, 5 ), // ISO weekday numbers: Mon..Fri
 			'transfer_rule'     => 'next_day',             // next_day | same_day | full_lot
 			'capacity_basis'    => 'current',              // current | new (Excel "New Productivity")
-			'inventory_enabled' => 0,
+			'inventory_enabled' => 1,                      // net requirements against available stock
+			'backflush_enabled' => 1,                      // daily production receives completed units and issues consumed materials
+			'allow_negative_stock' => 0,
+			'default_warehouse' => 'MAIN',
 			'currency'          => 'NGN',
 			'include_overheads' => 1,
 			'cost_basis'        => 'unit_cost',             // unit_cost (workbook "Unit Cost" column) | erp (workbook "Cost per unit" ERP line cost)

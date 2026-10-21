@@ -69,6 +69,31 @@ class JMG_API {
 		self::route( '/admin/users', 'POST', 'users_create', 'jmg_admin' );
 		self::route( '/admin/users/(?P<id>\d+)', 'PUT', 'users_update', 'jmg_admin' );
 		self::route( '/admin/demo', 'POST', 'admin_demo', 'jmg_admin' );
+		self::route( '/inventory/balances', 'GET', 'inv_balances' );
+		self::route( '/inventory/ledger', 'GET', 'inv_ledger' );
+		self::route( '/inventory/txn', 'POST', 'inv_post', 'jmg_stock' );
+		self::route( '/inventory/txn/(?P<id>\d+)/reverse', 'POST', 'inv_reverse', 'jmg_stock' );
+		self::route( '/inventory/shortages', 'GET', 'inv_shortages' );
+		self::route( '/inventory/valuation', 'GET', 'inv_valuation' );
+		self::route( '/inventory/warehouses', 'GET', 'inv_warehouses' );
+		self::route( '/inventory/item/(?P<code>[^/]+)', 'GET', 'inv_item' );
+	}
+
+	/* ---------------- inventory ---------------- */
+	public static function inv_balances( $req ) { return JMG_Inventory::balances( $req->get_params() ); }
+	public static function inv_ledger( $req ) { return JMG_Inventory::ledger( $req->get_params() ); }
+	public static function inv_post( $req ) { return self::result( JMG_Inventory::post( self::body( $req ) ) ); }
+	public static function inv_reverse( $req ) { return self::result( JMG_Inventory::reverse( (int) $req['id'] ) ); }
+	public static function inv_shortages( $req ) { return JMG_Inventory::shortages( $req->get_params() ); }
+	public static function inv_valuation( $req ) { return JMG_Inventory::valuation(); }
+	public static function inv_warehouses( $req ) { return JMG_Inventory::warehouses(); }
+	public static function inv_item( $req ) {
+		global $wpdb;
+		$code = urldecode( $req['code'] );
+		$p = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . JMG_DB::table( 'products' ) . ' WHERE code=%s', $code ), ARRAY_A );
+		$oh = JMG_Inventory::on_hand_map();
+		$res = JMG_Inventory::reserved_map( 0 );
+		return array( 'product' => $p, 'warehouses' => $oh[ $code ] ?? array(), 'on_hand' => array_sum( $oh[ $code ] ?? array() ), 'reserved' => $res[ $code ] ?? 0, 'ledger' => JMG_Inventory::ledger( array( 'item' => $code, 'limit' => 300 ) ), 'used_in' => $wpdb->get_results( $wpdb->prepare( 'SELECT c.order_id, o.order_no, o.status, c.total_qty, c.inventory_qty, c.qty_issued, c.qty_received FROM ' . JMG_DB::table( 'order_components' ) . ' c JOIN ' . JMG_DB::table( 'orders' ) . " o ON o.id=c.order_id WHERE c.component_code=%s AND o.status IN ('CONFIRMED','IN_PROGRESS','DRAFT') ORDER BY o.id DESC LIMIT 50", $code ), ARRAY_A ) );
 	}
 
 	private static function body( $req ) {
@@ -94,6 +119,7 @@ class JMG_API {
 			'settings' => JMG_Settings::all(), 'sections' => $sections, 'departments' => array_values( $departments ), 'products' => $products,
 			'today' => JMG_Calendar::today(), 'logout_url' => wp_logout_url( home_url( '/' ) ), 'app_url' => JMG_App::app_url(), 'admin_url' => admin_url(),
 			'counts' => array( 'issues' => (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . JMG_DB::table( 'data_issues' ) . ' WHERE is_resolved=0' ), 'alerts' => (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . JMG_DB::table( 'alerts' ) . ' WHERE is_ack=0' ) ),
+			'warehouses' => JMG_Inventory::warehouses(),
 			'import' => $wpdb->get_row( 'SELECT file_name, created_at, summary FROM ' . JMG_DB::table( 'import_log' ) . ' ORDER BY id DESC LIMIT 1', ARRAY_A ),
 			'version' => JMG_PP_VERSION,
 		);
@@ -331,7 +357,7 @@ class JMG_API {
 		foreach ( $b as $k => $v ) {
 			if ( ! in_array( $k, $allowed, true ) ) { continue; }
 			if ( 'working_days' === $k ) { $v = array_values( array_map( 'intval', (array) $v ) ); }
-			elseif ( in_array( $k, array( 'break_minutes', 'net_minutes', 'shifts_per_day', 'inventory_enabled', 'include_overheads', 'horizon_days', 'plan_lead_days' ), true ) ) { $v = (int) $v; }
+			elseif ( in_array( $k, array( 'break_minutes', 'net_minutes', 'shifts_per_day', 'inventory_enabled', 'backflush_enabled', 'allow_negative_stock', 'include_overheads', 'horizon_days', 'plan_lead_days' ), true ) ) { $v = (int) $v; }
 			elseif ( is_string( $v ) ) { $v = sanitize_text_field( $v ); }
 			JMG_Settings::set( $k, $v ); $changed[ $k ] = $v;
 		}

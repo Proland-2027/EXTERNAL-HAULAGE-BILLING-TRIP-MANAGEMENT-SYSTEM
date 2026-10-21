@@ -77,6 +77,16 @@ Source: `Prodction Data.xlsx` (11 sheets). Import summary from the bundled workb
 Products above 900 kVA (SPGP1100-C, SPGM1100-1, SPGP1250, SPGP1500, SPGP2000) have no size class in the
 workbook; their operations are flagged "missing" until capacity rows are added.
 
+## Inventory data
+
+* The BOM *Warehouse* column (e.g. WH-IK-FLI, WH-GB-RM) is stored on the product master and used as the
+  item's default warehouse for stock movements; items without one use Settings → Default warehouse (MAIN).
+* The workbook contains no stock balances: stock on hand starts at zero and is built from receipts
+  (opening stock, purchases), production receipts and issues recorded in the application. The demo
+  scenario posts a small opening stock (sheets, powder, 2 base tanks, 10 kits) to show the netting.
+* Consumption per completed component (backflush) uses the BOM rows directly under the component
+  (`Calculation Type` Item / BOM, excluding STATUS ITEM rows) × (good + rejected units).
+
 ## Costing data
 
 * Material unit costs come from the BOM column **Unit Cost** (col. Y); 255 codes have more than one value

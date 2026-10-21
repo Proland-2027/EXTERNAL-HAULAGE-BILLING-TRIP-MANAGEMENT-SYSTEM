@@ -8,8 +8,10 @@ https://claude.ai/artifact/4eqdTG5R9fhNfmkZcn7HBG
 * `engine.js`  – JavaScript port of the plugin's BOM explosion, cost roll-up, routing resolver,
   calendar and finite-capacity scheduler (`includes/class-jmg-bom.php`, `class-jmg-routing.php`,
   `class-jmg-scheduler.php`, `class-jmg-calendar.php`).
-* `server.js`  – port of orders, tracking, reports and the REST routes (`class-jmg-orders.php`,
-  `class-jmg-tracking.php`, `class-jmg-reports.php`, `class-jmg-api.php`) on top of the shared store.
+* `server.js`  – port of orders, tracking, inventory, reports and the REST routes (`class-jmg-orders.php`,
+  `class-jmg-tracking.php`, `class-jmg-inventory.php`, `class-jmg-reports.php`, `class-jmg-api.php`) on
+  top of the shared store. Stock movements are kept in the `stock` collection as small batch documents
+  (one per manual posting, one per daily log) so a backflush never needs dozens of store writes.
 * `build.py`   – derives the hosted front-end from `assets/app.js` (in-page navigation, dialogs,
   downloads through the platform, role selector).
 * `build_index.py` – inlines CSS and scripts into the publishable page; `shim.js` emulates the runtime
@@ -19,6 +21,7 @@ https://claude.ai/artifact/4eqdTG5R9fhNfmkZcn7HBG
   which the page loads at start.
 
 Differences from the WordPress edition: roles are chosen by the viewer ("Acting as") until the owner
-assigns fixed roles; the stage map and size classes are read-only; workbook re-import, PDF print view
-and WordPress user accounts are only in the WordPress edition. Writes need Contributor or Editor
+assigns fixed roles; the stage map and size classes are read-only; all items use the default warehouse
+(the exported masters carry no warehouse column); workbook re-import, PDF print view and WordPress user
+accounts are only in the WordPress edition. Writes need Contributor or Editor
 access to the artifact.

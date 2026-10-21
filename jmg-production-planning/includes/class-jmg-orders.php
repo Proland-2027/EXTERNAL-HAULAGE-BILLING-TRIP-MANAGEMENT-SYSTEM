@@ -128,7 +128,22 @@ class JMG_Orders {
 		if ( ! $order ) { return new WP_Error( 'jmg_404', 'Order not found' ); }
 		$qty = (float) $order['qty'];
 		$inventory = array();
-		if ( (int) JMG_Settings::get( 'inventory_enabled', 0 ) ) { $inventory = (array) JMG_Settings::get( 'inventory_qty', array() ); }
+		$inv_on = (int) JMG_Settings::get( 'inventory_enabled', 1 );
+		// previous allocations consumed by production (kept across re-plans)
+		$prev = array();
+		foreach ( $wpdb->get_results( $wpdb->prepare( 'SELECT component_code, parent_code, qty_issued, qty_received, inventory_qty FROM ' . JMG_DB::table( 'order_components' ) . ' WHERE order_id=%d', $order_id ), ARRAY_A ) as $pc ) { $prev[ $pc['component_code'] . '|' . $pc['parent_code'] ] = $pc; }
+		if ( $inv_on ) {
+			$inventory = JMG_Inventory::availability_map( $order_id );
+			// units this order produced itself are in stock for its own parent stages: exclude them from
+			// external allocation, and never allocate more external stock than is still to be produced
+			$totals = array();
+			foreach ( JMG_BOM::explode( $order['product_code'], $qty )['components'] as $c0 ) { if ( 'assembly' === $c0['kind'] ) { $totals[ $c0['code'] ] = ( $totals[ $c0['code'] ] ?? 0 ) + (float) $c0['total_qty']; } }
+			foreach ( $prev as $pc ) {
+				$own = max( 0.0, (float) $pc['qty_received'] - (float) $pc['qty_issued'] );
+				if ( $own > 0 && isset( $inventory[ $pc['component_code'] ] ) ) { $inventory[ $pc['component_code'] ] = max( 0.0, $inventory[ $pc['component_code'] ] - $own ); }
+				if ( isset( $totals[ $pc['component_code'] ], $inventory[ $pc['component_code'] ] ) ) { $inventory[ $pc['component_code'] ] = min( $inventory[ $pc['component_code'] ], max( 0.0, $totals[ $pc['component_code'] ] - (float) $pc['qty_received'] ) ); }
+			}
+		}
 		$ex = JMG_BOM::explode( $order['product_code'], $qty, $inventory );
 		$routing = new JMG_Routing();
 		$built = $routing->build( $ex, $qty );
@@ -184,6 +199,20 @@ class JMG_Orders {
 		foreach ( $res['ops'] as $op ) { $ops_by_comp[ $op['component_code'] ][] = $op; }
 		foreach ( $ex['components'] as $c ) {
 			$price = isset( $prices[ $c['code'] ] ) ? $prices[ $c['code'] ]['cost'] : null;
+			$pk = $c['code'] . '|' . $c['parent'];
+			$issued = isset( $prev[ $pk ] ) ? (float) $prev[ $pk ]['qty_issued'] : 0.0;
+			$received = isset( $prev[ $pk ] ) ? (float) $prev[ $pk ]['qty_received'] : 0.0;
+			if ( 'material' === $c['kind'] || 'purchased_assembly' === $c['kind'] ) {
+				// allocate available stock to purchased items (issued quantities are already out of stock)
+				$need = max( 0.0, (float) $c['total_qty'] - $issued );
+				$avail = isset( $inventory[ $c['code'] ] ) ? (float) $inventory[ $c['code'] ] : 0.0;
+				$alloc = $inv_on ? min( $avail, $need ) : 0.0;
+				if ( $alloc > 0 ) { $inventory[ $c['code'] ] = $avail - $alloc; }
+				$c['inventory_qty'] = $alloc + $issued;
+				$c['qty_to_make'] = max( 0.0, (float) $c['total_qty'] - $c['inventory_qty'] ); // = quantity to purchase
+			} else {
+				$c['inventory_qty'] = max( (float) ( $c['inventory_qty'] ?? 0 ), min( $issued, (float) $c['total_qty'] ) );
+			}
 			$dept = '';
 			if ( isset( $ops_by_comp[ $c['code'] ] ) ) {
 				$d = array();
@@ -193,9 +222,9 @@ class JMG_Orders {
 			$crow[] = array(
 				'order_id' => $order_id, 'component_code' => $c['code'], 'description' => $c['description'], 'parent_code' => $c['parent'], 'level' => $c['level'],
 				'qty_per_parent' => $c['qty_per_parent'], 'qty_per_unit' => $c['qty_per_unit'], 'total_qty' => $c['total_qty'], 'inventory_qty' => $c['inventory_qty'] ?? 0,
-				'qty_to_make' => 'material' === $c['kind'] ? $c['total_qty'] : ( $c['qty_to_make'] ?? $c['total_qty'] ), 'unit' => $c['unit'], 'comp_kind' => $c['kind'], 'cost_group' => $c['cost_group'],
+				'qty_to_make' => $c['qty_to_make'] ?? $c['total_qty'], 'unit' => $c['unit'], 'comp_kind' => $c['kind'], 'cost_group' => $c['cost_group'],
 				'department' => $dept, 'unit_cost' => $price, 'ext_cost' => null === $price ? null : round( $price * $c['total_qty'], 2 ), 'cost_pending' => ( 'material' === $c['kind'] && null === $price ) ? 1 : 0,
-				'status' => 'PENDING',
+				'qty_issued' => $issued, 'qty_received' => $received, 'status' => 'PENDING',
 			);
 		}
 		JMG_DB::bulk_insert( 'order_components', $crow );
@@ -279,6 +308,12 @@ class JMG_Orders {
 		JMG_Audit::log( 'order_confirm', 'order', $id, array( 'order_no' => $o['order_no'], 'planned_end' => $o['planned_end'], 'requested_date' => $o['requested_date'] ) );
 		if ( $o['requested_date'] && $o['planned_end'] && $o['planned_end'] > $o['requested_date'] ) {
 			self::add_alert( $id, $o['order_no'], 'delivery_risk', 'warning', 'sales,planning', sprintf( 'Committed completion %s is later than the Sales requested date %s (%d working days).', $o['planned_end'], $o['requested_date'], JMG_Calendar::working_days_between( $o['requested_date'], $o['planned_end'] ) - 1 ) );
+		}
+		if ( (int) JMG_Settings::get( 'inventory_enabled', 1 ) ) {
+			$short = $wpdb->get_results( $wpdb->prepare( 'SELECT component_code, total_qty, inventory_qty FROM ' . JMG_DB::table( 'order_components' ) . " WHERE order_id=%d AND comp_kind IN ('material','purchased_assembly') AND total_qty > inventory_qty + 0.0005", $id ), ARRAY_A );
+			if ( $short ) {
+				self::add_alert( $id, $o['order_no'], 'material_shortage', 'warning', 'planning,purchasing', sprintf( '%d purchased item(s) are not covered by available stock (e.g. %s: %s short). See Inventory > Shortages & purchase list.', count( $short ), $short[0]['component_code'], rtrim( rtrim( number_format( (float) $short[0]['total_qty'] - (float) $short[0]['inventory_qty'], 2, '.', '' ), '0' ), '.' ) ) );
+			}
 		}
 		return self::get( $id );
 	}
@@ -400,6 +435,13 @@ class JMG_Orders {
 		$o['warnings'] = json_decode( $o['warnings_json'], true ) ?: array(); unset( $o['warnings_json'] );
 		$o['delayed'] = self::is_delayed( $o );
 		$o['components'] = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . JMG_DB::table( 'order_components' ) . ' WHERE order_id=%d ORDER BY level, id', $id ), ARRAY_A );
+		$oh = JMG_Inventory::on_hand_map();
+		foreach ( $o['components'] as &$c ) {
+			$c['on_hand'] = round( array_sum( $oh[ $c['component_code'] ] ?? array() ), 4 );
+			$c['shortage'] = in_array( $c['comp_kind'], array( 'material', 'purchased_assembly' ), true ) ? round( max( 0, (float) $c['total_qty'] - (float) $c['inventory_qty'] ), 4 ) : 0;
+		}
+		unset( $c );
+		$o['stock_moves'] = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . JMG_DB::table( 'stock_txns' ) . ' WHERE order_id=%d ORDER BY id DESC LIMIT 300', $id ), ARRAY_A );
 		$ops = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . JMG_DB::table( 'order_ops' ) . ' WHERE order_id=%d ORDER BY level DESC, component_code, sequence, id', $id ), ARRAY_A );
 		foreach ( $ops as &$op ) {
 			$op['daily'] = json_decode( $op['daily_json'], true ) ?: array(); unset( $op['daily_json'] );

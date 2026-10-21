@@ -77,6 +77,7 @@ class JMG_Tracking {
 		if ( $final ) { $oupd['qty_completed'] = (float) $final['qty_completed']; }
 		$wpdb->update( JMG_DB::table( 'orders' ), $oupd, array( 'id' => $op['order_id'] ) );
 		JMG_Audit::log( 'daily_log', 'order', $op['order_id'], array( 'log_id' => $log_id, 'op' => $op['component_code'] . ' / ' . $op['stage_name'], 'date' => $date, 'actual' => $actual, 'rejected' => $rejected, 'rework' => $rework ) );
+		$moves = JMG_Inventory::backflush( $order, $op, $actual, $rejected, $date, $log_id );
 		// re-forecast remaining work from the next working day (never before today)
 		$from = JMG_Calendar::next_working( JMG_Calendar::add_days( $date, 1 ) );
 		if ( JMG_Calendar::today() > $from ) { $from = JMG_Calendar::today(); }
@@ -87,6 +88,7 @@ class JMG_Tracking {
 			JMG_Orders::add_alert( $op['order_id'], $op['order_no'], 'shortfall', 'warning', 'planning', sprintf( '%s / %s on %s: %s of %s planned units completed (%s%%). Balance of %s carried forward; forecast completion now %s.', $op['section_name'], $op['component_code'], $date, rtrim( rtrim( number_format( $actual, 2, '.', '' ), '0' ), '.' ), rtrim( rtrim( number_format( $planned, 2, '.', '' ), '0' ), '.' ), $achievement, rtrim( rtrim( number_format( $planned - $actual, 2, '.', '' ), '0' ), '.' ), $o['forecast_end'] ) );
 		}
 		$row['id'] = $log_id;
+		$row['stock_moves'] = count( $moves );
 		$row['forecast_end'] = $o['forecast_end'];
 		$row['baseline_end'] = $o['baseline_end'];
 		$row['order_status'] = $o['status'];
@@ -116,6 +118,7 @@ class JMG_Tracking {
 			$wpdb->update( JMG_DB::table( 'order_ops' ), array( 'qty_completed' => $completed, 'qty_rejected' => max( 0, (float) $op['qty_rejected'] - (float) $log['rejected_qty'] ), 'qty_rework' => max( 0, (float) $op['qty_rework'] - (float) $log['rework_qty'] ), 'status' => $completed > 0 ? 'IN_PROGRESS' : 'PENDING', 'actual_end' => null ), array( 'id' => $op['id'] ) );
 			$wpdb->delete( JMG_DB::table( 'op_schedule' ), array( 'op_id' => $op['id'], 'sched_date' => $log['log_date'], 'is_actual' => 1 ) );
 		}
+		JMG_Inventory::reverse_log( $id, $log['order_id'] );
 		$wpdb->delete( $t, array( 'id' => $id ) );
 		JMG_Audit::log( 'daily_log_delete', 'order', $log['order_id'], array( 'log_id' => $id ) );
 		if ( $op ) { JMG_Orders::plan_order( $op['order_id'] ); JMG_Orders::check_delay_alerts( $op['order_id'] ); }

@@ -5,12 +5,13 @@ window.JMG_SERVER = (function () {
   const E = window.JMG; const S = E.S; const M = E.M; const Cal = E.Cal; const BOM = E.BOM; const R = E.Routing; const Sched = E.Sched;
   const Srv = { ready: false, user: { id: null, name: '', isOwner: false, canWrite: null }, role: 'jmg_planner', listeners: [] };
   const ROLES = {
-    administrator: { name: 'Administrator', caps: ['jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track', 'jmg_manage', 'jmg_cost', 'jmg_admin'] },
+    administrator: { name: 'Administrator', caps: ['jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track', 'jmg_manage', 'jmg_cost', 'jmg_stock', 'jmg_admin'] },
     jmg_sales: { name: 'Sales', caps: ['jmg_view', 'jmg_sales'] },
-    jmg_planner: { name: 'Production Planner', caps: ['jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track'] },
+    jmg_planner: { name: 'Production Planner', caps: ['jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track', 'jmg_stock'] },
     jmg_supervisor: { name: 'Section Supervisor', caps: ['jmg_view', 'jmg_track'] },
-    jmg_manager: { name: 'Production Manager', caps: ['jmg_view', 'jmg_plan', 'jmg_track', 'jmg_manage'] },
+    jmg_manager: { name: 'Production Manager', caps: ['jmg_view', 'jmg_plan', 'jmg_track', 'jmg_manage', 'jmg_stock'] },
     jmg_costing: { name: 'Costing / Finance', caps: ['jmg_view', 'jmg_cost'] },
+    jmg_store: { name: 'Store Keeper', caps: ['jmg_view', 'jmg_stock'] },
   };
   Srv.ROLES = ROLES;
   const err = (msg, code) => { const e = new Error(msg); e.code = code || 'jmg_error'; return e; };
@@ -20,7 +21,7 @@ window.JMG_SERVER = (function () {
   const LS_KEY = 'jmg-pp-demo-store';
   function localLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; } }
   function localSave(d) { try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch (e) { /* ignore */ } }
-  const COLLECTIONS = ['requests', 'orders', 'logs', 'alerts', 'roles'];
+  const COLLECTIONS = ['requests', 'orders', 'logs', 'alerts', 'roles', 'stock'];
   const SETTING_DOCS = ['main', 'calendar', 'prices', 'capacities', 'sections', 'overrides', 'counters'];
   function applySettingDoc(id, data) {
     data = data || {};
@@ -86,6 +87,153 @@ window.JMG_SERVER = (function () {
     S.auditDoc = (S.auditDoc || []).concat([a]).slice(-400);
     writeDoc('settings', 'audit', { items: S.auditDoc }).catch(() => {});
   }
+
+  /* ------------------------------------------------------------ inventory (stock ledger in the shared store)
+     Every movement is a transaction row; rows are stored in small batch documents (one per manual posting,
+     one per daily log for backflush) so a production log never needs dozens of store writes. */
+  const INV_TYPES = ['RECEIPT', 'ISSUE', 'PRODUCTION', 'ADJUSTMENT', 'COUNT', 'TRANSFER', 'RETURN'];
+  const r4 = (v) => Math.round(Number(v) * 10000) / 10000;
+  const fmtQ = (v) => String(Math.round(Number(v) * 100) / 100);
+  const Inv = {
+    defaultWarehouse: () => String(E.setting('default_warehouse') || 'MAIN'),
+    itemWarehouse: (code) => { const p = M.products[code]; return (p && p.warehouse) || Inv.defaultWarehouse(); },
+    txns() { const out = []; Object.values(S.stock || {}).forEach((b) => { (b.txns || []).forEach((t) => out.push(t)); }); return out; },
+    warehouses() { const set = new Set([Inv.defaultWarehouse()]); Inv.txns().forEach((t) => { if (t.warehouse) { set.add(t.warehouse); } }); return [...set].sort(); },
+    onHandMap() { const m = {}; Inv.txns().forEach((t) => { const w = m[t.item_code] = m[t.item_code] || {}; w[t.warehouse] = r4((w[t.warehouse] || 0) + Number(t.qty)); }); return m; },
+    onHand(code, wh) { let s = 0; Inv.txns().forEach((t) => { if (t.item_code === code && (!wh || t.warehouse === wh)) { s += Number(t.qty); } }); return r4(s); },
+    sumWh: (whs) => r4(Object.values(whs || {}).reduce((a, b) => a + Number(b), 0)),
+    /** quantity claimed by other open orders: external allocation + own production received, less what was issued */
+    reservedMap(excludeOrderId) {
+      const m = {};
+      Object.values(S.orders).forEach((o) => { if (!['CONFIRMED', 'IN_PROGRESS'].includes(o.status) || o.id === excludeOrderId) { return; } (o.components || []).forEach((c) => { const claim = Number(c.inventory_qty || 0) + Number(c.qty_received || 0) - Number(c.qty_issued || 0); if (claim > 0) { m[c.component_code] = r4((m[c.component_code] || 0) + claim); } }); });
+      return m;
+    },
+    availabilityMap(excludeOrderId) {
+      const oh = Inv.onHandMap(); const res = Inv.reservedMap(excludeOrderId); const out = {};
+      Object.entries(oh).forEach(([code, whs]) => { const a = Inv.sumWh(whs) - (res[code] || 0); if (a > 0.0005) { out[code] = r4(a); } });
+      return out;
+    },
+    balances(f) {
+      f = f || {}; const oh = Inv.onHandMap(); const res = Inv.reservedMap(null);
+      const codes = new Set(Object.keys(oh)); Object.keys(res).forEach((c) => codes.add(c));
+      const out = [];
+      [...codes].sort().forEach((code) => {
+        const whs = oh[code] || {}; const tot = Inv.sumWh(whs); const p = M.products[code] || { description: '', item_type: '', unit: '', cost_group: '' }; const price = E.priceOf(code);
+        const row = { code, description: p.description, item_type: p.item_type, unit: p.unit, cost_group: p.cost_group, warehouses: whs, on_hand: tot, reserved: res[code] || 0, available: r4(tot - (res[code] || 0)), unit_cost: price, value: price == null ? null : Math.round(tot * price * 100) / 100 };
+        if (f.q && !(code + ' ' + p.description + ' ' + p.cost_group).toLowerCase().includes(String(f.q).toLowerCase())) { return; }
+        if (f.warehouse && whs[f.warehouse] === undefined) { return; }
+        if (f.type && p.item_type !== f.type) { return; }
+        if (f.negative && row.available >= 0) { return; }
+        out.push(row);
+      });
+      return out;
+    },
+    ledger(f) {
+      f = f || {}; let list = Inv.txns();
+      if (f.item) { list = list.filter((t) => t.item_code === f.item); }
+      if (f.warehouse) { list = list.filter((t) => t.warehouse === f.warehouse); }
+      if (f.type) { list = list.filter((t) => t.txn_type === f.type); }
+      if (f.order_id) { list = list.filter((t) => t.order_id === f.order_id); }
+      if (f.from) { list = list.filter((t) => t.txn_date >= f.from); } if (f.to) { list = list.filter((t) => t.txn_date <= f.to); }
+      if (f.q) { const q = String(f.q).toLowerCase(); list = list.filter((t) => (t.item_code + ' ' + t.description + ' ' + t.reference).toLowerCase().includes(q)); }
+      return list.sort((a, b) => b.txn_date.localeCompare(a.txn_date) || b.created_at.localeCompare(a.created_at) || (b.seq - a.seq)).slice(0, Number(f.limit) || 500);
+    },
+    /** Build (and validate) the transaction rows of a posting without writing them. */
+    build(d, system) {
+      const type = String(d.txn_type || '').trim().toUpperCase();
+      if (!INV_TYPES.includes(type)) { throw err('Unknown transaction type ' + type); }
+      const code = String(d.item_code || '').replace(/ /g, ' ').trim();
+      if (!code) { throw err('Item code is required.'); }
+      const product = M.products[code] || null;
+      if (!product && !system) { throw err('Unknown item code ' + code + '. Add it to the product master first.'); }
+      const wh = String(d.warehouse || '').trim() || Inv.itemWarehouse(code);
+      const date = d.txn_date || E.today(); if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { throw err('Invalid date.'); }
+      let qty = Number(d.qty) || 0;
+      if (type === 'COUNT') { qty = r4((Number(d.counted_qty) || 0) - Inv.onHand(code, wh)); if (Math.abs(qty) < 0.00005) { throw err('Counted quantity equals stock on hand; nothing to adjust.'); } }
+      else if (type === 'ADJUSTMENT') { if (!qty) { throw err('Quantity is required (positive to add, negative to remove).'); } }
+      else { if (qty <= 0) { throw err('Quantity must be greater than zero.'); } if (type === 'ISSUE' || type === 'TRANSFER') { qty = -qty; } }
+      if ((type === 'ISSUE' || type === 'TRANSFER') && !system && !Number(E.setting('allow_negative_stock'))) { const oh = Inv.onHand(code, wh); if (oh + qty < -0.00005) { throw err('Only ' + fmtQ(oh) + ' of ' + code + ' on hand in ' + wh + '; cannot issue ' + fmtQ(-qty) + '. Enable negative stock in Settings or receive stock first.'); } }
+      const unitCost = (d.unit_cost !== undefined && d.unit_cost !== '' && d.unit_cost !== null) ? Number(d.unit_cost) : E.priceOf(code);
+      const row = { id: E.uid(), txn_date: date, item_code: code, description: product ? product.description : String(d.description || ''), warehouse: wh, txn_type: type, qty: r4(qty), unit: product ? product.unit : String(d.unit || ''), unit_cost: unitCost == null ? null : unitCost, reference: String(d.reference || '').slice(0, 120), order_id: d.order_id || null, order_no: d.order_no || '', op_id: d.op_id || null, log_id: d.log_id || null, reason: String(d.reason || '').slice(0, 255), is_system: system ? 1 : 0, created_by: Srv.user.name || (Srv.user.isOwner ? 'owner' : 'viewer'), created_at: E.now() };
+      const rows = [row];
+      if (type === 'TRANSFER') { const to = String(d.to_warehouse || '').trim(); if (!to || to === wh) { throw err('A different destination warehouse is required for a transfer.'); } rows.push(Object.assign({}, row, { id: E.uid(), warehouse: to, qty: r4(-qty), reason: ('Transfer from ' + wh + '. ' + row.reason).trim() })); row.to_warehouse = to; }
+      return rows;
+    },
+    async writeBatch(rows, extra) {
+      const id = E.uid(); let seq = 0; rows.forEach((r) => { r.batch_id = id; r.seq = ++seq; });
+      const doc = Object.assign({ id, txns: rows, created_at: E.now() }, extra || {});
+      S.stock = S.stock || {}; S.stock[id] = doc; await writeDoc('stock', id, doc); return doc;
+    },
+    async post(d, system) {
+      if (!system) { need('jmg_stock'); }
+      const rows = Inv.build(d, system); await Inv.writeBatch(rows, {});
+      if (!system) { audit('stock_' + rows[0].txn_type.toLowerCase(), 'stock', rows[0].item_code, { qty: rows[0].qty, warehouse: rows[0].warehouse, reference: rows[0].reference }); }
+      return rows[0];
+    },
+    async reverse(id) {
+      need('jmg_stock'); const t = Inv.txns().find((x) => x.id === id); if (!t) { throw err('Transaction not found', 'jmg_404'); }
+      if (t.is_system) { throw err('Movements generated by production tracking are reversed by undoing the daily log.'); }
+      const rev = Object.assign({}, t, { id: E.uid(), qty: r4(-t.qty), reason: ('Reversal of ' + t.txn_type + ' ' + t.txn_date + '. ' + t.reason).trim(), created_at: E.now(), created_by: Srv.user.name || 'viewer' }); delete rev.batch_id; delete rev.seq;
+      await Inv.writeBatch([rev], {}); audit('stock_reverse', 'stock', t.item_code, { txn: id }); return { id: rev.id };
+    },
+    /** Backflush for a daily log: at the component's final scheduled stage, receive the good units and issue what they consumed. */
+    async backflush(order, op, good, rejected, date, logId) {
+      if (!Number(E.setting('inventory_enabled')) || !Number(E.setting('backflush_enabled'))) { return []; }
+      let last = null; (order.ops || []).forEach((x) => { if (x.component_code === op.component_code && x.is_scheduled) { last = last == null ? x.sequence : Math.max(last, x.sequence); } });
+      if (last == null || Number(op.sequence) !== Number(last)) { return []; }
+      const rows = []; const consumed = good + rejected; const ref = 'Log ' + logId.slice(0, 6) + ' ' + op.stage_name; const comps = order.components || [];
+      if (good > 0) {
+        rows.push(...Inv.build({ txn_type: 'PRODUCTION', item_code: op.component_code, qty: good, txn_date: date, reference: ref, order_id: order.id, order_no: order.order_no, op_id: op.id, log_id: logId, reason: 'Completed at ' + op.section_name }, true));
+        comps.forEach((c) => { if (c.component_code === op.component_code) { c.qty_received = r4(Number(c.qty_received || 0) + good); } });
+      }
+      if (consumed > 0) {
+        (BOM.rowsByParent(order.product_code)[op.component_code] || []).forEach((b) => {
+          if (!['Item', 'BOM'].includes(b.calc_type) || b.type1 === 'STATUS ITEM') { return; }
+          const q = r4(Number(b.qty) * consumed); if (q <= 0) { return; }
+          rows.push(...Inv.build({ txn_type: 'ISSUE', item_code: b.component_code, qty: q, txn_date: date, reference: ref, order_id: order.id, order_no: order.order_no, op_id: op.id, log_id: logId, reason: 'Backflush for ' + op.component_code, description: b.description, unit: b.unit }, true));
+          comps.forEach((c) => { if (c.component_code === b.component_code && c.parent_code === op.component_code) { c.qty_issued = r4(Number(c.qty_issued || 0) + q); } });
+        });
+      }
+      if (rows.length) { await Inv.writeBatch(rows, { log_id: logId, order_id: order.id }); }
+      return rows;
+    },
+    async reverseLog(logId, order) {
+      let n = 0;
+      for (const b of Object.values(S.stock || {})) {
+        if (b.log_id !== logId) { continue; }
+        (b.txns || []).forEach((t) => { n++; (order && order.components || []).forEach((c) => { if (c.component_code !== t.item_code) { return; } if (t.txn_type === 'PRODUCTION') { c.qty_received = Math.max(0, r4(Number(c.qty_received || 0) - t.qty)); } else if (t.txn_type === 'ISSUE') { c.qty_issued = Math.max(0, r4(Number(c.qty_issued || 0) + t.qty)); } }); });
+        delete S.stock[b.id]; await deleteDoc('stock', b.id);
+      }
+      return n;
+    },
+    shortages(f) {
+      f = f || {}; const oh = Inv.onHandMap(); const items = {};
+      Object.values(S.orders).filter((o) => ['CONFIRMED', 'IN_PROGRESS'].includes(o.status)).sort((a, b) => String(a.planned_start || '').localeCompare(String(b.planned_start || ''))).forEach((o) => {
+        (o.components || []).forEach((c) => {
+          if (!['material', 'purchased_assembly'].includes(c.comp_kind)) { return; }
+          const code = c.component_code; const it = items[code] = items[code] || { code, description: c.description, unit: c.unit, cost_group: c.cost_group, required: 0, allocated: 0, issued: 0, shortage: 0, on_hand: Inv.sumWh(oh[code]), unit_cost: c.unit_cost, orders: [], needed_by: null };
+          const short = Math.max(0, r4(Number(c.total_qty) - Number(c.inventory_qty || 0)));
+          it.required = r4(it.required + Number(c.total_qty)); it.allocated = r4(it.allocated + Number(c.inventory_qty || 0)); it.issued = r4(it.issued + Number(c.qty_issued || 0)); it.shortage = r4(it.shortage + short);
+          it.orders.push({ order_no: o.order_no, order_id: o.id, required: Number(c.total_qty), allocated: Number(c.inventory_qty || 0), issued: Number(c.qty_issued || 0), shortage: short, needed_by: o.planned_start });
+          if (short > 0 && (it.needed_by == null || (o.planned_start && o.planned_start < it.needed_by))) { it.needed_by = o.planned_start; }
+        });
+      });
+      let out = Object.values(items).map((it) => Object.assign(it, { purchase_value: it.unit_cost == null ? null : Math.round(it.shortage * it.unit_cost * 100) / 100 }));
+      if (f.shortage_only) { out = out.filter((i) => i.shortage > 0.0005); }
+      return out.sort((a, b) => (b.shortage - a.shortage) || a.code.localeCompare(b.code));
+    },
+    valuation() {
+      const rows = Inv.balances({}); const by = {}; let total = 0, pending = 0;
+      rows.forEach((r) => { const k = r.item_type || 'OTHER'; const t = by[k] = by[k] || { item_type: k, items: 0, qty: 0, value: 0, unpriced: 0 }; t.items++; t.qty = r4(t.qty + r.on_hand); if (r.value == null) { t.unpriced++; pending++; } else { t.value = Math.round((t.value + r.value) * 100) / 100; total += r.value; } });
+      return { total_value: Math.round(total * 100) / 100, unpriced_items: pending, by_type: Object.values(by), items: rows.length };
+    },
+    item(code) {
+      const oh = Inv.onHandMap(); const res = Inv.reservedMap(null); const p = M.products[code] || null;
+      const usedIn = []; Object.values(S.orders).filter((o) => ['CONFIRMED', 'IN_PROGRESS', 'DRAFT'].includes(o.status)).sort((a, b) => b.created_at.localeCompare(a.created_at)).forEach((o) => { (o.components || []).forEach((c) => { if (c.component_code === code) { usedIn.push({ order_id: o.id, order_no: o.order_no, status: o.status, total_qty: c.total_qty, inventory_qty: c.inventory_qty || 0, qty_issued: c.qty_issued || 0, qty_received: c.qty_received || 0 }); } }); });
+      return { product: p ? Object.assign({ warehouse: Inv.itemWarehouse(code) }, p) : null, warehouses: oh[code] || {}, on_hand: Inv.sumWh(oh[code]), reserved: res[code] || 0, ledger: Inv.ledger({ item: code, limit: 300 }), used_in: usedIn.slice(0, 50) };
+    },
+  };
+  Srv.Inv = Inv;
 
   /* ------------------------------------------------------------ numbering */
   function nextNumber(prefix) {
@@ -156,12 +304,22 @@ window.JMG_SERVER = (function () {
     const o = S.orders[id]; if (!o) { return; }
     for (const l of Object.values(S.logs)) { if (l.order_id === id) { await deleteDoc('logs', l.id); delete S.logs[l.id]; } }
     for (const a of Object.values(S.alerts)) { if (a.order_id === id) { await deleteDoc('alerts', a.id); delete S.alerts[a.id]; } }
+    for (const b of Object.values(S.stock || {})) { if (b.order_id === id) { await deleteDoc('stock', b.id); delete S.stock[b.id]; } }
     delete S.orders[id]; await deleteDoc('orders', id);
   }
   /** (Re)plan an order in memory (caller saves). */
   function planOrder(o, opts) {
     opts = opts || {};
-    const qty = Number(o.qty); const inventory = Number(E.setting('inventory_enabled')) ? (E.setting('inventory_qty') || {}) : {};
+    const qty = Number(o.qty); const invOn = Number(E.setting('inventory_enabled')); let inventory = {};
+    // previous allocations consumed by production are kept across re-plans
+    const prev = {}; (o.components || []).forEach((c) => { prev[c.component_code + '|' + c.parent_code] = c; });
+    if (invOn) {
+      inventory = Inv.availabilityMap(o.id);
+      // units this order produced itself are in stock for its own parent stages: exclude them from external
+      // allocation, and never allocate more external stock than is still to be produced
+      const totals = {}; BOM.explode(o.product_code, qty).components.forEach((c0) => { if (c0.kind === 'assembly') { totals[c0.code] = (totals[c0.code] || 0) + Number(c0.total_qty); } });
+      Object.values(prev).forEach((pc) => { const code = pc.component_code; const own = Math.max(0, Number(pc.qty_received || 0) - Number(pc.qty_issued || 0)); if (own > 0 && inventory[code] != null) { inventory[code] = Math.max(0, inventory[code] - own); } if (totals[code] != null && inventory[code] != null) { inventory[code] = Math.min(inventory[code], Math.max(0, totals[code] - Number(pc.qty_received || 0))); } });
+    }
     const ex = BOM.explode(o.product_code, qty, inventory); const built = R.build(ex, qty); let warnings = ex.issues.concat(built.warnings);
     const existing = {}; (o.ops || []).forEach((e) => { existing[e.component_code + '|' + e.stage_key] = e; });
     const ops = built.ops;
@@ -185,7 +343,18 @@ window.JMG_SERVER = (function () {
     const res = Sched.schedule(ops, start, loads, sopts); warnings = warnings.concat(res.warnings);
     // components
     const opsByComp = {}; res.ops.forEach((op) => { (opsByComp[op.component_code] = opsByComp[op.component_code] || []).push(op); });
-    o.components = ex.components.map((c) => { const price = E.priceOf(c.code); const d = {}; (opsByComp[c.code] || []).forEach((x) => { if (x.section_name) { d[x.section_name] = 1; } }); return { component_code: c.code, description: c.description, parent_code: c.parent, level: c.level, qty_per_parent: c.qty_per_parent, qty_per_unit: c.qty_per_unit, total_qty: c.total_qty, inventory_qty: c.inventory_qty || 0, qty_to_make: c.kind === 'material' ? c.total_qty : (c.qty_to_make != null ? c.qty_to_make : c.total_qty), unit: c.unit, comp_kind: c.kind, cost_group: c.cost_group, department: Object.keys(d).join(', '), unit_cost: price, ext_cost: price == null ? null : Math.round(price * c.total_qty * 100) / 100, cost_pending: (c.kind === 'material' && price == null) ? 1 : 0, status: 'PENDING' }; });
+    o.components = ex.components.map((c) => {
+      const price = E.priceOf(c.code); const d = {}; (opsByComp[c.code] || []).forEach((x) => { if (x.section_name) { d[x.section_name] = 1; } });
+      const pc = prev[c.code + '|' + c.parent]; const issued = pc ? Number(pc.qty_issued || 0) : 0; const received = pc ? Number(pc.qty_received || 0) : 0;
+      let invQty, toMake;
+      if (c.kind === 'material' || c.kind === 'purchased_assembly') {
+        // allocate available stock to purchased items (issued quantities are already out of stock); the balance is to purchase
+        const needQ = Math.max(0, Number(c.total_qty) - issued); const avail = Number(inventory[c.code] || 0); const alloc = invOn ? Math.min(avail, needQ) : 0;
+        if (alloc > 0) { inventory[c.code] = avail - alloc; }
+        invQty = r4(alloc + issued); toMake = Math.max(0, r4(Number(c.total_qty) - invQty));
+      } else { invQty = Math.max(Number(c.inventory_qty || 0), Math.min(issued, Number(c.total_qty))); toMake = c.qty_to_make != null ? c.qty_to_make : c.total_qty; }
+      return { component_code: c.code, description: c.description, parent_code: c.parent, level: c.level, qty_per_parent: c.qty_per_parent, qty_per_unit: c.qty_per_unit, total_qty: c.total_qty, inventory_qty: invQty, qty_to_make: toMake, qty_issued: issued, qty_received: received, unit: c.unit, comp_kind: c.kind, cost_group: c.cost_group, department: Object.keys(d).join(', '), unit_cost: price, ext_cost: price == null ? null : Math.round(price * c.total_qty * 100) / 100, cost_pending: (c.kind === 'material' && price == null) ? 1 : 0, status: 'PENDING' };
+    });
     // ops (stable ids)
     let n = 0; (o.ops || []).forEach((e) => { const m = String(e.id || '').match(/-(\d+)$/); if (m) { n = Math.max(n, parseInt(m[1], 10)); } });
     const uidToId = {};
@@ -219,6 +388,7 @@ window.JMG_SERVER = (function () {
     const req = o.request_id ? S.requests[o.request_id] : null; if (req) { req.status = 'CONFIRMED'; req.updated_at = E.now(); await saveRequest(req); }
     audit('order_confirm', 'order', o.order_no, { planned_end: o.planned_end, requested_date: o.requested_date });
     if (o.requested_date && o.planned_end && o.planned_end > o.requested_date) { await addAlert(o, 'delivery_risk', 'warning', 'sales,planning', 'Committed completion ' + o.planned_end + ' is later than the Sales requested date ' + o.requested_date + ' (' + (Cal.workingDaysBetween(o.requested_date, o.planned_end) - 1) + ' working days).'); }
+    if (Number(E.setting('inventory_enabled'))) { const short = o.components.filter((c) => ['material', 'purchased_assembly'].includes(c.comp_kind) && Number(c.total_qty) > Number(c.inventory_qty || 0) + 0.0005); if (short.length) { await addAlert(o, 'material_shortage', 'warning', 'planning,purchasing', short.length + ' purchased item(s) are not covered by available stock (e.g. ' + short[0].component_code + ': ' + fmtQ(Number(short[0].total_qty) - Number(short[0].inventory_qty || 0)) + ' short). See Inventory > Shortages & purchase list.'); } }
     return getOrder(id);
   }
   async function cancelOrder(id, reason) {
@@ -272,6 +442,9 @@ window.JMG_SERVER = (function () {
     const depts = {};
     out.ops.forEach((op) => { if (!op.section_name) { return; } const k = op.section_name; if (!depts[k]) { depts[k] = { section_id: op.section_id, section_name: op.section_name, site: op.site, department: op.department, ops: [], daily: {} }; } depts[k].ops.push({ op_id: op.id, component_code: op.component_code, stage_name: op.stage_name, qty_planned: op.qty_planned, qty_completed: op.qty_completed, planned_start: op.planned_start, planned_end: op.planned_end, status: op.status }); Object.entries(op.daily || {}).forEach(([d, q]) => { depts[k].daily[d] = Math.round(((depts[k].daily[d] || 0) + q) * 1000) / 1000; }); });
     out.departments = Object.values(depts).map((d) => { const sorted = {}; Object.keys(d.daily).sort().forEach((k) => { sorted[k] = d.daily[k]; }); d.daily = sorted; return d; });
+    const ohm = Inv.onHandMap();
+    out.components.forEach((c) => { c.qty_issued = c.qty_issued || 0; c.qty_received = c.qty_received || 0; c.on_hand = Inv.sumWh(ohm[c.component_code]); c.shortage = ['material', 'purchased_assembly'].includes(c.comp_kind) ? Math.max(0, r4(Number(c.total_qty) - Number(c.inventory_qty || 0))) : 0; });
+    out.stock_moves = Inv.ledger({ order_id: id, limit: 300 });
     out.materials = out.components.filter((c) => c.comp_kind === 'material' || c.comp_kind === 'purchased_assembly');
     out.semi_finished = out.components.filter((c) => c.comp_kind === 'assembly');
     out.cost = out.schedule ? out.schedule.cost : null;
@@ -309,6 +482,7 @@ window.JMG_SERVER = (function () {
     const achievement = planned > 0 ? Math.round(10000 * actual / planned) / 100 : null;
     const row = { id: E.uid(), log_date: date, order_id: order.id, order_no: order.order_no, op_id: op.id, section_id: op.section_id, section_name: op.section_name, component_code: op.component_code, stage_name: op.stage_name, planned_qty: planned, actual_qty: actual, rejected_qty: rejected, rework_qty: rework, wip_qty: wip, downtime_min: downtime, manpower: (d.manpower === '' || d.manpower == null) ? null : Number(d.manpower), remarks: d.remarks || '', delay_reason: d.delay_reason || '', achievement_pct: achievement, minutes: Math.round((actual * Number(op.minutes_per_unit || 0) + downtime) * 100) / 100, created_by: Srv.user.id, created_at: E.now() };
     await saveLog(row);
+    const moves = await Inv.backflush(order, op, actual, rejected, date, row.id);
     op.qty_completed = Number(op.qty_completed) + actual; op.qty_rejected = Number(op.qty_rejected || 0) + rejected; op.qty_rework = Number(op.qty_rework || 0) + rework;
     if (!op.actual_start || date < op.actual_start) { op.actual_start = date; }
     if (op.qty_completed >= op.qty_planned - 0.0005) { op.status = 'COMPLETED'; op.actual_end = date; } else { op.status = 'IN_PROGRESS'; }
@@ -318,7 +492,7 @@ window.JMG_SERVER = (function () {
     let from = Cal.nextWorking(Cal.addDays(date, 1)); if (E.today() > from) { from = E.today(); }
     planOrder(order, { from }); await saveOrder(order); await checkDelayAlerts(order);
     if (planned > 0 && actual < planned) { await addAlert(order, 'shortfall', 'warning', 'planning', op.section_name + ' / ' + op.component_code + ' on ' + date + ': ' + actual + ' of ' + planned + ' planned units completed (' + achievement + '%). Balance of ' + (Math.round((planned - actual) * 100) / 100) + ' carried forward; forecast completion now ' + order.forecast_end + '.'); }
-    return Object.assign({}, row, { forecast_end: order.forecast_end, baseline_end: order.baseline_end, order_status: order.status });
+    return Object.assign({}, row, { forecast_end: order.forecast_end, baseline_end: order.baseline_end, order_status: order.status, stock_moves: moves.length });
   }
   function listLogs(f) {
     f = f || {}; let list = Object.values(S.logs);
@@ -332,6 +506,7 @@ window.JMG_SERVER = (function () {
     const order = S.orders[log.order_id]; const op = order ? order.ops.find((x) => String(x.id) === String(log.op_id)) : null;
     if (op) { op.qty_completed = Math.max(0, op.qty_completed - log.actual_qty); op.qty_rejected = Math.max(0, (op.qty_rejected || 0) - log.rejected_qty); op.qty_rework = Math.max(0, (op.qty_rework || 0) - log.rework_qty); op.status = op.qty_completed > 0 ? 'IN_PROGRESS' : 'PENDING'; op.actual_end = null; }
     delete S.logs[id]; await deleteDoc('logs', id);
+    await Inv.reverseLog(id, order);
     audit('daily_log_delete', 'order', log.order_no, { log_id: id });
     if (order) { planOrder(order, {}); await saveOrder(order); await checkDelayAlerts(order); }
     return true;
@@ -423,8 +598,10 @@ window.JMG_SERVER = (function () {
     for (const o of Object.values(S.orders)) { if ((o.sales_ref || '').startsWith('DEMO-')) { await deleteOrder(o.id); } }
     for (const r of Object.values(S.requests)) { if ((r.sales_ref || '').startsWith('DEMO-')) { delete S.requests[r.id]; await deleteDoc('requests', r.id); } }
     const today = E.today(); let monday = Cal.addDays(today, -((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7)); monday = Cal.nextWorking(monday);
-    const next = Cal.nextWorking(Cal.addDays(today, 1)); const log = { orders: [], daily_logs: 0 };
+    const next = Cal.nextWorking(Cal.addDays(today, 1)); const log = { orders: [], daily_logs: 0, opening_stock: 0 };
     Srv.role = 'administrator';
+    for (const b of Object.values(S.stock || {})) { if ((b.txns || []).some((t) => t.reference === 'DEMO-OPENING')) { delete S.stock[b.id]; await deleteDoc('stock', b.id); } }
+    for (const s of [['MSH1-2MM2000x1220-H', 60], ['MSH1-2MM1500x1220-H', 25], ['1111931302-RAL-9001', 150], ['BASE-400SRS', 2], ['KIT-P22', 10]]) { try { await Inv.post({ txn_type: 'RECEIPT', item_code: s[0], qty: s[1], txn_date: Cal.addDays(monday, -3), reference: 'DEMO-OPENING', reason: 'Demonstration opening stock' }); log.opening_stock++; } catch (e) { log.errors = (log.errors || []).concat([e.message]); } }
     const r1 = await createRequest({ sales_ref: 'DEMO-SO-1001', customer: 'Acceptance Test Customer', product_code: 'SPGP22', qty: 20, requested_date: Cal.addWorkingDays(monday, 12), priority: 'Normal', instructions: 'Demonstration: 20 units, zero opening stock, all components manufactured from scratch.', requested_by: 'Sales Demo' });
     const r2 = await createRequest({ sales_ref: 'DEMO-SO-1002', customer: 'Lagos Industrial Park', product_code: 'SPGP65-OPT', qty: 10, requested_date: Cal.addWorkingDays(monday, 14), priority: 'Urgent', instructions: 'Competes with the first order for base welding, panel assembly, genset assembly, STC and packaging.', requested_by: 'Sales Demo' });
     await createRequest({ sales_ref: 'DEMO-SO-1003', customer: 'Abuja Data Centre', product_code: 'SPGP110-OPT', qty: 6, requested_date: Cal.addWorkingDays(monday, 20), priority: 'Normal', instructions: 'Awaiting planning - use "Generate plan" to see the proposal.', requested_by: 'Sales Demo' });
@@ -455,7 +632,7 @@ window.JMG_SERVER = (function () {
     const sections = R.sectionsAll().sort((a, b) => (a.site + a.department + a.section_name).localeCompare(b.site + b.department + b.section_name)).map((s) => ({ id: s.id, site: s.site, department: s.department, section_name: s.section_name, stage_key: s.stage_key, is_active: s.is_active }));
     const dm = {}; sections.forEach((s) => { dm[s.site + ' / ' + s.department] = { site: s.site, department: s.department }; });
     const assigned = Srv.user.id && S.roles[Srv.user.id];
-    return { user: { id: Srv.user.id, login: Srv.user.name, name: Srv.user.name || (Srv.user.isOwner ? 'Owner' : 'Demo user'), roles: [Srv.role], role_label: ROLES[Srv.role].name.replace('JMG ', ''), caps: caps(), sections: assigned && assigned.sections ? assigned.sections : [], role_assigned: Srv.roleAssigned, is_owner: Srv.user.isOwner, can_write: Srv.user.canWrite, local_store: store.local }, settings: Object.assign({}, E.DEFAULTS, S.settings), sections, departments: Object.values(dm), products: M.productList.map((p) => ({ code: p.code, description: p.description, item_type: p.item_type, category: p.category, model_kva: p.model_kva })), today: E.today(), counts: { issues: M.issues.length - (S.settings.resolved_issues || []).length, alerts: Object.values(S.alerts).filter((a) => !a.is_ack).length }, import: M.importInfo, version: '1.0.0-demo', roles: ROLES };
+    return { user: { id: Srv.user.id, login: Srv.user.name, name: Srv.user.name || (Srv.user.isOwner ? 'Owner' : 'Demo user'), roles: [Srv.role], role_label: ROLES[Srv.role].name.replace('JMG ', ''), caps: caps(), sections: assigned && assigned.sections ? assigned.sections : [], role_assigned: Srv.roleAssigned, is_owner: Srv.user.isOwner, can_write: Srv.user.canWrite, local_store: store.local }, settings: Object.assign({}, E.DEFAULTS, S.settings), sections, departments: Object.values(dm), products: M.productList.map((p) => ({ code: p.code, description: p.description, item_type: p.item_type, category: p.category, model_kva: p.model_kva })), warehouses: Inv.warehouses(), today: E.today(), counts: { issues: M.issues.length - (S.settings.resolved_issues || []).length, alerts: Object.values(S.alerts).filter((a) => !a.is_ack).length }, import: M.importInfo, version: '1.0.0-demo', roles: ROLES };
   });
   route('GET', /^products$/, (m, q) => { let list = q.all ? Object.values(M.products) : M.productList; if (q.q) { const s = q.q.toLowerCase(); list = list.filter((p) => (p.code + ' ' + p.description).toLowerCase().includes(s)); } return list.slice(0, Number(q.limit) || 300); });
   route('GET', /^products\/([^/]+)\/bom$/, (m, q) => { const code = decodeURIComponent(m[1]); const qty = Math.max(1, Number(q.qty) || 1); const ex = BOM.explode(code, qty); const cost = BOM.costRollup(code, qty); const built = R.build(ex, qty); return { product: ex.product, tree: BOM.slimTree(ex.root), components: ex.components, issues: ex.issues, cost, ops: built.ops, routing_warnings: built.warnings }; });
@@ -481,6 +658,14 @@ window.JMG_SERVER = (function () {
   route('GET', /^gantt$/, (m, q) => gantt(q));
   route('GET', /^alerts$/, (m, q) => Object.values(S.alerts).filter((a) => q.all || !a.is_ack).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 200));
   route('POST', /^alerts\/([^/]+)\/ack$/, async (m) => { const a = S.alerts[m[1]]; if (a) { a.is_ack = 1; a.ack_by = Srv.user.id; await saveAlert(a); audit('alert_ack', 'alert', m[1]); } return { ok: true }; });
+  route('GET', /^inventory\/balances$/, (m, q) => Inv.balances(q));
+  route('GET', /^inventory\/ledger$/, (m, q) => Inv.ledger(q));
+  route('POST', /^inventory\/txn$/, (m, q, b) => Inv.post(b, false));
+  route('POST', /^inventory\/txn\/([^/]+)\/reverse$/, (m) => Inv.reverse(m[1]));
+  route('GET', /^inventory\/shortages$/, (m, q) => Inv.shortages(q));
+  route('GET', /^inventory\/valuation$/, () => Inv.valuation());
+  route('GET', /^inventory\/warehouses$/, () => Inv.warehouses());
+  route('GET', /^inventory\/item\/([^/]+)$/, (m) => Inv.item(decodeURIComponent(m[1])));
   route('GET', /^costing\/([^/]+)$/, (m, q) => BOM.costRollup(decodeURIComponent(m[1]), Math.max(1, Number(q.qty) || 1)));
   route('GET', /^prices$/, (m, q) => { let list = M.priceRows.map((p) => { const edited = S.priceEdits[p.code]; return edited === undefined ? p : Object.assign({}, p, { unit_cost: edited, source: 'manual' }); }); Object.keys(S.priceEdits).forEach((code) => { if (!M.prices[code]) { list.push({ code, description: (S.priceMeta || {})[code] || '', price_type: 'material', unit: '', cost_group: '', unit_cost: S.priceEdits[code], source: 'manual', conflict_note: '' }); } }); if (q.q) { const s = q.q.toLowerCase(); list = list.filter((p) => (p.code + ' ' + p.description + ' ' + p.cost_group).toLowerCase().includes(s)); } if (q.type) { list = list.filter((p) => p.price_type === q.type); } if (q.pending) { list = list.filter((p) => p.unit_cost == null); } return list.sort((a, b) => ((b.unit_cost == null) - (a.unit_cost == null)) || a.code.localeCompare(b.code)).slice(0, 400); });
   route('POST', /^prices$/, async (m, q, b) => { need('jmg_cost'); if (!b.code) { throw err('code required'); } S.priceEdits[b.code] = (b.unit_cost === '' || b.unit_cost == null) ? null : Number(b.unit_cost); await saveSetting('prices'); audit('price_update', 'price', b.code, { unit_cost: S.priceEdits[b.code] }); return { code: b.code, unit_cost: S.priceEdits[b.code] }; });
@@ -501,10 +686,10 @@ window.JMG_SERVER = (function () {
   route('GET', /^masters\/issues$/, (m, q) => { const resolved = new Set(S.settings.resolved_issues || []); return M.issues.map((i, idx) => Object.assign({ id: idx }, i, { is_resolved: resolved.has(idx) ? 1 : 0 })).filter((i) => q.all || !i.is_resolved); });
   route('PUT', /^masters\/issues\/(\d+)$/, async (m, q, b) => { need('jmg_admin'); const set = new Set(S.settings.resolved_issues || []); if (Number(b.is_resolved)) { set.add(Number(m[1])); } else { set.delete(Number(m[1])); } S.settings.resolved_issues = [...set]; await saveSetting('main'); return { ok: true }; });
   route('GET', /^settings$/, () => Object.assign({}, E.DEFAULTS, S.settings));
-  route('PUT', /^settings$/, async (m, q, b) => { need('jmg_admin'); const allowed = Object.keys(E.DEFAULTS).concat(['inventory_qty']); const changed = {}; Object.entries(b).forEach(([k, v]) => { if (!allowed.includes(k)) { return; } if (k === 'working_days') { v = [].concat(v).map(Number); } else if (['break_minutes', 'net_minutes', 'shifts_per_day', 'inventory_enabled', 'include_overheads', 'horizon_days', 'plan_lead_days'].includes(k)) { v = Number(v); } S.settings[k] = v; changed[k] = v; }); await saveSetting('main'); audit('settings_update', 'settings', '', changed); return Object.assign({}, E.DEFAULTS, S.settings); });
+  route('PUT', /^settings$/, async (m, q, b) => { need('jmg_admin'); const allowed = Object.keys(E.DEFAULTS).concat(['inventory_qty']); const changed = {}; Object.entries(b).forEach(([k, v]) => { if (!allowed.includes(k)) { return; } if (k === 'working_days') { v = [].concat(v).map(Number); } else if (['break_minutes', 'net_minutes', 'shifts_per_day', 'inventory_enabled', 'backflush_enabled', 'allow_negative_stock', 'include_overheads', 'horizon_days', 'plan_lead_days'].includes(k)) { v = Number(v); } S.settings[k] = v; changed[k] = v; }); await saveSetting('main'); audit('settings_update', 'settings', '', changed); return Object.assign({}, E.DEFAULTS, S.settings); });
   route('GET', /^admin\/audit$/, (m, q) => { let list = (S.auditDoc || []).slice().reverse(); if (q.entity) { list = list.filter((a) => a.entity === q.entity); } if (q.entity_id) { list = list.filter((a) => a.entity_id === String(q.entity_id)); } return list.slice(0, Number(q.limit) || 300); });
-  route('GET', /^admin\/backup$/, () => { need('jmg_admin'); audit('backup_export', 'backup', ''); return { format: 'jmg-pp-backup', version: '1.0.0-demo', created_at: E.now(), tables: { requests: Object.values(S.requests), orders: Object.values(S.orders), logs: Object.values(S.logs), alerts: Object.values(S.alerts), settings: S.settings, calendar: S.calendar, prices: S.priceEdits, capacities: S.capEdits, sections: S.sectionEdits, overrides: S.overrides, roles: S.roles } }; });
-  route('POST', /^admin\/restore$/, async (m, q, b) => { need('jmg_admin'); if (!b || b.format !== 'jmg-pp-backup') { throw err('Not a Production Planning backup file.'); } const t = b.tables || {}; for (const c of ['requests', 'orders', 'logs', 'alerts']) { for (const id of Object.keys(S[c])) { await deleteDoc(c, id); } S[c] = {}; for (const row of (t[c] || [])) { S[c][row.id] = row; await writeDoc(c, row.id, row); } } S.settings = t.settings || {}; S.calendar = t.calendar || {}; S.priceEdits = t.prices || {}; S.capEdits = t.capacities || {}; S.sectionEdits = t.sections || {}; S.overrides = t.overrides || {}; for (const id of ['main', 'calendar', 'prices', 'capacities', 'sections', 'overrides']) { await saveSetting(id); } audit('backup_restore', 'backup', ''); return { requests: (t.requests || []).length, orders: (t.orders || []).length, logs: (t.logs || []).length }; });
+  route('GET', /^admin\/backup$/, () => { need('jmg_admin'); audit('backup_export', 'backup', ''); return { format: 'jmg-pp-backup', version: '1.0.0-demo', created_at: E.now(), tables: { requests: Object.values(S.requests), orders: Object.values(S.orders), logs: Object.values(S.logs), alerts: Object.values(S.alerts), stock: Object.values(S.stock || {}), settings: S.settings, calendar: S.calendar, prices: S.priceEdits, capacities: S.capEdits, sections: S.sectionEdits, overrides: S.overrides, roles: S.roles } }; });
+  route('POST', /^admin\/restore$/, async (m, q, b) => { need('jmg_admin'); if (!b || b.format !== 'jmg-pp-backup') { throw err('Not a Production Planning backup file.'); } const t = b.tables || {}; for (const c of ['requests', 'orders', 'logs', 'alerts', 'stock']) { S[c] = S[c] || {}; for (const id of Object.keys(S[c])) { await deleteDoc(c, id); } S[c] = {}; for (const row of (t[c] || [])) { S[c][row.id] = row; await writeDoc(c, row.id, row); } } S.settings = t.settings || {}; S.calendar = t.calendar || {}; S.priceEdits = t.prices || {}; S.capEdits = t.capacities || {}; S.sectionEdits = t.sections || {}; S.overrides = t.overrides || {}; for (const id of ['main', 'calendar', 'prices', 'capacities', 'sections', 'overrides']) { await saveSetting(id); } audit('backup_restore', 'backup', ''); return { requests: (t.requests || []).length, orders: (t.orders || []).length, logs: (t.logs || []).length }; });
   route('GET', /^admin\/users$/, () => ({ users: Object.entries(S.roles).map(([id, r]) => ({ id, login: r.name || id.slice(0, 10), name: r.name || id.slice(0, 10), email: '', roles: [r.role], role_label: (ROLES[r.role] || {}).name || r.role, sections: r.sections || [] })), roles: ROLES, me: { id: Srv.user.id, name: Srv.user.name, role: Srv.role } }));
   route('POST', /^admin\/users$/, async (m, q, b) => { need('jmg_admin'); if (!b.user_id || !ROLES[b.role]) { throw err('viewer id and a valid role are required'); } S.roles[b.user_id] = { role: b.role, name: b.name || '', sections: [].concat(b.sections || []).map(Number).filter(Boolean) }; await writeDoc('roles', b.user_id, S.roles[b.user_id]); audit('user_role', 'user', b.user_id, { role: b.role }); return { id: b.user_id }; });
   route('PUT', /^admin\/users\/([^/]+)$/, async (m, q, b) => { need('jmg_admin'); const id = decodeURIComponent(m[1]); const r = S.roles[id] || { role: 'jmg_sales', name: '', sections: [] }; if (ROLES[b.role]) { r.role = b.role; } if (b.sections !== undefined) { r.sections = [].concat(b.sections).map(Number).filter(Boolean); } if (b.name !== undefined) { r.name = b.name; } S.roles[id] = r; await writeDoc('roles', id, r); audit('user_update', 'user', id, b); return { ok: true }; });

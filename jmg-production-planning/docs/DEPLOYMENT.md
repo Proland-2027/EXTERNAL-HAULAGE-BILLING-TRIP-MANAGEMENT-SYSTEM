@@ -68,6 +68,7 @@ docker compose up -d            # WordPress + MariaDB + Caddy (automatic Let's E
 | `supervisor.demo` | `Supervisor@2026` | Section Supervisor | record daily output for assigned sections (all sections by default) |
 | `manager.demo` | `Manager@2026` | Production Manager | dashboards, reports, alerts, replanning approval, audit |
 | `costing.demo` | `Costing@2026` | Costing / Finance | material prices, labour and processing rates, costing |
+| `store.demo` | `Store@2026` | Store Keeper | receipts, issues, returns, transfers, stock take, ledger, shortages, valuation |
 
 Change these passwords in Administration → Users before inviting real users.
 
@@ -95,7 +96,9 @@ Administration → Backup downloads all planning tables as JSON; Restore reloads
 with the host's normal WordPress/database backup.
 
 ## Technical notes
-* Tables are prefixed `wp_jmg_*` (22 tables); the BOM table holds ~26,700 rows for the current workbook.
+* Tables are prefixed `wp_jmg_*` (23 tables, including the stock ledger `wp_jmg_stock_txns`); the BOM
+  table holds ~26,700 rows for the current workbook. Updating the plugin from 1.0 creates the new table
+  and columns automatically on activation.
 * REST API base: `/wp-json/jmg/v1/` (cookie authentication + nonce, capability checks per route).
 * No external build tools; the only optional external resource is the SheetJS library loaded from a CDN for
   Excel export (CSV fallback when offline).

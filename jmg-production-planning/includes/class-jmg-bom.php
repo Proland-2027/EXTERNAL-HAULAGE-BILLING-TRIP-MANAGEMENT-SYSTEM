@@ -99,7 +99,7 @@ class JMG_BOM {
 		return array( 'root' => $tree, 'product' => $product, 'components' => $components, 'issues' => $issues );
 	}
 
-	private static function walk( $finished, $parent, $mult, $level, &$by, &$components, &$issues, &$visited, $qty, $inventory ) {
+	private static function walk( $finished, $parent, $mult, $level, &$by, &$components, &$issues, &$visited, $qty, &$inventory ) {
 		$node = array( 'children' => array(), 'ops' => array(), 'materials' => array(), 'overheads' => array() );
 		if ( empty( $by[ $parent ] ) ) { return $node; }
 		if ( $level > 12 ) { $issues[] = 'BOM deeper than 12 levels at ' . $parent; return $node; }
@@ -128,7 +128,14 @@ class JMG_BOM {
 				$key = $parent . '>' . $code;
 				if ( isset( $visited[ $key ] ) ) { continue; }
 				$visited[ $key ] = true;
-				$sub = self::walk( $finished, $code, $per_unit, $level + 1, $by, $components, $issues, $visited, $qty, $inventory );
+				// stock allocated to the sub-assembly needs neither materials nor operations: explode the balance only
+				$avail = isset( $inventory[ $code ] ) ? (float) $inventory[ $code ] : 0.0;
+				$inv = min( $avail, $child['total_qty'] );
+				if ( $inv > 0 ) { $inventory[ $code ] = $avail - $inv; }
+				$child['inventory_qty'] = $inv;
+				$child['qty_to_make'] = max( 0.0, $child['total_qty'] - $inv );
+				$sub_qty = $child['total_qty'] > 0 ? $qty * $child['qty_to_make'] / $child['total_qty'] : $qty;
+				$sub = self::walk( $finished, $code, $per_unit, $level + 1, $by, $components, $issues, $visited, $sub_qty, $inventory );
 				$child = array_merge( $child, array( 'children' => $sub['children'], 'ops' => $sub['ops'], 'materials' => $sub['materials'], 'overheads' => $sub['overheads'] ) );
 				$has_rows = ! empty( $by[ $code ] );
 				if ( ! $has_rows ) {
@@ -138,9 +145,6 @@ class JMG_BOM {
 				} else {
 					$child['kind'] = ! empty( $sub['ops'] ) ? 'assembly' : 'purchased_assembly';
 				}
-				$inv = isset( $inventory[ $code ] ) ? (float) $inventory[ $code ] : 0.0;
-				$child['inventory_qty'] = $inv;
-				$child['qty_to_make'] = max( 0.0, $child['total_qty'] - $inv );
 				$components[] = self::strip( $child );
 				$node['children'][] = $child;
 			} else {

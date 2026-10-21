@@ -93,7 +93,10 @@ The folder [`jmg-production-planning/`](jmg-production-planning/) contains a sep
 WordPress plugin that provides a complete production planning and manufacturing control system for
 Genset and Canopy manufacturing (sales demand → multi-level BOM explosion → finite-capacity
 scheduling → plan confirmation → daily departmental tracking → dashboards, monthly reports, BOM
-costing and Gantt), built from the workbook `Prodction Data.xlsx`.
+costing and Gantt), built from the workbook `Prodction Data.xlsx`. Version 1.1 adds the **inventory
+process**: a stock ledger per item and warehouse (receipts, issues, returns, adjustments, transfers,
+stock take), netting of plans against available stock, automatic receipt of completed components and
+backflush of the materials they consumed, shortage / purchase list, valuation and a Store Keeper role.
 
 * Plugin zip ready for upload: [`jmg-production-planning.zip`](jmg-production-planning.zip)
 * Deployment (hosting requirements, Docker + HTTPS, test accounts): [`jmg-production-planning/docs/DEPLOYMENT.md`](jmg-production-planning/docs/DEPLOYMENT.md)
