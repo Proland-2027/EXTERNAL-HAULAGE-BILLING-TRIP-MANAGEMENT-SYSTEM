@@ -1,4 +1,4 @@
-# User guide
+# JMG Production Planning — user guide
 
 Open the application URL and sign in. The tabs you see depend on your role; every role can view
 everything, editing follows the permissions below.

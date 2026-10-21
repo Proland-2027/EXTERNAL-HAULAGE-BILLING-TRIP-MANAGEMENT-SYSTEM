@@ -1,5 +1,5 @@
 {
-  "name": "proland-production-planning-system",
+  "name": "jmg-production-planning",
   "version": "2.0.0",
   "description": "Integrated production planning, manufacturing tracking and BOM costing for gensets and canopies.",
   "private": true,

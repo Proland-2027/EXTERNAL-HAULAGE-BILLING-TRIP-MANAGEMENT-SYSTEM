@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Proland Production Planning Portal
+ * Plugin Name: JMG Production Planning Portal
  * Description: Embeds the Production Planning & Manufacturing Management application in WordPress and signs WordPress users into it (single sign-on, role-mapped). Shortcode: [proland_portal] — add it to any page. Settings: Settings → Production Portal.
  * Version: 1.0.0
  * Author: Proland Manufacturing
@@ -53,7 +53,7 @@ final class Proland_Production_Portal {
     public static function page() {
         if (!current_user_can('manage_options')) { return; }
         $o = self::get(); ?>
-        <div class="wrap"><h1>Production Planning Portal</h1>
+        <div class="wrap"><h1>JMG Production Planning Portal</h1>
         <p>Point this at the Node application (see <code>docs/DEPLOYMENT.md</code> in the repository). The shared secret must equal the <code>WP_SSO_SECRET</code> environment variable of the application. Logged-in WordPress users are signed into the application with the mapped role; the application keeps its own audit trail and record-level permissions.</p>
         <form method="post" action="options.php"><?php settings_fields('proland_portal'); ?>
         <table class="form-table">

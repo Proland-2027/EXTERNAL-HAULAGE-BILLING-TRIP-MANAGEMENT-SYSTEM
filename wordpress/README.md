@@ -1,6 +1,6 @@
 # WordPress integration
 
-`proland-production-portal.php` is a small WordPress plugin that
+`jmg-production-portal.php` is a small WordPress plugin that
 
 * adds **Settings → Production Portal** (application URL, shared secret, role mapping),
 * adds the shortcode `[proland_portal]` which embeds the application for logged-in WordPress users
@@ -13,7 +13,7 @@
 
 ## Install
 
-1. Copy `proland-production-portal.php` to `wp-content/plugins/proland-production-portal/` and activate it.
+1. Copy `jmg-production-portal.php` to `wp-content/plugins/jmg-production-portal/` and activate it.
 2. Generate a secret (`openssl rand -hex 32`), set it as `WP_SSO_SECRET` for the Node application
    and paste it in **Settings → Production Portal**. Set the application URL (HTTPS).
 3. Map WordPress roles to application roles (SALES, PLANNER, PRODUCTION_MANAGER, SUPERVISOR, STORE,

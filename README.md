@@ -1,4 +1,4 @@
-# Proland Production Planning, Manufacturing Tracking & BOM Costing System
+# JMG Production Planning — Manufacturing Tracking & BOM Costing System
 
 One online application for a genset and canopy manufacturing operation, built from the uploaded
 workbook **Prodction Data.xlsx** (BOM, capacities, productivity, finished product list). The haulage

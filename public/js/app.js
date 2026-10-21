@@ -19,8 +19,8 @@
   async function loadSession() {
     const me = await get('/api/me');
     S.user = me.user; S.perms = me.permissions || {}; S.company = me.company; S.currency = me.currency || 'NGN'; S.tripLogUrl = me.tripLogUrl || '';
-    document.title = `${S.company} · Production Planning`;
-    A.$('#brand-title').textContent = `${S.company} · Production Planning`;
+    document.title = `${S.company} Production Planning`;
+    A.$('#brand-title').textContent = `${S.company} Production Planning`;
     if (S.user) {
       A.$('#brand-user').textContent = `${S.user.name} · ${S.user.roleLabel}`;
       const [sections, products] = await Promise.all([get('/api/sections'), get('/api/products')]);

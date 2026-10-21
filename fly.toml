@@ -1,5 +1,5 @@
 # fly.io: `fly launch --copy-config --no-deploy && fly volumes create ppm_data --size 5 && fly deploy`
-app = "proland-production-planning"
+app = "jmg-production-planning"
 primary_region = "lhr"
 [build]
 [env]

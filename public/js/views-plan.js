@@ -5,7 +5,7 @@
 
   // ---------- login
   A.route('/login', async ({ view }) => {
-    view.innerHTML = `<div class="card login-box"><h1>Sign in</h1><p class="muted small">${esc(S.company || 'Production Planning & Manufacturing Management')}</p>
+    view.innerHTML = `<div class="card login-box"><h1>Sign in</h1><p class="muted small">${esc(S.company || 'JMG')} Production Planning &amp; Manufacturing Management</p>
       <form id="login-form" class="stack"><label>Username<input name="username" autocomplete="username" required autofocus></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="btn primary" type="submit">Sign in</button></form>
       <div class="demo">Demo accounts (password = Role@2026): <b>admin</b> Admin@2026 · <b>sales</b> Sales@2026 · <b>planner</b> Planner@2026 · <b>prodmgr</b> Prodmgr@2026 · <b>cutting</b> / <b>welding</b> / <b>coating</b> / <b>assembly</b> (supervisors) · <b>stores</b> Stores@2026 · <b>costing</b> Costing@2026 · <b>management</b> Manage@2026</div></div>`;
     A.$('#login-form').onsubmit = async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target).entries()); try { await post('/api/login', d); await root.AppBoot.loadSession(); go('/'); } catch (err) { /* toast shown */ } };

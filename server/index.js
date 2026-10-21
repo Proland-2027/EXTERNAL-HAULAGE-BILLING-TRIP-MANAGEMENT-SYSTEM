@@ -52,7 +52,7 @@ function startServer(db) {
     return { user: publicUser(u), setCookie: cookie('sid', s.id, s.exp) };
   });
   router.post('/api/logout', ({ sid, user }) => { auth.destroySession(db, sid); if (user) db.audit(user, 'LOGOUT', 'user', user.id, {}); return { ok: true, setCookie: cookie('sid', '', new Date(0).toISOString()) }; });
-  router.get('/api/me', ({ user }) => ({ user: user ? publicUser(user) : null, permissions: user ? Object.fromEntries(Object.keys(auth.PERMS).map((p) => [p, auth.can(user, p)])) : {}, company: db.setting('company', 'Proland Manufacturing'), currency: db.setting('currency', 'NGN'), tripLogUrl: db.setting('triplog_url', '') || null, sso: !!cfg.ssoSecret }));
+  router.get('/api/me', ({ user }) => ({ user: user ? publicUser(user) : null, permissions: user ? Object.fromEntries(Object.keys(auth.PERMS).map((p) => [p, auth.can(user, p)])) : {}, company: db.setting('company', 'JMG'), currency: db.setting('currency', 'NGN'), tripLogUrl: db.setting('triplog_url', '') || null, sso: !!cfg.ssoSecret }));
   require('./api/index.js')(router, ctx);
 
   const server = http.createServer(async (req, res) => {
@@ -111,7 +111,7 @@ function startServer(db) {
       if (process.env.LOG_REQUESTS) console.log(`${req.method} ${req.url} ${res.statusCode} ${Date.now() - started}ms`);
     }
   });
-  server.listen(cfg.port, cfg.host, () => console.log(`[ready] ${db.setting('company', 'Production Planning')} v${cfg.version} on http://${cfg.host}:${cfg.port} (db: ${cfg.dbFile})`));
+  server.listen(cfg.port, cfg.host, () => console.log(`[ready] ${db.setting('company', 'JMG')} Production Planning v${cfg.version} on http://${cfg.host}:${cfg.port} (db: ${cfg.dbFile})`));
   // scheduled backups + session purge
   let lastBackupDay = null;
   setInterval(() => {

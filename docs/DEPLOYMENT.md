@@ -56,7 +56,7 @@ sudo certbot --nginx -d planning.example.com
 
 ## WordPress
 
-Install `wordpress/proland-production-portal.php` (see `wordpress/README.md`). Set the same secret
+Install `wordpress/jmg-production-portal.php` (see `wordpress/README.md`). Set the same secret
 as `WP_SSO_SECRET`, map WordPress roles to application roles, and add `[proland_portal]` to a page.
 WordPress users then open the application already signed in; the application still enforces its own
 permissions and audit trail. Users who do not have WordPress accounts can be created in

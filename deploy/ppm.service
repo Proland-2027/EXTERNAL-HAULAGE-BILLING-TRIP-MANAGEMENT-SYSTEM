@@ -1,6 +1,6 @@
 # systemd unit for a VPS (Ubuntu/Debian): copy to /etc/systemd/system/ppm.service
 [Unit]
-Description=Proland Production Planning
+Description=JMG Production Planning
 After=network.target
 [Service]
 User=ppm
