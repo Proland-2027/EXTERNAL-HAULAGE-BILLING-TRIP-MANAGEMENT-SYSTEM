@@ -28,6 +28,8 @@ window.JMG_SERVER = (function () {
     if (id === 'main') { S.settings = data; } else if (id === 'calendar') { S.calendar = data.overrides || {}; } else if (id === 'prices') { S.priceEdits = data.edits || {}; }
     else if (id === 'capacities') { S.capEdits = data.edits || {}; } else if (id === 'sections') { S.sectionEdits = data.edits || {}; } else if (id === 'overrides') { S.overrides = data.items || {}; } else if (id === 'counters') { S.counters = data; }
   }
+  // store snapshots deliver read-only (frozen) documents: keep mutable copies in memory
+  const thaw = (v) => (v == null ? v : JSON.parse(JSON.stringify(v)));
   function notify() { Srv.listeners.forEach((fn) => { try { fn(); } catch (e) { /* ignore */ } }); }
   Srv.onChange = (fn) => { Srv.listeners.push(fn); };
 
@@ -57,9 +59,9 @@ window.JMG_SERVER = (function () {
       await new Promise((resolve) => {
         let pending = COLLECTIONS.length + 1; const done = () => { if (--pending === 0) { resolve(); } };
         const errFn = (e) => { console.warn('db subscription error', e); done(); };
-        db.collection('settings').onSnapshot((snap) => { SETTING_DOCS.forEach((id) => applySettingDoc(id, {})); snap.docs.forEach((d) => applySettingDoc(d.id, d.data())); if (pending > 0) { done(); } notify(); }, errFn);
+        db.collection('settings').onSnapshot((snap) => { SETTING_DOCS.forEach((id) => applySettingDoc(id, {})); snap.docs.forEach((d) => applySettingDoc(d.id, thaw(d.data()))); if (pending > 0) { done(); } notify(); }, errFn);
         COLLECTIONS.forEach((c) => {
-          db.collection(c).onSnapshot((snap) => { S[c] = {}; snap.docs.forEach((d) => { S[c][d.id] = d.data(); }); if (pending > 0) { done(); } notify(); }, errFn);
+          db.collection(c).onSnapshot((snap) => { S[c] = {}; snap.docs.forEach((d) => { S[c][d.id] = thaw(d.data()); }); if (pending > 0) { done(); } notify(); }, errFn);
         });
         setTimeout(() => { if (pending > 0) { pending = 0; resolve(); } }, 12000);
       });
