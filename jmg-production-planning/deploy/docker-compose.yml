@@ -1,0 +1,81 @@
+# JMG Production Planning - WordPress + MariaDB + Caddy (automatic HTTPS)
+# 1. cp .env.example .env  and set DOMAIN / passwords
+# 2. docker compose up -d
+# 3. ./setup.sh   (installs WordPress, activates the plugin, creates demo accounts + scenario)
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  wordpress:
+    image: wordpress:6.8-php8.3-apache
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_HOME', 'https://${DOMAIN}');
+        define('WP_SITEURL', 'https://${DOMAIN}');
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { $$_SERVER['HTTPS'] = 'on'; }
+        @ini_set('memory_limit', '512M');
+        @ini_set('max_execution_time', '300');
+        @ini_set('upload_max_filesize', '32M');
+        @ini_set('post_max_size', '40M');
+    volumes:
+      - wp_data:/var/www/html
+      - ..:/var/www/html/wp-content/plugins/jmg-production-planning:ro
+      - ./php-uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - wordpress
+
+  cli:
+    image: wordpress:cli-php8.3
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    user: "33:33"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - wp_data:/var/www/html
+      - ..:/var/www/html/wp-content/plugins/jmg-production-planning:ro
+
+volumes:
+  db_data:
+  wp_data:
+  caddy_data:
+  caddy_config:

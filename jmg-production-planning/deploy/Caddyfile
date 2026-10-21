@@ -1,0 +1,6 @@
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy wordpress:80 {
+		header_up X-Forwarded-Proto https
+	}
+}

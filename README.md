@@ -84,3 +84,19 @@ docs/               billing format and data model
 * Internal diesel uses actual litres when logged on the trip, otherwise the line's standard litres.
 * Per-unit comparisons assume the same unit (e.g. tonnes) on a route for both parties; a flat `TRIP`
   line reports cost per trip in those columns.
+
+---
+
+# JMG Production Planning (WordPress application)
+
+The folder [`jmg-production-planning/`](jmg-production-planning/) contains a separate deliverable: a
+WordPress plugin that provides a complete production planning and manufacturing control system for
+JMG Genset and Canopy manufacturing (sales demand → multi-level BOM explosion → finite-capacity
+scheduling → plan confirmation → daily departmental tracking → dashboards, monthly reports, BOM
+costing and Gantt), built from the workbook `Prodction Data.xlsx`.
+
+* Plugin zip ready for upload: [`jmg-production-planning.zip`](jmg-production-planning.zip)
+* Deployment (hosting requirements, Docker + HTTPS, test accounts): [`jmg-production-planning/docs/DEPLOYMENT.md`](jmg-production-planning/docs/DEPLOYMENT.md)
+* User guide: [`jmg-production-planning/docs/USER_GUIDE.md`](jmg-production-planning/docs/USER_GUIDE.md)
+* Workbook analysis, mapping and flagged gaps: [`jmg-production-planning/docs/DATA_MAPPING.md`](jmg-production-planning/docs/DATA_MAPPING.md)
+* Acceptance-test scenario and results: [`jmg-production-planning/docs/ACCEPTANCE_TEST.md`](jmg-production-planning/docs/ACCEPTANCE_TEST.md)
