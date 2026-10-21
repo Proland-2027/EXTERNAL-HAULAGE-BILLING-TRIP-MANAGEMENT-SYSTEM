@@ -1,0 +1,4360 @@
+{
+ "source": "Client_Contracts_And_Rate_Cards_cleaned_3.xlsx",
+ "importedAt": "2026-10-20",
+ "rows": 927,
+ "skippedNoPrice": [
+  {
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Yola",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "price": null
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ilorin",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "price": 0
+  },
+  {
+   "client": "ABBA ABASS",
+   "from": "Ogere",
+   "to": "Lafia",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "price": null
+  },
+  {
+   "client": "WALTER & HIFY RESOURCES",
+   "from": "Port Harcourt",
+   "to": "Benin City",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "price": null
+  },
+  {
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Idiroko",
+   "tonnage": "40T",
+   "size": "JUMBO",
+   "price": null
+  }
+ ],
+ "clientMapping": {
+  "JAMARA": "Jamara",
+  "Mega Manu": "MEGA MANU",
+  "Mega Manu-Local": "MEGA MANU",
+  "JAT": "JUBAILI AGROTEC",
+  "Interstyle": "INTERSTYLE",
+  "VANDERA": "VENDARA",
+  "Givanas": "GIVANAS",
+  "Orca": "ORCA DECO LIMITED",
+  "NIGER BISCUIT": "NIGER BISCUITS",
+  "WALTER & Hiffy": "WALTER & HIFY RESOURCES",
+  "Lebruni": "LEBRUNI AGRO LTD",
+  "ABBA SALEH": "ABBA ABASS"
+ },
+ "assumptions": [
+  "Prices on the card are excl. VAT (120 lanes match the June price list to the naira, which is VAT-exclusive).",
+  "Changed lanes: the new price is effective 2026-10-20 and the previous rate expires 2026-10-19; lanes new to the card are effective 2026-01-01 because the card carries no contract dates.",
+  "\"ABBA SALEH\" is read as the ABBA ABASS account (its Ogere → Lafia lane matches that client's Nasarawa ↔ Ogere trips) — confirm.",
+  "Vehicle type from the Division / Truck Size columns: NBL-DSL → HAULAGE (FLATBED size → Flat Trucks Logistics), CANTER → Closed Body Logistics, Hiabs Logistics → Hiabs Logistics.",
+  "Route Master kilometres are kept (road-routed in the Setup_Haulage import); the card's KM is stored on each rate as contractKm and listed where it differs by more than 5 km.",
+  "Natural Beauty: the June list recorded its rates as VAT-inclusive; the card restates the figures without a basis, so they are read as VAT-exclusive like every other lane (previous inclusive records expire 2026-10-19)."
+ ],
+ "unchanged": 118,
+ "changed": [
+  {
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Gombe",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    3935135.14
+   ],
+   "after": 4273000,
+   "changePct": 8.59
+  },
+  {
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Minna",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    2724324.32
+   ],
+   "after": 2875676,
+   "changePct": 5.56
+  },
+  {
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Bida",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    2724324.32
+   ],
+   "after": 1891892,
+   "changePct": -30.56
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "before": [
+    850000,
+    740000
+   ],
+   "after": 750000,
+   "changePct": -11.76
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    4000000
+   ],
+   "after": 4450000,
+   "changePct": 11.25
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Agbara",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    749250
+   ],
+   "after": 666000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Isolo",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    716625
+   ],
+   "after": 637000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    850000
+   ],
+   "after": 828000,
+   "changePct": -2.59
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Sango-Ota",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    749250
+   ],
+   "after": 666000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Matori",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    716625
+   ],
+   "after": 637000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Fatai Atere",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    716625
+   ],
+   "after": 637000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Igbesa",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    803250
+   ],
+   "after": 714000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ikeja",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    733500
+   ],
+   "after": 652000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Dopemu",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    733500
+   ],
+   "after": 652000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Sagamu",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    830250
+   ],
+   "after": 738000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Mowe",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    830250
+   ],
+   "after": 738000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ojota",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    811125
+   ],
+   "after": 721000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ijebu-Ode",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    929250
+   ],
+   "after": 826000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Apapa",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    716625
+   ],
+   "after": 637000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ilupeju",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    733500
+   ],
+   "after": 652000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ajao Estate",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    733500
+   ],
+   "after": 652000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Okota",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    716625
+   ],
+   "after": 637000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Oshodi",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    716625
+   ],
+   "after": 637000,
+   "changePct": -11.11
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ogba",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    733500
+   ],
+   "after": 652000,
+   "changePct": -11.11
+  },
+  {
+   "client": "VENDARA",
+   "from": "Lagos",
+   "to": "Calabar",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    3300000
+   ],
+   "after": 3200000,
+   "changePct": -3.03
+  },
+  {
+   "client": "NATURAL BEAUTY",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    4650000
+   ],
+   "after": 4450000,
+   "changePct": -4.3
+  },
+  {
+   "client": "NATURAL BEAUTY",
+   "from": "Lagos",
+   "to": "Maiduguri",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "before": [
+    5700000
+   ],
+   "after": 5820000,
+   "changePct": 2.11
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Abuja",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    3270000
+   ],
+   "after": 3440000,
+   "changePct": 5.2
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    4400000
+   ],
+   "after": 4450000,
+   "changePct": 1.14
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Funtua",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    4170000
+   ],
+   "after": 4380000,
+   "changePct": 5.04
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Kaduna",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    3850000
+   ],
+   "after": 4040000,
+   "changePct": 4.94
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Zaria",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    4030000
+   ],
+   "after": 4230000,
+   "changePct": 4.96
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Gombe",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    5130000
+   ],
+   "after": 5380000,
+   "changePct": 4.87
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Yola",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    6430000
+   ],
+   "after": 6740000,
+   "changePct": 4.82
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Mubi",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    6430000
+   ],
+   "after": 6740000,
+   "changePct": 4.82
+  },
+  {
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Jalingo",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "before": [
+    5130000
+   ],
+   "after": 5380000,
+   "changePct": 4.87
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Osun",
+   "tonnage": "30T",
+   "size": "CONTAINARIZED",
+   "before": [
+    1190000
+   ],
+   "after": 1090000,
+   "changePct": -8.4
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Kwara",
+   "tonnage": "30T",
+   "size": "CONTAINARIZED",
+   "before": [
+    1360000
+   ],
+   "after": 1280000,
+   "changePct": -5.88
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Abeokuta",
+   "tonnage": "30T",
+   "size": "CONTAINARIZED",
+   "before": [
+    690000
+   ],
+   "after": 610000,
+   "changePct": -11.59
+  },
+  {
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Bida",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "before": [
+    1850000
+   ],
+   "after": 1250000,
+   "changePct": -32.43
+  },
+  {
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kabba",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "before": [
+    1370000
+   ],
+   "after": 1500000,
+   "changePct": 9.49
+  },
+  {
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Otukpo",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "before": [
+    2430000
+   ],
+   "after": 2400000,
+   "changePct": -1.23
+  }
+ ],
+ "added": 744,
+ "expired": 43,
+ "duplicateLanes": [
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "8T",
+   "size": "25CBM",
+   "prices": [
+    235969.6335209667,
+    141581.78011258
+   ]
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "3T",
+   "size": "16CBM",
+   "prices": [
+    148299.2381150904,
+    88979.54286905425
+   ]
+  },
+  {
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "45T",
+   "size": "JUMBO",
+   "prices": [
+    850000,
+    828000
+   ]
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "IKM",
+   "tonnage": "30T",
+   "size": "FLATBED",
+   "prices": [
+    330000,
+    440000
+   ]
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Epe",
+   "tonnage": "30T",
+   "size": "FLATBED",
+   "prices": [
+    970000,
+    740000
+   ]
+  }
+ ],
+ "kmDifferences": [
+  {
+   "route": "RM-0138",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Obudu Cattle Ranch",
+   "tonnage": "10T",
+   "routeMasterKm": 412,
+   "cardKm": 525.5
+  },
+  {
+   "route": "RM-0141",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Ogoja",
+   "tonnage": "10T",
+   "routeMasterKm": 375,
+   "cardKm": 405
+  },
+  {
+   "route": "RM-0143",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Ikom",
+   "tonnage": "10T",
+   "routeMasterKm": 291,
+   "cardKm": 358
+  },
+  {
+   "route": "RM-0144",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Ekpoma",
+   "tonnage": "10T",
+   "routeMasterKm": 308,
+   "cardKm": 359
+  },
+  {
+   "route": "RM-0145",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Auchi",
+   "tonnage": "10T",
+   "routeMasterKm": 352,
+   "cardKm": 335.5
+  },
+  {
+   "route": "RM-0146",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Otukpa",
+   "tonnage": "10T",
+   "routeMasterKm": 349,
+   "cardKm": 327
+  },
+  {
+   "route": "RM-0147",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Nsukka",
+   "tonnage": "10T",
+   "routeMasterKm": 300,
+   "cardKm": 290.5
+  },
+  {
+   "route": "RM-0148",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Benin City",
+   "tonnage": "10T",
+   "routeMasterKm": 300,
+   "cardKm": 289
+  },
+  {
+   "route": "RM-0151",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Abakaliki",
+   "tonnage": "10T",
+   "routeMasterKm": 266,
+   "cardKm": 279.5
+  },
+  {
+   "route": "RM-0152",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Agbor",
+   "tonnage": "10T",
+   "routeMasterKm": 241,
+   "cardKm": 269
+  },
+  {
+   "route": "RM-0153",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Akpabuyo",
+   "tonnage": "10T",
+   "routeMasterKm": 200,
+   "cardKm": 253
+  },
+  {
+   "route": "RM-0155",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Sapele",
+   "tonnage": "10T",
+   "routeMasterKm": 252,
+   "cardKm": 233.5
+  },
+  {
+   "route": "RM-0156",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Calabar",
+   "tonnage": "10T",
+   "routeMasterKm": 185,
+   "cardKm": 228
+  },
+  {
+   "route": "RM-0157",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Kwale",
+   "tonnage": "10T",
+   "routeMasterKm": 156,
+   "cardKm": 227
+  },
+  {
+   "route": "RM-0159",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Akamkpa",
+   "tonnage": "10T",
+   "routeMasterKm": 201,
+   "cardKm": 220
+  },
+  {
+   "route": "RM-0160",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Awka",
+   "tonnage": "10T",
+   "routeMasterKm": 202,
+   "cardKm": 216
+  },
+  {
+   "route": "RM-0161",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Odukpani",
+   "tonnage": "10T",
+   "routeMasterKm": 191,
+   "cardKm": 214
+  },
+  {
+   "route": "RM-0162",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Abraka",
+   "tonnage": "10T",
+   "routeMasterKm": 196,
+   "cardKm": 212.5
+  },
+  {
+   "route": "RM-0165",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Warri",
+   "tonnage": "10T",
+   "routeMasterKm": 213,
+   "cardKm": 197
+  },
+  {
+   "route": "RM-0166",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Arochukwu",
+   "tonnage": "10T",
+   "routeMasterKm": 150,
+   "cardKm": 189
+  },
+  {
+   "route": "RM-0167",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Onitsha",
+   "tonnage": "10T",
+   "routeMasterKm": 196,
+   "cardKm": 188.5
+  },
+  {
+   "route": "RM-0169",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Arondizuogu",
+   "tonnage": "10T",
+   "routeMasterKm": 165,
+   "cardKm": 176
+  },
+  {
+   "route": "RM-0170",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Ughelli",
+   "tonnage": "10T",
+   "routeMasterKm": 183,
+   "cardKm": 169
+  },
+  {
+   "route": "RM-0172",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Mbo",
+   "tonnage": "10T",
+   "routeMasterKm": 184,
+   "cardKm": 163.5
+  },
+  {
+   "route": "RM-0175",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Oron",
+   "tonnage": "10T",
+   "routeMasterKm": 171,
+   "cardKm": 156.5
+  },
+  {
+   "route": "RM-0176",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Oguta",
+   "tonnage": "10T",
+   "routeMasterKm": 134,
+   "cardKm": 147.5
+  },
+  {
+   "route": "RM-0177",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Okigwe",
+   "tonnage": "10T",
+   "routeMasterKm": 153,
+   "cardKm": 147
+  },
+  {
+   "route": "RM-0179",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Uyo",
+   "tonnage": "10T",
+   "routeMasterKm": 128,
+   "cardKm": 145
+  },
+  {
+   "route": "RM-0180",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Ikot Ekpene",
+   "tonnage": "10T",
+   "routeMasterKm": 110,
+   "cardKm": 140
+  },
+  {
+   "route": "RM-0182",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Nsit Ibom",
+   "tonnage": "10T",
+   "routeMasterKm": 120,
+   "cardKm": 136
+  },
+  {
+   "route": "RM-0183",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Sagbama",
+   "tonnage": "10T",
+   "routeMasterKm": 132,
+   "cardKm": 123.5
+  },
+  {
+   "route": "RM-0188",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Eket",
+   "tonnage": "10T",
+   "routeMasterKm": 128,
+   "cardKm": 115.5
+  },
+  {
+   "route": "RM-0189",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Owerri",
+   "tonnage": "10T",
+   "routeMasterKm": 97,
+   "cardKm": 106
+  },
+  {
+   "route": "RM-0190",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Ikot Abasi",
+   "tonnage": "10T",
+   "routeMasterKm": 83,
+   "cardKm": 93
+  },
+  {
+   "route": "RM-0191",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Omoku",
+   "tonnage": "10T",
+   "routeMasterKm": 95,
+   "cardKm": 88.5
+  },
+  {
+   "route": "RM-0192",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Mbiama",
+   "tonnage": "10T",
+   "routeMasterKm": 95,
+   "cardKm": 87.5
+  },
+  {
+   "route": "RM-0193",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Abua",
+   "tonnage": "10T",
+   "routeMasterKm": 60,
+   "cardKm": 78
+  },
+  {
+   "route": "RM-0196",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Mbaise",
+   "tonnage": "10T",
+   "routeMasterKm": 99,
+   "cardKm": 60
+  },
+  {
+   "route": "RM-0198",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Bori",
+   "tonnage": "10T",
+   "routeMasterKm": 53,
+   "cardKm": 44.5
+  },
+  {
+   "route": "RM-0199",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Isiokpo",
+   "tonnage": "10T",
+   "routeMasterKm": 34,
+   "cardKm": 43
+  },
+  {
+   "route": "RM-0205",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Okrika",
+   "tonnage": "10T",
+   "routeMasterKm": 14,
+   "cardKm": 19.4
+  },
+  {
+   "route": "RM-0210",
+   "client": "JMG",
+   "from": "Port Harcourt",
+   "to": "Rumuepirikom",
+   "tonnage": "10T",
+   "routeMasterKm": 14,
+   "cardKm": 8.75
+  },
+  {
+   "route": "RM-0214",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Mubi",
+   "tonnage": "10T",
+   "routeMasterKm": 860,
+   "cardKm": 965.5
+  },
+  {
+   "route": "RM-0215",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Maiduguri",
+   "tonnage": "10T",
+   "routeMasterKm": 921,
+   "cardKm": 845
+  },
+  {
+   "route": "RM-0216",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Yola",
+   "tonnage": "10T",
+   "routeMasterKm": 730,
+   "cardKm": 796.5
+  },
+  {
+   "route": "RM-0219",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Port Harcourt",
+   "tonnage": "10T",
+   "routeMasterKm": 631,
+   "cardKm": 684.5
+  },
+  {
+   "route": "RM-0220",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Abeokuta",
+   "tonnage": "10T",
+   "routeMasterKm": 703,
+   "cardKm": 662
+  },
+  {
+   "route": "RM-0221",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Birnin Kebbi",
+   "tonnage": "10T",
+   "routeMasterKm": 694,
+   "cardKm": 660
+  },
+  {
+   "route": "RM-0222",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Sokoto",
+   "tonnage": "10T",
+   "routeMasterKm": 676,
+   "cardKm": 656.5
+  },
+  {
+   "route": "RM-0223",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Jalingo",
+   "tonnage": "10T",
+   "routeMasterKm": 565,
+   "cardKm": 616.5
+  },
+  {
+   "route": "RM-0224",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Warri",
+   "tonnage": "10T",
+   "routeMasterKm": 583,
+   "cardKm": 592
+  },
+  {
+   "route": "RM-0225",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Ibadan",
+   "tonnage": "10T",
+   "routeMasterKm": 612,
+   "cardKm": 566.5
+  },
+  {
+   "route": "RM-0226",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Gombe",
+   "tonnage": "10T",
+   "routeMasterKm": 565,
+   "cardKm": 546.5
+  },
+  {
+   "route": "RM-0229",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Kano",
+   "tonnage": "10T",
+   "routeMasterKm": 460,
+   "cardKm": 429
+  },
+  {
+   "route": "RM-0230",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Bauchi",
+   "tonnage": "10T",
+   "routeMasterKm": 389,
+   "cardKm": 396
+  },
+  {
+   "route": "RM-0231",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Gboko",
+   "tonnage": "10T",
+   "routeMasterKm": 338,
+   "cardKm": 374
+  },
+  {
+   "route": "RM-0232",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Ankpa",
+   "tonnage": "10T",
+   "routeMasterKm": 240,
+   "cardKm": 371.5
+  },
+  {
+   "route": "RM-0233",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Idah",
+   "tonnage": "10T",
+   "routeMasterKm": 302,
+   "cardKm": 327
+  },
+  {
+   "route": "RM-0234",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Makurdi",
+   "tonnage": "10T",
+   "routeMasterKm": 241,
+   "cardKm": 288.5
+  },
+  {
+   "route": "RM-0236",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Okene",
+   "tonnage": "10T",
+   "routeMasterKm": 283,
+   "cardKm": 267
+  },
+  {
+   "route": "RM-0237",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Jos",
+   "tonnage": "10T",
+   "routeMasterKm": 229,
+   "cardKm": 265
+  },
+  {
+   "route": "RM-0238",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Obajana",
+   "tonnage": "10T",
+   "routeMasterKm": 224,
+   "cardKm": 234
+  },
+  {
+   "route": "RM-0239",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Lokoja",
+   "tonnage": "10T",
+   "routeMasterKm": 211,
+   "cardKm": 200.5
+  },
+  {
+   "route": "RM-0240",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Kaduna",
+   "tonnage": "10T",
+   "routeMasterKm": 212,
+   "cardKm": 195.5
+  },
+  {
+   "route": "RM-0241",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Lafia",
+   "tonnage": "10T",
+   "routeMasterKm": 167,
+   "cardKm": 188
+  },
+  {
+   "route": "RM-0242",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Minna",
+   "tonnage": "10T",
+   "routeMasterKm": 157,
+   "cardKm": 162.5
+  },
+  {
+   "route": "RM-0244",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Suleja",
+   "tonnage": "10T",
+   "routeMasterKm": 51,
+   "cardKm": 63.5
+  },
+  {
+   "route": "RM-0246",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Karshi",
+   "tonnage": "10T",
+   "routeMasterKm": 36,
+   "cardKm": 44.3
+  },
+  {
+   "route": "RM-0249",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Kuje",
+   "tonnage": "10T",
+   "routeMasterKm": 49,
+   "cardKm": 39.5
+  },
+  {
+   "route": "RM-0250",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Kurudu",
+   "tonnage": "10T",
+   "routeMasterKm": 17,
+   "cardKm": 30.25
+  },
+  {
+   "route": "RM-0253",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Mararaba",
+   "tonnage": "10T",
+   "routeMasterKm": 17,
+   "cardKm": 24.7
+  },
+  {
+   "route": "RM-0254",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Karu",
+   "tonnage": "10T",
+   "routeMasterKm": 14,
+   "cardKm": 24.3
+  },
+  {
+   "route": "RM-0255",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Jikwoyi",
+   "tonnage": "10T",
+   "routeMasterKm": 15,
+   "cardKm": 24.25
+  },
+  {
+   "route": "RM-0256",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Nyanya",
+   "tonnage": "10T",
+   "routeMasterKm": 13,
+   "cardKm": 23.6
+  },
+  {
+   "route": "RM-0258",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "River Park",
+   "tonnage": "10T",
+   "routeMasterKm": 14,
+   "cardKm": 20.85
+  },
+  {
+   "route": "RM-0265",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Apo Mechanic Village",
+   "tonnage": "10T",
+   "routeMasterKm": 11,
+   "cardKm": 16.5
+  },
+  {
+   "route": "RM-0266",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Bida",
+   "tonnage": "10T",
+   "routeMasterKm": 211,
+   "cardKm": 16
+  },
+  {
+   "route": "RM-0268",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Asokoro",
+   "tonnage": "10T",
+   "routeMasterKm": 5,
+   "cardKm": 15
+  },
+  {
+   "route": "RM-0271",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Guzape",
+   "tonnage": "10T",
+   "routeMasterKm": 8,
+   "cardKm": 13.1
+  },
+  {
+   "route": "RM-0273",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Garki 2",
+   "tonnage": "10T",
+   "routeMasterKm": 4,
+   "cardKm": 12.3
+  },
+  {
+   "route": "RM-0277",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Dei-Dei",
+   "tonnage": "10T",
+   "routeMasterKm": 32,
+   "cardKm": 10.4
+  },
+  {
+   "route": "RM-0281",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Gwarinpa",
+   "tonnage": "10T",
+   "routeMasterKm": 16,
+   "cardKm": 9.25
+  },
+  {
+   "route": "RM-0293",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Jabi",
+   "tonnage": "10T",
+   "routeMasterKm": 12,
+   "cardKm": 3.85
+  },
+  {
+   "route": "RM-0296",
+   "client": "JMG",
+   "from": "Abuja",
+   "to": "Utako",
+   "tonnage": "10T",
+   "routeMasterKm": 8,
+   "cardKm": 1.5
+  },
+  {
+   "route": "R001",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kano",
+   "tonnage": "45T",
+   "routeMasterKm": 876,
+   "cardKm": 952
+  },
+  {
+   "route": "R004",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Abuja",
+   "tonnage": "45T",
+   "routeMasterKm": 612,
+   "cardKm": 650
+  },
+  {
+   "route": "R005",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Suleja",
+   "tonnage": "45T",
+   "routeMasterKm": 578,
+   "cardKm": 650
+  },
+  {
+   "route": "R006",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Sokoto",
+   "tonnage": "45T",
+   "routeMasterKm": 787,
+   "cardKm": 863.5
+  },
+  {
+   "route": "R007",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Wukari",
+   "tonnage": "45T",
+   "routeMasterKm": 846,
+   "cardKm": 910
+  },
+  {
+   "route": "R008",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Jalingo",
+   "tonnage": "45T",
+   "routeMasterKm": 1090,
+   "cardKm": 1350
+  },
+  {
+   "route": "R009",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kontagora",
+   "tonnage": "45T",
+   "routeMasterKm": 527,
+   "cardKm": 470
+  },
+  {
+   "route": "R010",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Gombe",
+   "tonnage": "45T",
+   "routeMasterKm": 1120,
+   "cardKm": 1110.5
+  },
+  {
+   "route": "R011",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Minna",
+   "tonnage": "45T",
+   "routeMasterKm": 535,
+   "cardKm": 499
+  },
+  {
+   "route": "R012",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Zaria",
+   "tonnage": "45T",
+   "routeMasterKm": 713,
+   "cardKm": 797.5
+  },
+  {
+   "route": "R013",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Funtua",
+   "tonnage": "45T",
+   "routeMasterKm": 721,
+   "cardKm": 681.5
+  },
+  {
+   "route": "R014",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Bauchi",
+   "tonnage": "45T",
+   "routeMasterKm": 949,
+   "cardKm": 955.5
+  },
+  {
+   "route": "R016",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kaduna",
+   "tonnage": "45T",
+   "routeMasterKm": 635,
+   "cardKm": 719
+  },
+  {
+   "route": "R017",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Jos",
+   "tonnage": "45T",
+   "routeMasterKm": 858,
+   "cardKm": 829
+  },
+  {
+   "route": "R018",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Saminaka",
+   "tonnage": "45T",
+   "routeMasterKm": 759,
+   "cardKm": 950
+  },
+  {
+   "route": "R019",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Makurdi",
+   "tonnage": "45T",
+   "routeMasterKm": 716,
+   "cardKm": 624.5
+  },
+  {
+   "route": "R020",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Lafia",
+   "tonnage": "45T",
+   "routeMasterKm": 733,
+   "cardKm": 850
+  },
+  {
+   "route": "R021",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Keffi",
+   "tonnage": "45T",
+   "routeMasterKm": 654,
+   "cardKm": 736
+  },
+  {
+   "route": "R022",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Bida",
+   "tonnage": "45T",
+   "routeMasterKm": 420,
+   "cardKm": 412.5
+  },
+  {
+   "route": "R023",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Idah",
+   "tonnage": "45T",
+   "routeMasterKm": 441,
+   "cardKm": 501
+  },
+  {
+   "route": "R024",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Gusau",
+   "tonnage": "45T",
+   "routeMasterKm": 744,
+   "cardKm": 833
+  },
+  {
+   "route": "R025",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kabba",
+   "tonnage": "45T",
+   "routeMasterKm": 318,
+   "cardKm": 300
+  },
+  {
+   "route": "R026",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Takum",
+   "tonnage": "45T",
+   "routeMasterKm": 873,
+   "cardKm": 883
+  },
+  {
+   "route": "R027",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Lokoja",
+   "tonnage": "45T",
+   "routeMasterKm": 444,
+   "cardKm": 500
+  },
+  {
+   "route": "R029",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Yauri",
+   "tonnage": "45T",
+   "routeMasterKm": 480,
+   "cardKm": 727.5
+  },
+  {
+   "route": "R030",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Ganye",
+   "tonnage": "45T",
+   "routeMasterKm": 1177,
+   "cardKm": 1270
+  },
+  {
+   "route": "R031",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Gboko",
+   "tonnage": "45T",
+   "routeMasterKm": 788,
+   "cardKm": 685
+  },
+  {
+   "route": "R032",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Potiskum",
+   "tonnage": "45T",
+   "routeMasterKm": 1199,
+   "cardKm": 1174.5
+  },
+  {
+   "route": "R033",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Mubi",
+   "tonnage": "45T",
+   "routeMasterKm": 1401,
+   "cardKm": 1443
+  },
+  {
+   "route": "R034",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Abaji",
+   "tonnage": "45T",
+   "routeMasterKm": 500,
+   "cardKm": 469.5
+  },
+  {
+   "route": "R035",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Tegina",
+   "tonnage": "45T",
+   "routeMasterKm": 546,
+   "cardKm": 500
+  },
+  {
+   "route": "R036",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Maiduguri",
+   "tonnage": "45T",
+   "routeMasterKm": 1469,
+   "cardKm": 1404
+  },
+  {
+   "route": "R039",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Ibadan",
+   "tonnage": "45T",
+   "routeMasterKm": 10,
+   "cardKm": 285
+  },
+  {
+   "route": "R040",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Ekpoma",
+   "tonnage": "45T",
+   "routeMasterKm": 315,
+   "cardKm": 346
+  },
+  {
+   "route": "R041",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Aba",
+   "tonnage": "45T",
+   "routeMasterKm": 580,
+   "cardKm": 573
+  },
+  {
+   "route": "R042",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Agbor",
+   "tonnage": "45T",
+   "routeMasterKm": 357,
+   "cardKm": 350
+  },
+  {
+   "route": "R043",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Onitsha",
+   "tonnage": "45T",
+   "routeMasterKm": 442,
+   "cardKm": 471
+  },
+  {
+   "route": "R045",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Otukpo",
+   "tonnage": "45T",
+   "routeMasterKm": 655,
+   "cardKm": 574
+  },
+  {
+   "route": "R046",
+   "client": "GIVANAS",
+   "from": "Lagos",
+   "to": "Onitsha",
+   "tonnage": "45T",
+   "routeMasterKm": 483,
+   "cardKm": 450
+  },
+  {
+   "route": "R047",
+   "client": "GIVANAS",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "routeMasterKm": 1021,
+   "cardKm": 1100
+  },
+  {
+   "route": "R057",
+   "client": "INTERSTYLE",
+   "from": "Apapa",
+   "to": "Abuja",
+   "tonnage": "30T",
+   "routeMasterKm": 756,
+   "cardKm": 750
+  },
+  {
+   "route": "R059",
+   "client": "INTERSTYLE",
+   "from": "Apapa",
+   "to": "Warri",
+   "tonnage": "30T",
+   "routeMasterKm": 425,
+   "cardKm": 435
+  },
+  {
+   "route": "R060",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Onitsha",
+   "tonnage": "45T",
+   "routeMasterKm": 475,
+   "cardKm": 460
+  },
+  {
+   "route": "RM-0002",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Aba",
+   "tonnage": "45T",
+   "routeMasterKm": 612,
+   "cardKm": 620
+  },
+  {
+   "route": "R061",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "routeMasterKm": 1017,
+   "cardKm": 1100
+  },
+  {
+   "route": "R063",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "45T",
+   "routeMasterKm": 156,
+   "cardKm": 124
+  },
+  {
+   "route": "R064",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Kaduna",
+   "tonnage": "45T",
+   "routeMasterKm": 774,
+   "cardKm": 950
+  },
+  {
+   "route": "R067",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Isolo",
+   "tonnage": "30T",
+   "routeMasterKm": 15,
+   "cardKm": 22.9
+  },
+  {
+   "route": "R068",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "30T",
+   "routeMasterKm": 156,
+   "cardKm": 120
+  },
+  {
+   "route": "R069",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Sango-Ota",
+   "tonnage": "30T",
+   "routeMasterKm": 42,
+   "cardKm": 49.3
+  },
+  {
+   "route": "R071",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Fatai Atere",
+   "tonnage": "30T",
+   "routeMasterKm": 12,
+   "cardKm": 22.6
+  },
+  {
+   "route": "R072",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Igbesa",
+   "tonnage": "30T",
+   "routeMasterKm": 39,
+   "cardKm": 54.5
+  },
+  {
+   "route": "R074",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Dopemu",
+   "tonnage": "30T",
+   "routeMasterKm": 27,
+   "cardKm": 32.2
+  },
+  {
+   "route": "R075",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Sagamu",
+   "tonnage": "30T",
+   "routeMasterKm": 70,
+   "cardKm": 76.3
+  },
+  {
+   "route": "R076",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Mowe",
+   "tonnage": "30T",
+   "routeMasterKm": 53,
+   "cardKm": 59.7
+  },
+  {
+   "route": "R077",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ijebu-Ososa",
+   "tonnage": "30T",
+   "routeMasterKm": 81,
+   "cardKm": 110
+  },
+  {
+   "route": "R079",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ijebu-Ode",
+   "tonnage": "30T",
+   "routeMasterKm": 96,
+   "cardKm": 110
+  },
+  {
+   "route": "R080",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Apapa",
+   "tonnage": "30T",
+   "routeMasterKm": 10,
+   "cardKm": 3.4
+  },
+  {
+   "route": "R081",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ilupeju",
+   "tonnage": "30T",
+   "routeMasterKm": 16,
+   "cardKm": 22.9
+  },
+  {
+   "route": "R082",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ajao Estate",
+   "tonnage": "30T",
+   "routeMasterKm": 16,
+   "cardKm": 24.8
+  },
+  {
+   "route": "R083",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Okota",
+   "tonnage": "30T",
+   "routeMasterKm": 12,
+   "cardKm": 17.5
+  },
+  {
+   "route": "R084",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Oshodi",
+   "tonnage": "30T",
+   "routeMasterKm": 17,
+   "cardKm": 22.9
+  },
+  {
+   "route": "R091",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Isolo",
+   "tonnage": "45T",
+   "routeMasterKm": 15,
+   "cardKm": 22.9
+  },
+  {
+   "route": "R063",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "45T",
+   "routeMasterKm": 156,
+   "cardKm": 144
+  },
+  {
+   "route": "R093",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Sango-Ota",
+   "tonnage": "45T",
+   "routeMasterKm": 42,
+   "cardKm": 49.3
+  },
+  {
+   "route": "R095",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Fatai Atere",
+   "tonnage": "45T",
+   "routeMasterKm": 12,
+   "cardKm": 22.6
+  },
+  {
+   "route": "R096",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Igbesa",
+   "tonnage": "45T",
+   "routeMasterKm": 39,
+   "cardKm": 54.5
+  },
+  {
+   "route": "R098",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Dopemu",
+   "tonnage": "45T",
+   "routeMasterKm": 27,
+   "cardKm": 32.2
+  },
+  {
+   "route": "R099",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Sagamu",
+   "tonnage": "45T",
+   "routeMasterKm": 70,
+   "cardKm": 76.3
+  },
+  {
+   "route": "R100",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Mowe",
+   "tonnage": "45T",
+   "routeMasterKm": 53,
+   "cardKm": 59.7
+  },
+  {
+   "route": "R101",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ijebu-Ososa",
+   "tonnage": "45T",
+   "routeMasterKm": 81,
+   "cardKm": 110
+  },
+  {
+   "route": "R103",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ijebu-Ode",
+   "tonnage": "45T",
+   "routeMasterKm": 96,
+   "cardKm": 110
+  },
+  {
+   "route": "R104",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Apapa",
+   "tonnage": "45T",
+   "routeMasterKm": 10,
+   "cardKm": 3.4
+  },
+  {
+   "route": "R105",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ilupeju",
+   "tonnage": "45T",
+   "routeMasterKm": 16,
+   "cardKm": 22.9
+  },
+  {
+   "route": "R106",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ajao Estate",
+   "tonnage": "45T",
+   "routeMasterKm": 16,
+   "cardKm": 24.8
+  },
+  {
+   "route": "R107",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Okota",
+   "tonnage": "45T",
+   "routeMasterKm": 12,
+   "cardKm": 17.5
+  },
+  {
+   "route": "R108",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Oshodi",
+   "tonnage": "45T",
+   "routeMasterKm": 17,
+   "cardKm": 22.9
+  },
+  {
+   "route": "R110",
+   "client": "VENDARA",
+   "from": "Lagos",
+   "to": "Onitsha",
+   "tonnage": "45T",
+   "routeMasterKm": 475,
+   "cardKm": 450
+  },
+  {
+   "route": "R111",
+   "client": "VENDARA",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "routeMasterKm": 1017,
+   "cardKm": 1100
+  },
+  {
+   "route": "R112",
+   "client": "VENDARA",
+   "from": "Lagos",
+   "to": "Calabar",
+   "tonnage": "45T",
+   "routeMasterKm": 742,
+   "cardKm": 756.5
+  },
+  {
+   "route": "R114",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Port Harcourt",
+   "tonnage": "45T",
+   "routeMasterKm": 612,
+   "cardKm": 628
+  },
+  {
+   "route": "R115",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Abuja",
+   "tonnage": "45T",
+   "routeMasterKm": 761,
+   "cardKm": 755
+  },
+  {
+   "route": "R116",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "routeMasterKm": 1020,
+   "cardKm": 1142
+  },
+  {
+   "route": "R117",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "45T",
+   "routeMasterKm": 157,
+   "cardKm": 148
+  },
+  {
+   "route": "R118",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Benin City",
+   "tonnage": "45T",
+   "routeMasterKm": 312,
+   "cardKm": 325
+  },
+  {
+   "route": "R119",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Onitsha",
+   "tonnage": "45T",
+   "routeMasterKm": 481,
+   "cardKm": 501
+  },
+  {
+   "route": "R120",
+   "client": "NATURAL BEAUTY",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "routeMasterKm": 990,
+   "cardKm": 1100
+  },
+  {
+   "route": "R121",
+   "client": "NATURAL BEAUTY",
+   "from": "Lagos",
+   "to": "Maiduguri",
+   "tonnage": "45T",
+   "routeMasterKm": 1557,
+   "cardKm": 1500
+  },
+  {
+   "route": "R122",
+   "client": "NATURAL BEAUTY",
+   "from": "Lagos",
+   "to": "Maiduguri",
+   "tonnage": "30T",
+   "routeMasterKm": 1557,
+   "cardKm": 1500
+  },
+  {
+   "route": "R123",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Abuja",
+   "tonnage": "45T",
+   "routeMasterKm": 763,
+   "cardKm": 755
+  },
+  {
+   "route": "R124",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "45T",
+   "routeMasterKm": 1021,
+   "cardKm": 1100
+  },
+  {
+   "route": "R125",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Funtua",
+   "tonnage": "45T",
+   "routeMasterKm": 868,
+   "cardKm": 1050
+  },
+  {
+   "route": "R126",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Kaduna",
+   "tonnage": "45T",
+   "routeMasterKm": 779,
+   "cardKm": 910
+  },
+  {
+   "route": "R127",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Zaria",
+   "tonnage": "45T",
+   "routeMasterKm": 858,
+   "cardKm": 989
+  },
+  {
+   "route": "R128",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Gombe",
+   "tonnage": "45T",
+   "routeMasterKm": 1253,
+   "cardKm": 1275
+  },
+  {
+   "route": "R129",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Yola",
+   "tonnage": "45T",
+   "routeMasterKm": 1375,
+   "cardKm": 1650
+  },
+  {
+   "route": "R130",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Mubi",
+   "tonnage": "45T",
+   "routeMasterKm": 1527,
+   "cardKm": 1650
+  },
+  {
+   "route": "R131",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Jalingo",
+   "tonnage": "45T",
+   "routeMasterKm": 1207,
+   "cardKm": 1275
+  },
+  {
+   "route": "R132",
+   "client": "SASO",
+   "from": "Lagos",
+   "to": "Katsina",
+   "tonnage": "30T",
+   "routeMasterKm": 1051,
+   "cardKm": 978
+  },
+  {
+   "route": "R166",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kano",
+   "tonnage": "30T",
+   "routeMasterKm": 876,
+   "cardKm": 945
+  },
+  {
+   "route": "R167",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Abuja",
+   "tonnage": "30T",
+   "routeMasterKm": 612,
+   "cardKm": 650
+  },
+  {
+   "route": "R168",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Suleja",
+   "tonnage": "30T",
+   "routeMasterKm": 578,
+   "cardKm": 650
+  },
+  {
+   "route": "R169",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Sokoto",
+   "tonnage": "30T",
+   "routeMasterKm": 787,
+   "cardKm": 863.5
+  },
+  {
+   "route": "R170",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Wukari",
+   "tonnage": "30T",
+   "routeMasterKm": 846,
+   "cardKm": 910
+  },
+  {
+   "route": "R171",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Jalingo",
+   "tonnage": "30T",
+   "routeMasterKm": 1090,
+   "cardKm": 1350
+  },
+  {
+   "route": "R172",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kontagora",
+   "tonnage": "30T",
+   "routeMasterKm": 527,
+   "cardKm": 470
+  },
+  {
+   "route": "R173",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Gombe",
+   "tonnage": "30T",
+   "routeMasterKm": 1120,
+   "cardKm": 1110.5
+  },
+  {
+   "route": "R174",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Minna",
+   "tonnage": "30T",
+   "routeMasterKm": 535,
+   "cardKm": 499
+  },
+  {
+   "route": "R175",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Zaria",
+   "tonnage": "30T",
+   "routeMasterKm": 713,
+   "cardKm": 797.5
+  },
+  {
+   "route": "R176",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Funtua",
+   "tonnage": "30T",
+   "routeMasterKm": 721,
+   "cardKm": 681.5
+  },
+  {
+   "route": "R177",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Bauchi",
+   "tonnage": "30T",
+   "routeMasterKm": 949,
+   "cardKm": 1001
+  },
+  {
+   "route": "R178",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Yola",
+   "tonnage": "30T",
+   "routeMasterKm": 1258,
+   "cardKm": 1250
+  },
+  {
+   "route": "R179",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kaduna",
+   "tonnage": "30T",
+   "routeMasterKm": 635,
+   "cardKm": 719
+  },
+  {
+   "route": "R180",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Jos",
+   "tonnage": "30T",
+   "routeMasterKm": 858,
+   "cardKm": 829
+  },
+  {
+   "route": "R181",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Saminaka",
+   "tonnage": "30T",
+   "routeMasterKm": 759,
+   "cardKm": 950
+  },
+  {
+   "route": "R182",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Makurdi",
+   "tonnage": "30T",
+   "routeMasterKm": 716,
+   "cardKm": 624.5
+  },
+  {
+   "route": "R183",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Lafia",
+   "tonnage": "30T",
+   "routeMasterKm": 733,
+   "cardKm": 850
+  },
+  {
+   "route": "R184",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Keffi",
+   "tonnage": "30T",
+   "routeMasterKm": 654,
+   "cardKm": 736
+  },
+  {
+   "route": "R185",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Bida",
+   "tonnage": "30T",
+   "routeMasterKm": 420,
+   "cardKm": 412.5
+  },
+  {
+   "route": "R186",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Idah",
+   "tonnage": "30T",
+   "routeMasterKm": 441,
+   "cardKm": 501
+  },
+  {
+   "route": "R187",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Gusau",
+   "tonnage": "30T",
+   "routeMasterKm": 744,
+   "cardKm": 833
+  },
+  {
+   "route": "R188",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Kabba",
+   "tonnage": "30T",
+   "routeMasterKm": 318,
+   "cardKm": 300
+  },
+  {
+   "route": "R189",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Takum",
+   "tonnage": "30T",
+   "routeMasterKm": 873,
+   "cardKm": 883
+  },
+  {
+   "route": "R190",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Lokoja",
+   "tonnage": "30T",
+   "routeMasterKm": 444,
+   "cardKm": 500
+  },
+  {
+   "route": "R192",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Yauri",
+   "tonnage": "30T",
+   "routeMasterKm": 480,
+   "cardKm": 727.5
+  },
+  {
+   "route": "R193",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Ganye",
+   "tonnage": "30T",
+   "routeMasterKm": 1177,
+   "cardKm": 1270
+  },
+  {
+   "route": "R194",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Gboko",
+   "tonnage": "30T",
+   "routeMasterKm": 788,
+   "cardKm": 685
+  },
+  {
+   "route": "R195",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Potiskum",
+   "tonnage": "30T",
+   "routeMasterKm": 1199,
+   "cardKm": 1174.5
+  },
+  {
+   "route": "R196",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Mubi",
+   "tonnage": "30T",
+   "routeMasterKm": 1401,
+   "cardKm": 1443
+  },
+  {
+   "route": "R197",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Abaji",
+   "tonnage": "30T",
+   "routeMasterKm": 500,
+   "cardKm": 469.5
+  },
+  {
+   "route": "R198",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Tegina",
+   "tonnage": "30T",
+   "routeMasterKm": 546,
+   "cardKm": 500
+  },
+  {
+   "route": "R199",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Maiduguri",
+   "tonnage": "30T",
+   "routeMasterKm": 1469,
+   "cardKm": 1404
+  },
+  {
+   "route": "R202",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Ibadan",
+   "tonnage": "30T",
+   "routeMasterKm": 10,
+   "cardKm": 285
+  },
+  {
+   "route": "R203",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Ekpoma",
+   "tonnage": "30T",
+   "routeMasterKm": 315,
+   "cardKm": 346
+  },
+  {
+   "route": "R204",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Aba",
+   "tonnage": "30T",
+   "routeMasterKm": 580,
+   "cardKm": 573
+  },
+  {
+   "route": "R205",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Agbor",
+   "tonnage": "30T",
+   "routeMasterKm": 357,
+   "cardKm": 350
+  },
+  {
+   "route": "R206",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Onitsha",
+   "tonnage": "30T",
+   "routeMasterKm": 442,
+   "cardKm": 471
+  },
+  {
+   "route": "R208",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Otukpo",
+   "tonnage": "30T",
+   "routeMasterKm": 655,
+   "cardKm": 574
+  },
+  {
+   "route": "R209",
+   "client": "ORCA DECO LIMITED",
+   "from": "Lagos",
+   "to": "Asaba",
+   "tonnage": "45T",
+   "routeMasterKm": 466,
+   "cardKm": 432.5
+  },
+  {
+   "route": "R211",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Ikot Ekpene",
+   "tonnage": "45T",
+   "routeMasterKm": 656,
+   "cardKm": 648
+  },
+  {
+   "route": "R214",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Yenagoa",
+   "tonnage": "45T",
+   "routeMasterKm": 536,
+   "cardKm": 546
+  },
+  {
+   "route": "R215",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Makurdi",
+   "tonnage": "45T",
+   "routeMasterKm": 828,
+   "cardKm": 808
+  },
+  {
+   "route": "R217",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Abakaliki",
+   "tonnage": "45T",
+   "routeMasterKm": 669,
+   "cardKm": 633
+  },
+  {
+   "route": "R218",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Enugu",
+   "tonnage": "45T",
+   "routeMasterKm": 583,
+   "cardKm": 560.5
+  },
+  {
+   "route": "R219",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Nsukka",
+   "tonnage": "45T",
+   "routeMasterKm": 577,
+   "cardKm": 563
+  },
+  {
+   "route": "R220",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Owerri",
+   "tonnage": "45T",
+   "routeMasterKm": 549,
+   "cardKm": 567
+  },
+  {
+   "route": "R222",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Uyo",
+   "tonnage": "45T",
+   "routeMasterKm": 690,
+   "cardKm": 678
+  },
+  {
+   "route": "R223",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Umunze",
+   "tonnage": "45T",
+   "routeMasterKm": 548,
+   "cardKm": 529
+  },
+  {
+   "route": "R224",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Abak",
+   "tonnage": "45T",
+   "routeMasterKm": 679,
+   "cardKm": 668.5
+  },
+  {
+   "route": "R225",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Awka",
+   "tonnage": "45T",
+   "routeMasterKm": 521,
+   "cardKm": 498
+  },
+  {
+   "route": "R226",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Ikom",
+   "tonnage": "45T",
+   "routeMasterKm": 758,
+   "cardKm": 776
+  },
+  {
+   "route": "R227",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Obubra",
+   "tonnage": "45T",
+   "routeMasterKm": 703,
+   "cardKm": 717
+  },
+  {
+   "route": "R229",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Eket",
+   "tonnage": "45T",
+   "routeMasterKm": 723,
+   "cardKm": 710.5
+  },
+  {
+   "route": "R230",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Bauchi",
+   "tonnage": "45T",
+   "routeMasterKm": 1086,
+   "cardKm": 1185
+  },
+  {
+   "route": "R231",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Maiduguri",
+   "tonnage": "45T",
+   "routeMasterKm": 1605,
+   "cardKm": 1560
+  },
+  {
+   "route": "R233",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Gombe",
+   "tonnage": "45T",
+   "routeMasterKm": 1251,
+   "cardKm": 1349
+  },
+  {
+   "route": "R234",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Kaduna",
+   "tonnage": "45T",
+   "routeMasterKm": 777,
+   "cardKm": 794.5
+  },
+  {
+   "route": "R235",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Zaria",
+   "tonnage": "45T",
+   "routeMasterKm": 856,
+   "cardKm": 878.5
+  },
+  {
+   "route": "R238",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Lokoja",
+   "tonnage": "45T",
+   "routeMasterKm": 569,
+   "cardKm": 548.5
+  },
+  {
+   "route": "R240",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Okene",
+   "tonnage": "45T",
+   "routeMasterKm": 482,
+   "cardKm": 475.5
+  },
+  {
+   "route": "R241",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Akwanga",
+   "tonnage": "45T",
+   "routeMasterKm": 872,
+   "cardKm": 904
+  },
+  {
+   "route": "R242",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Keffi",
+   "tonnage": "45T",
+   "routeMasterKm": 795,
+   "cardKm": 840
+  },
+  {
+   "route": "R243",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Lafia",
+   "tonnage": "45T",
+   "routeMasterKm": 863,
+   "cardKm": 907.5
+  },
+  {
+   "route": "R244",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Kontagora",
+   "tonnage": "45T",
+   "routeMasterKm": 696,
+   "cardKm": 584.5
+  },
+  {
+   "route": "R245",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Minna",
+   "tonnage": "45T",
+   "routeMasterKm": 699,
+   "cardKm": 626.5
+  },
+  {
+   "route": "R246",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Jos",
+   "tonnage": "45T",
+   "routeMasterKm": 1007,
+   "cardKm": 1025
+  },
+  {
+   "route": "R248",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Sokoto",
+   "tonnage": "45T",
+   "routeMasterKm": 927,
+   "cardKm": 991.5
+  },
+  {
+   "route": "R249",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Birnin Kebbi",
+   "tonnage": "45T",
+   "routeMasterKm": 817,
+   "cardKm": 885
+  },
+  {
+   "route": "R250",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Illela",
+   "tonnage": "45T",
+   "routeMasterKm": 1016,
+   "cardKm": 995
+  },
+  {
+   "route": "R251",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Jalingo",
+   "tonnage": "45T",
+   "routeMasterKm": 1205,
+   "cardKm": 1169
+  },
+  {
+   "route": "R253",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Gusau",
+   "tonnage": "45T",
+   "routeMasterKm": 891,
+   "cardKm": 880.5
+  },
+  {
+   "route": "R254",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Yola",
+   "tonnage": "45T",
+   "routeMasterKm": 1373,
+   "cardKm": 1332.5
+  },
+  {
+   "route": "R255",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Mubi",
+   "tonnage": "45T",
+   "routeMasterKm": 1525,
+   "cardKm": 1508
+  },
+  {
+   "route": "R256",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Madagali",
+   "tonnage": "45T",
+   "routeMasterKm": 1606,
+   "cardKm": 1711.5
+  },
+  {
+   "route": "R257",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Bida",
+   "tonnage": "45T",
+   "routeMasterKm": 583,
+   "cardKm": 541.5
+  },
+  {
+   "route": "R258",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Katsina",
+   "tonnage": "45T",
+   "routeMasterKm": 1050,
+   "cardKm": 956
+  },
+  {
+   "route": "R259",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Jebba",
+   "tonnage": "45T",
+   "routeMasterKm": 477,
+   "cardKm": 374
+  },
+  {
+   "route": "R260",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Ilorin",
+   "tonnage": "45T",
+   "routeMasterKm": 369,
+   "cardKm": 305
+  },
+  {
+   "route": "R261",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Offa",
+   "tonnage": "45T",
+   "routeMasterKm": 316,
+   "cardKm": 278.5
+  },
+  {
+   "route": "R262",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Akure",
+   "tonnage": "45T",
+   "routeMasterKm": 293,
+   "cardKm": 301.5
+  },
+  {
+   "route": "R266",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Osogbo",
+   "tonnage": "45T",
+   "routeMasterKm": 259,
+   "cardKm": 229.5
+  },
+  {
+   "route": "R267",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Ado-Ekiti",
+   "tonnage": "45T",
+   "routeMasterKm": 320,
+   "cardKm": 325.5
+  },
+  {
+   "route": "R268",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Auchi",
+   "tonnage": "45T",
+   "routeMasterKm": 406,
+   "cardKm": 433
+  },
+  {
+   "route": "R269",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Oja-Odan",
+   "tonnage": "45T",
+   "routeMasterKm": 90,
+   "cardKm": 98.5
+  },
+  {
+   "route": "R270",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Kaiama",
+   "tonnage": "45T",
+   "routeMasterKm": 500,
+   "cardKm": 435
+  },
+  {
+   "route": "R271",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Imeko",
+   "tonnage": "45T",
+   "routeMasterKm": 157,
+   "cardKm": 179.5
+  },
+  {
+   "route": "R274",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Warri",
+   "tonnage": "45T",
+   "routeMasterKm": 432,
+   "cardKm": 426.5
+  },
+  {
+   "route": "R275",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Zaki Biam",
+   "tonnage": "45T",
+   "routeMasterKm": 987,
+   "cardKm": 900
+  },
+  {
+   "route": "R276",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Katsina-Ala",
+   "tonnage": "45T",
+   "routeMasterKm": 929,
+   "cardKm": 849
+  },
+  {
+   "route": "R277",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Adikpo",
+   "tonnage": "45T",
+   "routeMasterKm": 917,
+   "cardKm": 817.5
+  },
+  {
+   "route": "R278",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Takum",
+   "tonnage": "45T",
+   "routeMasterKm": 964,
+   "cardKm": 926.5
+  },
+  {
+   "route": "R279",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Mutum Biyu",
+   "tonnage": "45T",
+   "routeMasterKm": 1116,
+   "cardKm": 1091.5
+  },
+  {
+   "route": "R280",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Chikanda",
+   "tonnage": "45T",
+   "routeMasterKm": 408,
+   "cardKm": 458
+  },
+  {
+   "route": "R281",
+   "client": "Lacasera",
+   "from": "Lagos",
+   "to": "Ifon",
+   "tonnage": "45T",
+   "routeMasterKm": 366,
+   "cardKm": 372.5
+  },
+  {
+   "route": "R411",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Port Harcourt",
+   "tonnage": "30T",
+   "routeMasterKm": 606,
+   "cardKm": 630
+  },
+  {
+   "route": "RM-0028",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Aba",
+   "tonnage": "30T",
+   "routeMasterKm": 612,
+   "cardKm": 622
+  },
+  {
+   "route": "R413",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Lafia",
+   "tonnage": "30T",
+   "routeMasterKm": 857,
+   "cardKm": 904
+  },
+  {
+   "route": "R414",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Enugu",
+   "tonnage": "30T",
+   "routeMasterKm": 577,
+   "cardKm": 560.5
+  },
+  {
+   "route": "R415",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Onitsha",
+   "tonnage": "30T",
+   "routeMasterKm": 475,
+   "cardKm": 450
+  },
+  {
+   "route": "R416",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Owerri",
+   "tonnage": "30T",
+   "routeMasterKm": 542,
+   "cardKm": 567
+  },
+  {
+   "route": "R417",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Warri",
+   "tonnage": "30T",
+   "routeMasterKm": 425,
+   "cardKm": 435
+  },
+  {
+   "route": "R418",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Kwale",
+   "tonnage": "30T",
+   "routeMasterKm": 453,
+   "cardKm": 435
+  },
+  {
+   "route": "R419",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Abakaliki",
+   "tonnage": "30T",
+   "routeMasterKm": 663,
+   "cardKm": 650
+  },
+  {
+   "route": "RM-0030",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Maiduguri",
+   "tonnage": "30T",
+   "routeMasterKm": 1600,
+   "cardKm": 1500
+  },
+  {
+   "route": "R423",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Kano",
+   "tonnage": "30T",
+   "routeMasterKm": 876,
+   "cardKm": 933.5
+  },
+  {
+   "route": "R424",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Abuja",
+   "tonnage": "30T",
+   "routeMasterKm": 612,
+   "cardKm": 622.5
+  },
+  {
+   "route": "R425",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Benin City",
+   "tonnage": "30T",
+   "routeMasterKm": 273,
+   "cardKm": 286.5
+  },
+  {
+   "route": "R426",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Port Harcourt",
+   "tonnage": "30T",
+   "routeMasterKm": 574,
+   "cardKm": 605
+  },
+  {
+   "route": "R430",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Akure",
+   "tonnage": "30T",
+   "routeMasterKm": 187,
+   "cardKm": 240
+  },
+  {
+   "route": "R431",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ikom",
+   "tonnage": "30T",
+   "routeMasterKm": 719,
+   "cardKm": 750
+  },
+  {
+   "route": "R432",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Abeokuta",
+   "tonnage": "30T",
+   "routeMasterKm": 84,
+   "cardKm": 104.5
+  },
+  {
+   "route": "R433",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Idiroko",
+   "tonnage": "30T",
+   "routeMasterKm": 201,
+   "cardKm": 170
+  },
+  {
+   "route": "R434",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibafo",
+   "tonnage": "30T",
+   "routeMasterKm": 116,
+   "cardKm": 0
+  },
+  {
+   "route": "R435",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Sango-Ota",
+   "tonnage": "30T",
+   "routeMasterKm": 138,
+   "cardKm": 127.5
+  },
+  {
+   "route": "R436",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Sagamu",
+   "tonnage": "30T",
+   "routeMasterKm": 87,
+   "cardKm": 75
+  },
+  {
+   "route": "R437",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ilorin",
+   "tonnage": "30T",
+   "routeMasterKm": 185,
+   "cardKm": 210
+  },
+  {
+   "route": "R438",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Agbor",
+   "tonnage": "30T",
+   "routeMasterKm": 357,
+   "cardKm": 350
+  },
+  {
+   "route": "R439",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Awka",
+   "tonnage": "30T",
+   "routeMasterKm": 482,
+   "cardKm": 465
+  },
+  {
+   "route": "R440",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Calabar",
+   "tonnage": "30T",
+   "routeMasterKm": 710,
+   "cardKm": 717.5
+  },
+  {
+   "route": "R441",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Enugu",
+   "tonnage": "30T",
+   "routeMasterKm": 544,
+   "cardKm": 527.5
+  },
+  {
+   "route": "R442",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Gboko",
+   "tonnage": "30T",
+   "routeMasterKm": 788,
+   "cardKm": 700
+  },
+  {
+   "route": "R443",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibadan (Toll Gate)",
+   "tonnage": "30T",
+   "routeMasterKm": 12,
+   "cardKm": 42.5
+  },
+  {
+   "route": "R444",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibadan (Town)",
+   "tonnage": "30T",
+   "routeMasterKm": 10,
+   "cardKm": 42.5
+  },
+  {
+   "route": "R445",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ogbomoso",
+   "tonnage": "30T",
+   "routeMasterKm": 119,
+   "cardKm": 145
+  },
+  {
+   "route": "R446",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Jos",
+   "tonnage": "30T",
+   "routeMasterKm": 858,
+   "cardKm": 945
+  },
+  {
+   "route": "R447",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Kaduna",
+   "tonnage": "30T",
+   "routeMasterKm": 635,
+   "cardKm": 710
+  },
+  {
+   "route": "R449",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Lagos Island",
+   "tonnage": "30T",
+   "routeMasterKm": 153,
+   "cardKm": 130
+  },
+  {
+   "route": "R450",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Lekki",
+   "tonnage": "30T",
+   "routeMasterKm": 149,
+   "cardKm": 140
+  },
+  {
+   "route": "R452",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Onitsha",
+   "tonnage": "30T",
+   "routeMasterKm": 442,
+   "cardKm": 430
+  },
+  {
+   "route": "R453",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Asaba",
+   "tonnage": "30T",
+   "routeMasterKm": 434,
+   "cardKm": 410
+  },
+  {
+   "route": "R456",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Osogbo",
+   "tonnage": "30T",
+   "routeMasterKm": 110,
+   "cardKm": 135
+  },
+  {
+   "route": "R457",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Kano",
+   "tonnage": "40T",
+   "routeMasterKm": 876,
+   "cardKm": 933.5
+  },
+  {
+   "route": "R458",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Abuja",
+   "tonnage": "40T",
+   "routeMasterKm": 612,
+   "cardKm": 622.5
+  },
+  {
+   "route": "R459",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Benin City",
+   "tonnage": "40T",
+   "routeMasterKm": 273,
+   "cardKm": 286.5
+  },
+  {
+   "route": "R460",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Port Harcourt",
+   "tonnage": "40T",
+   "routeMasterKm": 574,
+   "cardKm": 605
+  },
+  {
+   "route": "R464",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Akure",
+   "tonnage": "40T",
+   "routeMasterKm": 187,
+   "cardKm": 240
+  },
+  {
+   "route": "R465",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ikom",
+   "tonnage": "40T",
+   "routeMasterKm": 719,
+   "cardKm": 750
+  },
+  {
+   "route": "R466",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Abeokuta",
+   "tonnage": "40T",
+   "routeMasterKm": 84,
+   "cardKm": 104.5
+  },
+  {
+   "route": "R468",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibafo",
+   "tonnage": "40T",
+   "routeMasterKm": 116,
+   "cardKm": 0
+  },
+  {
+   "route": "R469",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Sango-Ota",
+   "tonnage": "40T",
+   "routeMasterKm": 138,
+   "cardKm": 127.5
+  },
+  {
+   "route": "R470",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Sagamu",
+   "tonnage": "40T",
+   "routeMasterKm": 87,
+   "cardKm": 75
+  },
+  {
+   "route": "R471",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ilorin",
+   "tonnage": "40T",
+   "routeMasterKm": 185,
+   "cardKm": 210
+  },
+  {
+   "route": "R472",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Agbor",
+   "tonnage": "40T",
+   "routeMasterKm": 357,
+   "cardKm": 350
+  },
+  {
+   "route": "R473",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Awka",
+   "tonnage": "40T",
+   "routeMasterKm": 482,
+   "cardKm": 465
+  },
+  {
+   "route": "R474",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Calabar",
+   "tonnage": "40T",
+   "routeMasterKm": 710,
+   "cardKm": 717.5
+  },
+  {
+   "route": "R475",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Enugu",
+   "tonnage": "40T",
+   "routeMasterKm": 544,
+   "cardKm": 527.5
+  },
+  {
+   "route": "R476",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Gboko",
+   "tonnage": "40T",
+   "routeMasterKm": 788,
+   "cardKm": 700
+  },
+  {
+   "route": "R477",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibadan (Toll Gate)",
+   "tonnage": "40T",
+   "routeMasterKm": 12,
+   "cardKm": 42.5
+  },
+  {
+   "route": "R478",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibadan (Town)",
+   "tonnage": "40T",
+   "routeMasterKm": 10,
+   "cardKm": 42.5
+  },
+  {
+   "route": "R479",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ogbomoso",
+   "tonnage": "40T",
+   "routeMasterKm": 119,
+   "cardKm": 145
+  },
+  {
+   "route": "R480",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Jos",
+   "tonnage": "40T",
+   "routeMasterKm": 858,
+   "cardKm": 945
+  },
+  {
+   "route": "R481",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Kaduna",
+   "tonnage": "40T",
+   "routeMasterKm": 635,
+   "cardKm": 710
+  },
+  {
+   "route": "R483",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Lagos Island",
+   "tonnage": "40T",
+   "routeMasterKm": 153,
+   "cardKm": 130
+  },
+  {
+   "route": "R484",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Lekki",
+   "tonnage": "40T",
+   "routeMasterKm": 149,
+   "cardKm": 140
+  },
+  {
+   "route": "R486",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Onitsha",
+   "tonnage": "40T",
+   "routeMasterKm": 442,
+   "cardKm": 430
+  },
+  {
+   "route": "R487",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Asaba",
+   "tonnage": "40T",
+   "routeMasterKm": 434,
+   "cardKm": 410
+  },
+  {
+   "route": "R490",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Osogbo",
+   "tonnage": "40T",
+   "routeMasterKm": 110,
+   "cardKm": 135
+  },
+  {
+   "route": "R491",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Kano",
+   "tonnage": "45T",
+   "routeMasterKm": 876,
+   "cardKm": 933.5
+  },
+  {
+   "route": "R492",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Abuja",
+   "tonnage": "45T",
+   "routeMasterKm": 612,
+   "cardKm": 622.5
+  },
+  {
+   "route": "R493",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Benin City",
+   "tonnage": "45T",
+   "routeMasterKm": 273,
+   "cardKm": 286.5
+  },
+  {
+   "route": "R494",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Port Harcourt",
+   "tonnage": "45T",
+   "routeMasterKm": 574,
+   "cardKm": 605
+  },
+  {
+   "route": "R498",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Akure",
+   "tonnage": "45T",
+   "routeMasterKm": 187,
+   "cardKm": 240
+  },
+  {
+   "route": "R499",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ikom",
+   "tonnage": "45T",
+   "routeMasterKm": 719,
+   "cardKm": 750
+  },
+  {
+   "route": "R500",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Abeokuta",
+   "tonnage": "45T",
+   "routeMasterKm": 84,
+   "cardKm": 104.5
+  },
+  {
+   "route": "R501",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Idiroko",
+   "tonnage": "45T",
+   "routeMasterKm": 201,
+   "cardKm": 170
+  },
+  {
+   "route": "R502",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibafo",
+   "tonnage": "45T",
+   "routeMasterKm": 116,
+   "cardKm": 0
+  },
+  {
+   "route": "R503",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Sango-Ota",
+   "tonnage": "45T",
+   "routeMasterKm": 138,
+   "cardKm": 127.5
+  },
+  {
+   "route": "R504",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Sagamu",
+   "tonnage": "45T",
+   "routeMasterKm": 87,
+   "cardKm": 75
+  },
+  {
+   "route": "R505",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ilorin",
+   "tonnage": "45T",
+   "routeMasterKm": 185,
+   "cardKm": 210
+  },
+  {
+   "route": "R506",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Agbor",
+   "tonnage": "45T",
+   "routeMasterKm": 357,
+   "cardKm": 350
+  },
+  {
+   "route": "R507",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Awka",
+   "tonnage": "45T",
+   "routeMasterKm": 482,
+   "cardKm": 465
+  },
+  {
+   "route": "R508",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Calabar",
+   "tonnage": "45T",
+   "routeMasterKm": 710,
+   "cardKm": 717.5
+  },
+  {
+   "route": "R509",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Enugu",
+   "tonnage": "45T",
+   "routeMasterKm": 544,
+   "cardKm": 527.5
+  },
+  {
+   "route": "R510",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Gboko",
+   "tonnage": "45T",
+   "routeMasterKm": 788,
+   "cardKm": 700
+  },
+  {
+   "route": "R511",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibadan (Toll Gate)",
+   "tonnage": "45T",
+   "routeMasterKm": 12,
+   "cardKm": 42.5
+  },
+  {
+   "route": "R512",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ibadan (Town)",
+   "tonnage": "45T",
+   "routeMasterKm": 10,
+   "cardKm": 42.5
+  },
+  {
+   "route": "R513",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Ogbomoso",
+   "tonnage": "45T",
+   "routeMasterKm": 119,
+   "cardKm": 145
+  },
+  {
+   "route": "R514",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Jos",
+   "tonnage": "45T",
+   "routeMasterKm": 858,
+   "cardKm": 945
+  },
+  {
+   "route": "R515",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Kaduna",
+   "tonnage": "45T",
+   "routeMasterKm": 635,
+   "cardKm": 710
+  },
+  {
+   "route": "R517",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Lagos Island",
+   "tonnage": "45T",
+   "routeMasterKm": 153,
+   "cardKm": 130
+  },
+  {
+   "route": "R518",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Lekki",
+   "tonnage": "45T",
+   "routeMasterKm": 149,
+   "cardKm": 140
+  },
+  {
+   "route": "R520",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Onitsha",
+   "tonnage": "45T",
+   "routeMasterKm": 442,
+   "cardKm": 430
+  },
+  {
+   "route": "R521",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Asaba",
+   "tonnage": "45T",
+   "routeMasterKm": 434,
+   "cardKm": 410
+  },
+  {
+   "route": "R524",
+   "client": "LEBRUNI AGRO LTD",
+   "from": "Ibadan",
+   "to": "Osogbo",
+   "tonnage": "45T",
+   "routeMasterKm": 110,
+   "cardKm": 135
+  }
+ ],
+ "routesPriced": 144,
+ "routePriceChanges": [
+  {
+   "route": "RM-0470",
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "8T",
+   "before": 235969.63,
+   "after": 141581.78
+  },
+  {
+   "route": "RM-0518",
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "3T",
+   "before": 148299.24,
+   "after": 88979.54
+  },
+  {
+   "route": "R010",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Gombe",
+   "tonnage": "45T",
+   "before": 3935135.14,
+   "after": 4273000
+  },
+  {
+   "route": "R022",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Bida",
+   "tonnage": "45T",
+   "before": 2724324.32,
+   "after": 1891892
+  },
+  {
+   "route": "R036",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Maiduguri",
+   "tonnage": "45T",
+   "before": 4389189.19,
+   "after": 5000000
+  },
+  {
+   "route": "R057",
+   "client": "INTERSTYLE",
+   "from": "Apapa",
+   "to": "Abuja",
+   "tonnage": "30T",
+   "before": 1550000,
+   "after": 3300000
+  },
+  {
+   "route": "R063",
+   "client": "MEGA MANU",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "45T",
+   "before": 850000,
+   "after": 828000
+  },
+  {
+   "route": "RM-0690",
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "IKM",
+   "tonnage": "30T",
+   "before": 330000,
+   "after": 440000
+  },
+  {
+   "route": "RM-0691",
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Epe",
+   "tonnage": "30T",
+   "before": 970000,
+   "after": 740000
+  },
+  {
+   "route": "R185",
+   "client": "JUBAILI AGROTEC",
+   "from": "Ibadan",
+   "to": "Bida",
+   "tonnage": "30T",
+   "before": 1800000,
+   "after": 1250000
+  },
+  {
+   "route": "R411",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Port Harcourt",
+   "tonnage": "30T",
+   "before": 2400000,
+   "after": 2500000
+  },
+  {
+   "route": "R412",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Abuja",
+   "tonnage": "30T",
+   "before": 2500000,
+   "after": 2750000
+  },
+  {
+   "route": "R413",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Lafia",
+   "tonnage": "30T",
+   "before": 2500000,
+   "after": 3900000
+  },
+  {
+   "route": "R414",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Enugu",
+   "tonnage": "30T",
+   "before": 2000000,
+   "after": 2380000
+  },
+  {
+   "route": "R415",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Onitsha",
+   "tonnage": "30T",
+   "before": 1950000,
+   "after": 2100000
+  },
+  {
+   "route": "R416",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Owerri",
+   "tonnage": "30T",
+   "before": 1800000,
+   "after": 2390000
+  },
+  {
+   "route": "R417",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Warri",
+   "tonnage": "30T",
+   "before": 1500000,
+   "after": 1950000
+  },
+  {
+   "route": "R418",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Kwale",
+   "tonnage": "30T",
+   "before": 1500000,
+   "after": 1950000
+  },
+  {
+   "route": "R419",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Abakaliki",
+   "tonnage": "30T",
+   "before": 2500000,
+   "after": 2850000
+  },
+  {
+   "route": "R420",
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Uyo",
+   "tonnage": "30T",
+   "before": 2400000,
+   "after": 2950000
+  }
+ ],
+ "routesAdded": 318,
+ "routeKmDifferences": 374,
+ "dslDifferences": [
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "8T",
+   "size": "25CBM",
+   "cardPrice": 235969.63,
+   "dslApprovedPrice": 141581.78
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "3T",
+   "size": "16CBM",
+   "cardPrice": 148299.24,
+   "dslApprovedPrice": 88979.54
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "cardPrice": 750000,
+   "dslApprovedPrice": 660000
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Festac-Mile 2-Amuwo-Okota",
+   "tonnage": "30T",
+   "size": "CONTAINARIZED",
+   "cardPrice": 480000,
+   "dslApprovedPrice": 420000
+  },
+  {
+   "client": "Jamara",
+   "from": "Lagos",
+   "to": "Festac-Mile 2-Amuwo-Okota",
+   "tonnage": "30T",
+   "size": "CONTAINARIZED",
+   "cardPrice": 480000,
+   "dslApprovedPrice": 420000
+  },
+  {
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Port Harcourt",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "cardPrice": 2500000,
+   "dslApprovedPrice": 2400000
+  },
+  {
+   "client": "NIGER BISCUITS",
+   "from": "Lagos",
+   "to": "Abuja",
+   "tonnage": "30T",
+   "size": "JUMBO",
+   "cardPrice": 2750000,
+   "dslApprovedPrice": 2970000
+  }
+ ],
+ "contractorPrices": 104,
+ "locationsAdded": 160,
+ "vehicleTypeMismatch": [
+  {
+   "client": "JMG",
+   "from": "Lagos",
+   "to": "Port Harcourt",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 2840000,
+   "existingRate": "rate-jmg-lagos-port-harcourt-30-2840000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 2840000
+  },
+  {
+   "client": "JMG",
+   "from": "Lagos",
+   "to": "Abuja",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 3300000,
+   "existingRate": "rate-jmg-lagos-abuja-30-3300000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 3300000
+  },
+  {
+   "client": "JMG",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 4530000,
+   "existingRate": "rate-jmg-lagos-kano-30-4610000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 4610000
+  },
+  {
+   "client": "JMG",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 740000,
+   "existingRate": "rate-jmg-lagos-ibadan-30-850000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 850000
+  },
+  {
+   "client": "JMG",
+   "from": "Lagos",
+   "to": "Kaduna",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 3970000,
+   "existingRate": "rate-jmg-lagos-kaduna-30-3970000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 3970000
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Port Harcourt",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 2790000,
+   "existingRate": "rate-i-hs-lagos-port-harcourt-30-2400000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 2400000
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Abuja",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 3300000,
+   "existingRate": "rate-i-hs-lagos-abuja-30-2850000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 2850000
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Kano",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 4420000,
+   "existingRate": "rate-i-hs-lagos-kano-30-3950000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 3950000
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Ibadan",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 740000,
+   "existingRate": "rate-i-hs-lagos-ibadan-30-850000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 850000
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Epe",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 970000,
+   "existingRate": "rate-i-hs-lagos-epe-30-750000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 750000
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Kaduna",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 3970000,
+   "existingRate": "rate-i-hs-lagos-kaduna-30-3500000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 3500000
+  },
+  {
+   "client": "I'HS",
+   "from": "Lagos",
+   "to": "Epe",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 740000,
+   "existingRate": "rate-i-hs-lagos-epe-30-750000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 750000
+  },
+  {
+   "client": "JMG",
+   "from": "Lagos",
+   "to": "IKM",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 440000,
+   "existingRate": "rate-jmg-lagos-ikm-30-525000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 525000
+  },
+  {
+   "client": "JMG",
+   "from": "Lagos",
+   "to": "Epe",
+   "tonnage": "30T",
+   "cardVehicleType": "Flat Trucks Logistics",
+   "cardPrice": 740000,
+   "existingRate": "rate-jmg-lagos-epe-30-850000-exclusive",
+   "existingVehicleType": "HAULAGE",
+   "existingPrice": 850000
+  }
+ ],
+ "ratesTotal": 1028,
+ "ratesActive": 984
+}

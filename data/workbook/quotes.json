@@ -1,0 +1,40 @@
+[
+ {
+  "id": "q-orc-001-heavylift",
+  "requestId": "ORC-3PL-001",
+  "contractorId": "ctr-heavylift",
+  "contractorName": "HeavyLift Logistics Ltd",
+  "equipmentType": "Lowbed",
+  "quantity": 1,
+  "price": 7200000,
+  "availability": "Available from 2026-10-15",
+  "validUntil": "2026-10-22",
+  "status": "Quoted",
+  "quotedAt": "2026-10-12T14:00:00Z",
+  "notes": "Includes escort and permits",
+  "version": 1,
+  "createdAt": "2026-10-12T00:00:00Z",
+  "createdBy": "crm",
+  "updatedAt": "2026-10-12T00:00:00Z",
+  "updatedBy": "crm"
+ },
+ {
+  "id": "q-orc-001-hiab",
+  "requestId": "ORC-3PL-001",
+  "contractorId": "ctr-hiabworks",
+  "contractorName": "Hiab Works Nigeria",
+  "equipmentType": "Lowbed",
+  "quantity": 1,
+  "price": 7950000,
+  "availability": "Subcontracted lowbed, 2026-10-17",
+  "validUntil": "2026-10-22",
+  "status": "Quoted",
+  "quotedAt": "2026-10-12T15:30:00Z",
+  "notes": "",
+  "version": 1,
+  "createdAt": "2026-10-12T00:00:00Z",
+  "createdBy": "crm",
+  "updatedAt": "2026-10-12T00:00:00Z",
+  "updatedBy": "crm"
+ }
+]
