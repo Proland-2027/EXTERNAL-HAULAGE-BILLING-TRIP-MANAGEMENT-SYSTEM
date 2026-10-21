@@ -22,6 +22,7 @@
       h('input', { type: 'search', placeholder: 'Search client, route, vehicle…', value: f.search || '', onInput: U.debounce((e) => { f.search = e.target.value; view.draw(); }, 200) }),
       U.select([['', 'All clients'], ...store.clientNames().map((c) => [c, c])], f.client || '', { onChange: (e) => { f.client = e.target.value; view.draw(); } }),
       U.select([['', 'All statuses'], ['Active', 'Active'], ['Expired', 'Expired'], ['Future', 'Future']], f.status || '', { onChange: (e) => { f.status = e.target.value; view.draw(); } }),
+      ...(HB.masterio ? HB.masterio.buttons(ctx, 'rates') : []),
       manage ? h('button', { class: 'btn accent', onClick: () => edit(ctx, null) }, '+ New rate') : null,
       manage ? h('button', { class: 'btn', onClick: () => importRates(ctx) }, 'Import Excel') : null,
       h('button', { class: 'btn', onClick: () => HB.exporter.xlsx([{ name: 'Price List', rows: [['Client', 'Loading From', 'Loading To', 'Vehicle Type', 'Contract Type', 'Agreed Price (₦)', 'Price Basis', 'Effective Date', 'Expiry Date', 'Status', 'Remarks'], ...rates.map((r) => [r.client, r.loadingFrom, r.loadingTo, r.vehicleType, r.contractType, r.price, r.priceBasis === 'inclusive' ? 'Incl VAT' : 'Excl VAT', r.effectiveDate, r.expiryDate, r.status, r.remarks])] }], `Client_Price_List_${today}.xlsx`) }, 'Export Excel'),

@@ -188,12 +188,36 @@
   function lostSalesKindFor(reason) { const hit = CANCEL_REASONS.find(([r]) => norm(r) === norm(reason)); return hit ? hit[1] : 'At risk'; }
   /** Agreed rate for a request: the price list (client + origin + destination + type/tonnage) first, then the route's approved price, then a 3PL selling price. */
   function requestRate(request, ctx) {
-    if (P.isTpl(request) && request.tpl && num(request.tpl.sellingPrice) !== null) return { rate: num(request.tpl.sellingPrice), source: 'client agreed selling price (3PL)' };
-    const probe = { client: request.client, loadingFrom: request.loadingFrom, loadingTo: request.destination, vehicleType: '', contractType: request.tonnage || '', dateDispatched: request.loadingDate || E.todayISO() };
+    const route = (ctx.routes || []).find((r) => r.id === (request.routeMasterId || request.routeId)) || null; const routePrice = route && num(route.price) ? num(route.price) : null;
+    if (P.isTpl(request) && request.tpl && num(request.tpl.sellingPrice) !== null) return { rate: num(request.tpl.sellingPrice), source: 'client agreed selling price (3PL)', approvedRate: num(request.tpl.sellingPrice), routePrice, entry: null, missingMapping: false };
+    const probe = { client: request.client, loadingFrom: request.loadingFrom, loadingTo: request.destination, vehicleType: '', contractType: request.tonnage || (request.plan && request.plan.tonnage) || '', truckSize: request.vehicleType || (request.plan && request.plan.vehicleType) || '', dateDispatched: request.loadingDate || E.todayISO() };
     const lk = E.lookupAgreedRate(probe, ctx.rates || [], ctx.zones || {}, ctx.clients || []);
-    if (lk.rate) return { rate: num(lk.rate.price), source: 'price list' };
-    const route = (ctx.routes || []).find((r) => r.id === (request.routeMasterId || request.routeId)); if (route && num(route.price)) return { rate: num(route.price), source: 'route register' };
-    return { rate: null, source: 'none' };
+    // the approved client rate comes from the Client Price List only (never the Trip Log); the Route Master price is reported separately
+    if (lk.rate) return { rate: num(lk.rate.price), source: 'price list', approvedRate: num(lk.rate.price), routePrice, entry: lk.rate, candidates: lk.candidates || [], missingMapping: false };
+    if (routePrice !== null) return { rate: routePrice, source: 'route register', approvedRate: null, routePrice, entry: null, candidates: lk.candidates || [], missingMapping: true };
+    return { rate: null, source: 'none', approvedRate: null, routePrice: null, entry: null, candidates: lk.candidates || [], missingMapping: true };
+  }
+  const rateCurrent = (r, today) => r.active !== false && r.approved !== false && (!r.effectiveDate || r.effectiveDate <= today) && (!r.expiryDate || r.expiryDate >= today);
+  /**
+   * Brief 8 CRM: the client's default loading origin(s) from the approved Client Price List (city + state, e.g. Givanas → Lagos /
+   * Lagos State; Jubaili Agro-Tech → Ibadan / Oyo State). Never derived from the Trip Log. Several origins are all returned.
+   */
+  function clientOrigins(client, ctx) {
+    const today = ctx.today || E.todayISO(); const stateOf = typeof ctx.stateOf === 'function' ? ctx.stateOf : () => '';
+    const mine = (ctx.rates || []).filter((r) => E.clientKey(r.client, ctx.clients) === E.clientKey(client, ctx.clients) && rateCurrent(r, today));
+    const m = new Map();
+    for (const r of mine) { const k = E.locKey(r.loadingFrom); if (!k) continue; const city0 = clean(r.loadingFrom); const o = m.get(k) || { city: city0 === city0.toUpperCase() ? city0.toLowerCase().replace(/\b\w/g, (ch) => ch.toUpperCase()) : city0, state: stateOf(r.loadingFrom) || '', lanes: 0, destinations: new Set(), vehicleTypes: new Set() }; o.lanes++; if (r.loadingTo) o.destinations.add(clean(r.loadingTo)); if (r.truckSize || r.contractType) o.vehicleTypes.add([r.truckSize, r.contractType].filter(Boolean).join(' ')); m.set(k, o); }
+    return [...m.values()].map((o) => Object.assign(o, { destinations: [...o.destinations].sort(), vehicleTypes: [...o.vehicleTypes].sort(), label: o.city + (o.state ? ' / ' + o.state + ' State' : '') })).sort((a, b) => b.lanes - a.lanes || a.city.localeCompare(b.city));
+  }
+  /** Approved price-list rates for a client lane (origin → destination), by vehicle category / tonnage and effective date; flags a missing mapping. */
+  function clientLaneRates(request, ctx) {
+    const today = request.loadingDate || ctx.today || E.todayISO(); const stateOf = typeof ctx.stateOf === 'function' ? ctx.stateOf : () => '';
+    const from = E.locKey(request.loadingFrom), to = E.locKey(request.destination); const zones = ctx.zones || {};
+    const sameLoc = (a, b) => E.locKey(a) === b || (E.zoneOf ? E.zoneOf(a, zones) && E.zoneOf(a, zones) === E.zoneOf(b, zones) : false);
+    const lanes = (ctx.rates || []).filter((r) => E.clientKey(r.client, ctx.clients) === E.clientKey(request.client, ctx.clients) && rateCurrent(r, today) && (!from || sameLoc(r.loadingFrom, from) || E.locMatch(r.loadingFrom, request.loadingFrom, zones)) && (!to || E.locMatch(r.loadingTo, request.destination, zones)));
+    const rows = lanes.map((r) => ({ id: r.id, loadingFrom: r.loadingFrom, loadingTo: r.loadingTo, destinationState: r.destinationState || stateOf(r.loadingTo) || '', vehicleType: r.truckSize || r.vehicleType || '', tonnage: r.contractType || '', price: num(r.price), priceBasis: r.priceBasis || 'exclusive', effectiveDate: r.effectiveDate || '', expiryDate: r.expiryDate || '', contractName: r.contractName || '' })).sort((a, b) => String(b.effectiveDate).localeCompare(String(a.effectiveDate)));
+    const rr = requestRate(request, ctx);
+    return { rows, selected: rr.entry || null, approvedRate: rr.approvedRate, routePrice: rr.routePrice, missingMapping: !lanes.length || rr.approvedRate === null, message: !lanes.length ? `No approved Client Price List entry for ${request.client || 'this client'} on ${request.loadingFrom || '?'} → ${request.destination || '?'}: rate mapping missing (Commercial / Audit & Control to map before planning).` : rr.approvedRate === null ? `Price List has ${lanes.length} lane(s) for this client and destination but none for ${request.vehicleType || ''} ${request.tonnage || ''}: choose the vehicle category on the list or map the rate.` : '' };
   }
   /** Lost Sales = unfulfilled trucks × agreed client rate. */
   function lostSales(request, counts, rate) { const unfulfilled = Math.max(0, (counts.requested || 0) - (counts.allocated || 0)); return { unfulfilled, rate: num(rate), lost: num(rate) === null ? null : round2(unfulfilled * num(rate)) }; }
@@ -306,5 +330,5 @@
     };
   }
 
-  return { CATEGORIES, LEGACY_CATEGORY, DEFAULT_DISPATCH, SLIP_STATUSES, SLIP_KINDS, EXPENSE_CATEGORIES, EXPENSE_STATUSES, PAYMENT_METHODS, LOST_KINDS, CANCEL_REASONS, TPL_ASSIGNMENT, QUOTE_STATUSES, QUESTIONS, setupOf, vehicleCategory, consumptionRate, distanceId, resolveDistance, dispatchCalc, nextSlipNumber, slipTotals, slipStatus, slipIssueError, slipFromCalc, tripExpenseControl, nextExpenseId, expenseRequestError, expenseTransitionError, lostSalesKindFor, requestRate, lostSales, lostSalesSummary, tplMargin, tplProfitability, assistant, anomalies, dashboard, managementKpis };
+  return { clientOrigins, clientLaneRates, CATEGORIES, LEGACY_CATEGORY, DEFAULT_DISPATCH, SLIP_STATUSES, SLIP_KINDS, EXPENSE_CATEGORIES, EXPENSE_STATUSES, PAYMENT_METHODS, LOST_KINDS, CANCEL_REASONS, TPL_ASSIGNMENT, QUOTE_STATUSES, QUESTIONS, setupOf, vehicleCategory, consumptionRate, distanceId, resolveDistance, dispatchCalc, nextSlipNumber, slipTotals, slipStatus, slipIssueError, slipFromCalc, tripExpenseControl, nextExpenseId, expenseRequestError, expenseTransitionError, lostSalesKindFor, requestRate, lostSales, lostSalesSummary, tplMargin, tplProfitability, assistant, anomalies, dashboard, managementKpis };
 });

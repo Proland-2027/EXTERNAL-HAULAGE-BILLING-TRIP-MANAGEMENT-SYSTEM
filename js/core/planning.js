@@ -30,7 +30,13 @@
   /** Workbook spellings map onto the configured list. */
   const STATUS_ALIASES = { 'available': 'Available', 'on standby / held': 'Allocated / Planned', 'loading at bay': 'Loading', 'laden': 'Loaded', 'outbound': 'Outbound / In Transit', 'in transit': 'Outbound / In Transit', 'at client destination': 'At Destination', 'offloading at client': 'Offloading', 'inbound (returning)': 'Inbound / Returning', 'in workshop': 'In Workshop', 'transit breakdown (offsite)': 'Breakdown in Transit', 'breakdown': 'Breakdown in Transit',
     // Setup brief status names
-    'available but unplanned': 'Available', 'allocated': 'Allocated / Planned', 'at loading point': 'At Loading Point', 'in transit': 'Outbound / In Transit', 'at destination': 'At Destination', 'offloading': 'Offloading', 'returning': 'Inbound / Returning', 'workshop': 'In Workshop', 'unavailable': 'Unavailable', 'loading': 'Loading', 'loaded': 'Loaded' };
+    'available but unplanned': 'Available', 'allocated': 'Allocated / Planned', 'at loading point': 'At Loading Point', 'in transit': 'Outbound / In Transit', 'at destination': 'At Destination', 'offloading': 'Offloading', 'returning': 'Inbound / Returning', 'workshop': 'In Workshop', 'unavailable': 'Unavailable', 'loading': 'Loading', 'loaded': 'Loaded',
+    // Brief 8 FMR: a Free truck is eligible for planning wherever it is; "returning empty" is still on the road
+    'free': 'Available', 'free (returning empty)': 'Inbound / Returning', 'returning empty': 'Inbound / Returning', 'returning loaded': 'Inbound / Returning', 'breakdown in transit': 'Breakdown in Transit' };
+  /** Movement direction of a truck (tracking field, separate from the operational status). */
+  const MOVEMENT_DIRECTIONS = ['Stationary', 'Outbound', 'Returning Empty', 'Returning Loaded', 'Repositioning'];
+  /** FMR planning filters (brief): all Free trucks, Free by state, Free returning empty, Free available for backloading. */
+  const FREE_FILTERS = [['', 'All trucks'], ['free', 'All Free trucks (any location)'], ['free-state', 'Free trucks by state'], ['free-returning', 'Free – returning empty'], ['free-backload', 'Free – available for backloading']];
   /** Journey-planning and on-time-delivery KPIs (Setup_Haulage KPI sheet + delivery-time bands); overridable in meta/planning.kpi. */
   const DEFAULT_KPI = { drivingKmPerDay: 300, loadingDays: 1, offloadingDays: 1, localIncludesHandlingKm: 100, otdBands: [{ maxKm: 100, hours: 24 }, { maxKm: 250, hours: 36 }, { maxKm: 500, hours: 48 }, { maxKm: 1000, hours: 72 }, { maxKm: 1500, hours: 96 }] };
   const kpiOf = (planning) => Object.assign({}, DEFAULT_KPI, (planning && planning.kpi) || {});
@@ -63,7 +69,7 @@
   // Plan Approved. Stage 3 (Station Manager): Partially / Fully Allocated → In Progress → Completed. 3rd-party requests follow the
   // 3PL stages instead. Cancellation Requested = CRM cancelled a request that still had allocated trucks; the Operations Manager
   // approves the release.
-  const REQUEST_STATUSES = ['Draft', 'Pending Route Mapping', 'Awaiting Planning', 'Plan Approved', 'Partially Allocated', 'Fully Allocated', 'In Progress', 'Completed', 'Cancellation Requested', 'Cancelled'];
+  const REQUEST_STATUSES = ['Draft', 'Pending Route Mapping', 'Awaiting Commercial Approval', 'Awaiting Planning', 'Plan Approved', 'Partially Allocated', 'Fully Allocated', 'In Progress', 'Completed', 'Cancellation Requested', 'Cancelled'];
   const TPL_STATUSES = ['Pending Route Mapping', '3PL Planning', 'Quotation', 'Cost Approved', 'Assigned', 'In Execution', 'Completed', 'Cancellation Requested', 'Cancelled'];
   const LEGACY_REQUEST_STATUS = { 'New Request': 'Awaiting Planning', 'Under Planning': 'Awaiting Planning' };
   const ROUTE_STATUSES = ['Approved', 'Pending Approval', 'Retired'];
@@ -193,6 +199,38 @@
     const nextAlloc = active.filter((a) => a.plannedLoadingDate).sort((a, b) => a.plannedLoadingDate.localeCompare(b.plannedLoadingDate))[0] || null;
     return { group, phase, tat: t, backOnGround: back, committedUntil, freeFrom, daysUntilFree, confidence, warnings, deliveryCheck, doubleBooked: overlap.length > 0, trackingOverdue, returnUnconfirmed, category, activeAllocations: active, nextClient: nextAlloc ? nextAlloc.client : '', nextLoadingDate: nextAlloc ? nextAlloc.plannedLoadingDate : '', expectedAvailable: freeFrom, route };
   }
+  /**
+   * Brief 8 FMR position: Operational Status, Current State, Current City, Current Location, Movement Direction, Expected
+   * Availability and Existing Allocation as separate fields. A truck whose operational status is Free is eligible for planning
+   * regardless of location (also while returning empty); "Free" means eligible for planning, not necessarily ready to load now.
+   */
+  function fleetPosition(truck, ctx) {
+    ctx = ctx || {}; const st = truckStatus(truck, ctx); const stateOf = typeof ctx.stateOf === 'function' ? ctx.stateOf : () => '';
+    const direction = truck.movementDirection || (st.group === 'Free' ? 'Stationary' : st.phase === 'inbound' ? 'Returning Empty' : st.group === 'On trip' ? 'Outbound' : 'Stationary');
+    const returningEmpty = st.group === 'On trip' && direction === 'Returning Empty';
+    const city = truck.currentCity || truck.currentLocation || (st.group === 'On trip' && !returningEmpty ? truck.destination : '') || (st.group === 'Free' ? truck.homeStation : '') || '';
+    const state = truck.currentState || stateOf(city) || stateOf(truck.currentLocation) || '';
+    const homeState = stateOf(truck.homeStation || '') || truck.homeStation || '';
+    const planningEligible = st.group === 'Free' || returningEmpty;
+    const operationalStatus = st.group === 'Free' ? 'Free' : returningEmpty ? 'Free (returning empty)' : st.group === 'On trip' ? 'On Trip' : st.group === 'Down' ? (/breakdown/i.test(truck.status) ? 'Breakdown' : 'Workshop') : truck.status ? 'Unavailable' : 'No status';
+    const awayFromBase = !!state && !!homeState && norm(state) !== norm(homeState);
+    const existing = st.activeAllocations.slice().sort((a, b) => String(a.plannedLoadingDate || '').localeCompare(String(b.plannedLoadingDate || '')))[0] || null;
+    return { operationalStatus, planningEligible, readyToLoad: st.group === 'Free' && !st.activeAllocations.length, currentState: state, currentCity: city, currentLocation: truck.currentLocation || '', movementDirection: direction, expectedAvailability: truck.expectedAvailability || st.freeFrom || '', existingAllocation: existing, existingAllocationLabel: existing ? `${existing.id} · ${existing.client} · load ${existing.plannedLoadingDate || '?'}` : '', returningEmpty, backloadCandidate: planningEligible && (returningEmpty || awayFromBase), awayFromBase, homeState, status: st };
+  }
+  /** Apply one of FREE_FILTERS to FMR rows ({ truck, pos }). */
+  function freeFilter(rows, filter, state) {
+    const want = norm(state || '');
+    return (rows || []).filter((r) => { const p = r.pos; if (!filter) return true; if (!p.planningEligible) return false; if (filter === 'free-state') return !want || norm(p.currentState) === want; if (filter === 'free-returning') return p.returningEmpty; if (filter === 'free-backload') return p.backloadCandidate; return true; });
+  }
+  /** Checks before allocating a Free truck that is away from the loading point: ETA at the new loading point, driver, conflicts. */
+  function allocationChecks(truck, row, ctx) {
+    const pos = fleetPosition(truck, ctx); const checks = [];
+    checks.push({ key: 'eta', ok: !!row.canLoad, label: row.canLoad ? `Can reach ${row.bay || 'the loading point'} by ${row.canLoad}${row.daysLate ? ' (' + row.daysLate + ' day(s) after the requested date)' : ''}` : 'ETA at the loading point cannot be estimated (no status date / route)' });
+    checks.push({ key: 'driver', ok: !!truck.driver, label: truck.driver ? `Driver ${truck.driver}` : 'No driver assigned' });
+    checks.push({ key: 'conflict', ok: !(row.booked || []).length, label: (row.booked || []).length ? `Allocation conflict: ${row.booked.map((b) => b.id + ' ' + b.client).join(', ')}` : pos.existingAllocation ? `Existing allocation ${pos.existingAllocationLabel} (check the sequence)` : 'No conflicting allocation' });
+    checks.push({ key: 'eligible', ok: pos.planningEligible, label: pos.planningEligible ? `${pos.operationalStatus}${pos.currentState ? ' in ' + pos.currentState : ''}${pos.returningEmpty ? ' (returning empty: eligible for planning, verify before loading)' : ''}` : `${pos.operationalStatus}: not eligible for planning` });
+    return { pos, checks, ok: checks.every((c) => c.ok) };
+  }
   function overlappingAllocations(allocs) {
     const out = [];
     for (let i = 0; i < allocs.length; i++) for (let j = i + 1; j < allocs.length; j++) { const a = allocs[i], b = allocs[j]; if (a.plannedLoadingDate && b.plannedLoadingDate && a.backOnGround && b.backOnGround && a.plannedLoadingDate <= b.backOnGround && b.plannedLoadingDate <= a.backOnGround) out.push([a, b]); }
@@ -233,7 +271,8 @@
       if (fit === 'No') notes.push('Wrong truck size or tonnage for this contract');
       if (fit === 'Not set') notes.push('Body type or tonnage not set');
       if (st.category === AVAILABILITY_CATEGORIES[5]) notes.push('Status unconfirmed: ' + (st.warnings[0] || 'needs tracking verification'));
-      return { truck, status: st, dropAt, moveDays, atBay, canLoad, reaches, back, daysLate, fit, booked, promised, sortKey, notes, canMakeDate: !!canLoad && daysLate === 0 && fit === 'Yes' && !booked.length };
+      const pos = fleetPosition(truck, ctx); if (pos.returningEmpty) notes.push(`Returning empty${pos.currentState ? ' through ' + pos.currentState : ''}: Free for planning, confirm the ETA at the bay and the driver before loading`); else if (pos.planningEligible && pos.awayFromBase) notes.push(`Free in ${pos.currentState}: eligible for planning away from base (${moveDays === null ? '?' : moveDays} day(s) to the bay)`); if (!truck.driver) notes.push('No driver assigned');
+      return { truck, status: st, pos, dropAt, moveDays, atBay, canLoad, reaches, back, daysLate, fit, booked, promised, sortKey, notes, canMakeDate: !!canLoad && daysLate === 0 && fit === 'Yes' && !booked.length };
     });
     rows.sort((a, b) => a.sortKey - b.sortKey || plateKey(a.truck.plate).localeCompare(plateKey(b.truck.plate)));
     rows.forEach((r, i) => { r.rank = i + 1; });
@@ -263,6 +302,7 @@
     if (request.status === 'Draft' && !request.submittedAt) return 'Draft';
     const rv = routeValidation(request, ctx && ctx.routes); if (!rv.ok) return 'Pending Route Mapping';
     if (isTpl(request)) { const t = request.tpl || {}; if (counts.deployed > 0 || t.assignmentStatus === 'In Execution') return 'In Execution'; if (t.assignmentStatus === 'Assigned' || t.assignedAt) return 'Assigned'; if (t.approvedCost !== null && t.approvedCost !== undefined && t.approvedCost !== '' && t.costApprovedAt) return 'Cost Approved'; if (t.quotesRequestedAt || (ctx && ctx.quotes && ctx.quotes.some((q) => q.requestId === request.id))) return 'Quotation'; return '3PL Planning'; }
+    if (!(request.plan && request.plan.approvedAt) && request.commercial && request.commercial.requiresGm && !request.commercial.gmApprovedAt && !(ctx && ctx.rateexceptions && ctx.rateexceptions.some((x) => x.requestId === request.id && x.status === 'Approved'))) return 'Awaiting Commercial Approval';
     if (!(request.plan && request.plan.approvedAt)) return 'Awaiting Planning';
     if (counts.deployed > 0) return 'In Progress';
     if (counts.allocated === 0) return 'Plan Approved';
@@ -506,7 +546,7 @@
   }
 
   return {
-    DEFAULT_STATUSES, STATUS_ALIASES, DEFAULT_SETUP, REQUEST_STATUSES, TPL_STATUSES, LEGACY_REQUEST_STATUS, ROUTE_STATUSES, TPL_EQUIPMENT, MILESTONES, EXTRA_EVENTS, DELAY_REASONS, ALLOCATION_STATUSES, PRIORITIES, WAYBILL_STATUSES, INVOICE_STATUS_AUTO, INVOICE_DOC_STATUSES, AVAILABILITY_CATEGORIES, DEFAULT_BODY_RUNS, CHAIN_STAGES, chainStage, requestBilling, tripFromAllocation, allocationLinkError,
+    DEFAULT_STATUSES, STATUS_ALIASES, DEFAULT_SETUP, REQUEST_STATUSES, MOVEMENT_DIRECTIONS, FREE_FILTERS, fleetPosition, freeFilter, allocationChecks, TPL_STATUSES, LEGACY_REQUEST_STATUS, ROUTE_STATUSES, TPL_EQUIPMENT, MILESTONES, EXTRA_EVENTS, DELAY_REASONS, ALLOCATION_STATUSES, PRIORITIES, WAYBILL_STATUSES, INVOICE_STATUS_AUTO, INVOICE_DOC_STATUSES, AVAILABILITY_CATEGORIES, DEFAULT_BODY_RUNS, CHAIN_STAGES, chainStage, requestBilling, tripFromAllocation, allocationLinkError,
     isTpl, normRequestStatus, routeFor, routeStatus, routeValidation, routeMaster, allocationGuard, allocationSubstitutionError, allocationLobError, tatCalc, milestoneError, tatDashboard, DEFAULT_KPI, kpiOf, otdTarget, journeyPlan, routeKpi,
     todayISO, addDays, diffDays, maxDate, plateKey, setupOf, statusList, statusInfo, canonicalStatus, repoDays, routeTiming, routeLabel, findRoute, routeCost, fits, bodyRuns,
     truckStatus, overlappingAllocations, allocationDates, bookingConflicts, planForRequest, requestCounts, requestStatus, nextRequestId, nextAllocationId, allocationChain,

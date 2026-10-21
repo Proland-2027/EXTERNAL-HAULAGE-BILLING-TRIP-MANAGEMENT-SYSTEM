@@ -15,12 +15,12 @@
     }
     async init(progress) {
       progress && progress('Loading shared records…');
-      const names = ['settings', 'meta', 'clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dieselreqs', 'roadslips', 'extraexpenses', 'contractors', 'quotes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'jobcards', 'stockmoves', 'postings', 'rateexceptions', 'auditfindings', 'tripchunks'];
+      const names = ['settings', 'meta', 'clients', 'assets', 'rates', 'invoices', 'payments', 'users', 'fleet', 'routes', 'requests', 'allocations', 'waybilldocs', 'lostsales', 'distances', 'dieselreqs', 'roadslips', 'extraexpenses', 'contractors', 'quotes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'jobcards', 'stockmoves', 'postings', 'rateexceptions', 'auditfindings', 'incidents', 'importlogs', 'tripchunks'];
       // The route register (524 workbook routes) ships as a static file; routes edited in the app are saved as documents and override it by id.
       try { const r = await fetch('data/workbook/routes.json'); if (r.ok) this.state.routes = await r.json(); } catch (e) { /* offline */ }
       // reference masters ship as static files too (large, rarely edited); documents saved in the app override them by id
       for (const n of ['staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates']) { try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[n] = await r.json(); } catch (e) { /* offline */ } }
-      for (const n of ['accountmap', 'routezones', 'turnaround', 'auditpolicy', 'ratecomparison']) { try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[n] = await r.json(); } catch (e) { /* offline */ } }
+      for (const n of ['accountmap', 'routezones', 'turnaround', 'auditpolicy', 'ratecomparison', 'incidentcats']) { try { const r = await fetch(`data/workbook/${n}.json`); if (r.ok) this.state[n] = await r.json(); } catch (e) { /* offline */ } }
       try { const r = await fetch('data/workbook/triplog_reconciliation.json'); if (r.ok) this.state.triplogReconciliation = await r.json(); } catch (e) { /* offline */ }
       // the Asset List (127 assets with cost centers) and the FMR fleet register (69 trucks) ship as static files as well; documents saved in the app are merged over them by id
       try { const r = await fetch('data/workbook/assets.json'); if (r.ok) this.state.assets = (await r.json()).map((x) => { const id = String(x.plate || '').replace(/[^A-Za-z0-9_-]+/g, '-'); const tb = x.vehicleCategory === 'New Batch' ? 'New Batch' : x.vehicleCategory === '3rd Party' ? '3rd Party' : 'Old Batch'; return Object.assign({ id, truckBatch: tb, batchHistory: [{ batch: tb, effectiveDate: '2024-01-01' }] }, x); }); } catch (e) { /* offline */ }
@@ -56,11 +56,11 @@
     async resume() { const s = U.storage.get('hb_session'); if (!s) return null; const u = this.state.users.find((x) => x.username === s.username && x.active !== false); this.user = this.publicUser(u); return this.user; }
     async logout() { this.user = null; U.storage.del('hb_session'); }
     /** Trip ID sequence: a shared counter document (meta/tripseq) advanced with a merge write, seeded from the Trip Log; duplicates are still refused on save. */
-    async nextTripId(year) {
-      year = year || new Date().getUTCFullYear(); const key = 'y' + year; const counter = this.state.tripseq || {};
-      const n = Math.max(Number(counter[key] || 0), HB.engine.maxTripSeq([...this.state.trips.values()], year) + 1);
+    async nextTripId(kind) {
+      kind = kind === 'tpl' ? 'tpl' : 'internal'; const key = 'k' + kind; const counter = this.state.tripseq || {};
+      const n = Math.max(Number(counter[key] || 0), HB.engine.nextTripSeq([...this.state.trips.values()], kind));
       await this._merge('meta', 'tripseq', { id: 'tripseq', [key]: n + 1 }); this.state.tripseq = Object.assign({}, counter, { [key]: n + 1 });
-      return HB.engine.formatTripId(year, n);
+      return HB.engine.formatTripId(kind, n);
     }
 
     async _merge(collection, id, patch) {

@@ -20,7 +20,7 @@ const DEMO_USERS = [
   { username: 'tracking', name: 'Ngozi Eze', role: 'tracking', password: 'Tracking@2026' },
   { username: 'planner', name: 'Tunde Bakare', role: 'planning', password: 'Planner@2026' },
   { username: 'crm', name: 'Amaka Obi', role: 'crm', password: 'Crm@2026' },
-  { username: 'station', name: 'Yusuf Danjuma', role: 'station', password: 'Station@2026' }, { username: 'supervisor', name: 'Bola Adeyinka', role: 'stationsup', password: 'Supervisor@2026' }, { username: 'tplcoord', name: 'Ngozi Eze', role: 'tplcoord', password: 'Tpl@2026' }, { username: 'workshop', name: 'Ghassan El Saifi', role: 'workshop', password: 'Workshop@2026' }, { username: 'storekeeper', name: 'Ibrahim Sule', role: 'storekeeper', password: 'Store@2026' },
+  { username: 'station', name: 'Yusuf Danjuma', role: 'station', password: 'Station@2026' }, { username: 'supervisor', name: 'Bola Adeyinka', role: 'stationsup', password: 'Supervisor@2026' }, { username: 'tplcoord', name: 'Ngozi Eze', role: 'tplcoord', password: 'Tpl@2026' }, { username: 'workshop', name: 'Ghassan El Saifi', role: 'workshop', password: 'Workshop@2026' }, { username: 'storekeeper', name: 'Ibrahim Sule', role: 'storekeeper', password: 'Store@2026' }, { username: 'gm', name: 'Olumide Adebayo', role: 'gm', password: 'Gm@2026' },
 ];
 const exists = (n) => fs2.existsSync(path.join(ROOT, 'data', 'workbook', n));
 
@@ -42,7 +42,7 @@ try {
   for (const c of ['fleet', 'routes', 'requests', 'allocations', 'distances', 'contractors', 'quotes', 'staff', 'costcenters', 'lob', 'accounts', 'items', 'suppliers', 'ratecard', 'tplrates', 'jobcards', 'stockmoves']) if (!store.list(c).length && exists(c + '.json')) for (const d of read(c + '.json')) store.putDoc(c, Object.assign({ version: 1 }, d));
   if (!store.doc('meta', 'locationmaster') && exists('locationmaster.json')) store.putDoc('meta', Object.assign({ version: 1 }, read('locationmaster.json'), { id: 'locationmaster' }));
   if (!store.doc('meta', 'planning') && exists('planning.json')) store.putDoc('meta', Object.assign({ version: 1 }, read('planning.json'), { id: 'planning' }));
-  for (const m of ['accountmap', 'routezones', 'turnaround', 'auditpolicy']) if (!store.doc('meta', m) && exists(m + '.json')) store.putDoc('meta', Object.assign({ version: 1 }, read(m + '.json'), { id: m }));
+  for (const m of ['accountmap', 'routezones', 'turnaround', 'auditpolicy', 'incidentcats']) if (!store.doc('meta', m) && exists(m + '.json')) store.putDoc('meta', Object.assign({ version: 1 }, read(m + '.json'), { id: m }));
   store.audit({ id: 'a-seed-' + Date.now().toString(36), ts: new Date().toISOString(), user: 'system', userName: 'Seed script', role: '', action: 'import', entity: 'workbook', entityId: 'Haulage_Billing_Sheet_September_R2', label: 'Workbook data loaded', changes: [] });
   db.exec('COMMIT');
 } catch (e) { db.exec('ROLLBACK'); throw e; }

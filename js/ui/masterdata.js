@@ -14,7 +14,11 @@
     const f = view.filters; const search = (placeholder) => h('input', { type: 'search', placeholder, value: f[view.tab] || '', onInput: U.debounce((e) => { f[view.tab] = e.target.value; view.draw(); }, 200) });
     const q = E.norm(f[view.tab] || ''); const hit = (...xs) => !q || E.norm(xs.join(' ')).includes(q);
     const manage = ctx.can('master.manage');
+    const ioKey = { costcenters: 'costcenters', lob: 'lob', accounts: 'accounts', staff: 'staff', suppliers: 'suppliers', ratecard: 'ratecard' }[view.tab];
+    if (ioKey && HB.masterio) wrap.append(h('div', { class: 'row', id: 'io-bar' }, h('span', { class: 'label', text: 'Excel' }), ...HB.masterio.buttons(ctx, ioKey)));
+    if (view.tab === 'report' && HB.masterio) wrap.append(h('div', { class: 'row', id: 'io-bar' }, h('span', { class: 'label', text: 'Diesel KPI' }), ...HB.masterio.buttons(ctx, 'dieselkpi'), h('span', { class: 'label', text: 'Item List' }), ...HB.masterio.buttons(ctx, 'items')));
     ({ costcenters: drawCostCenters, lob: drawLob, accounts: drawAccounts, staff: drawStaff, suppliers: drawSuppliers, ratecard: drawRateCard, tplrates: drawTplRates, report: drawReport })[view.tab](ctx, wrap, { search, hit, manage });
+    if (view.tab === 'report' && HB.masterio) wrap.append(HB.masterio.logTable(ctx));
   };
   const table = (headers, rows, id) => h('div', { class: 'table-frame' }, rows.length ? h('table', { class: 'data', id }, h('thead', {}, h('tr', {}, headers.map((x) => h('th', { class: typeof x === 'object' ? x.cls || '' : '', text: typeof x === 'object' ? x.t : x })))), h('tbody', {}, rows)) : h('div', { class: 'empty', text: 'Nothing to show.' }));
   const exportBtn = (ctx, name, headers, rows) => (ctx.can('export') ? h('button', { class: 'btn', onClick: () => HB.exporter.xlsx([{ name, rows: [headers, ...rows] }], `${name.replace(/\W+/g, '_')}_${U.todayISO()}.xlsx`) }, 'Export Excel') : null);

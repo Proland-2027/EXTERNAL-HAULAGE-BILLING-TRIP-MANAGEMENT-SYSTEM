@@ -1,0 +1,22 @@
+{
+  "id": "incidentcats",
+  "source": "Brief 8 (Incident & Breakdown Log) — admin-maintained master",
+  "list": [
+    { "name": "Breakdown in Transit", "active": true, "mechanical": true, "workshop": true },
+    { "name": "Engine Failure", "active": true, "mechanical": true, "workshop": true },
+    { "name": "Gearbox or Transmission Failure", "active": true, "mechanical": true, "workshop": true },
+    { "name": "Tyre Burst or Tyre Damage", "active": true, "mechanical": true, "workshop": true },
+    { "name": "Electrical Failure", "active": true, "mechanical": true, "workshop": true },
+    { "name": "Brake Failure", "active": true, "mechanical": true, "workshop": true },
+    { "name": "Accident", "active": true, "mechanical": true, "workshop": true },
+    { "name": "Road Traffic Incident", "active": true, "mechanical": false, "workshop": false },
+    { "name": "Vehicle Recovery or Towing", "active": true, "mechanical": true, "workshop": true },
+    { "name": "Cargo Damage", "active": true, "mechanical": false, "workshop": false },
+    { "name": "Cargo Shortage or Loss", "active": true, "mechanical": false, "workshop": false },
+    { "name": "Security Incident", "active": true, "mechanical": false, "workshop": false },
+    { "name": "Road Blockage or Detention", "active": true, "mechanical": false, "workshop": false },
+    { "name": "Loading Incident", "active": true, "mechanical": false, "workshop": false },
+    { "name": "Offloading Incident", "active": true, "mechanical": false, "workshop": false },
+    { "name": "Other Operational Incident", "active": true, "mechanical": false, "workshop": false }
+  ]
+}

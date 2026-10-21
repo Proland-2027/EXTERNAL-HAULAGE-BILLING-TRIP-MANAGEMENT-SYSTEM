@@ -24,7 +24,7 @@
     comparison: { period: 'quarter', vehicleGrouping: 'workbook', minTripsForBenchmark: 3, minClientsPerGroup: 2, excludeExceptional: true, scopeFrom: '2026-01-02', scopeTo: '' },
     thresholds: { belowApprovedTolerancePct: 0.5, materialBelowBenchmarkPct: 10, thinBenchmarkTrips: 3, lowMarginPct: 5 },
     blocking: { invoice: { belowApproved: true, belowCost: true, missingRate: false, override: true }, allocation: { belowCost: true, missingRate: false, belowBenchmark: false } },
-    approvalMatrix: { belowApproved: { review: ['operations'], approve: ['management', 'finance'] }, belowCost: { review: ['operations'], approve: ['management'] }, missingRate: { review: ['operations'], approve: ['management', 'finance'] }, override: { review: ['operations'], approve: ['management', 'finance'] }, exceptional: { review: ['operations'], approve: ['management'] } },
+    approvalMatrix: { belowApproved: { review: ['operations'], approve: ['management', 'finance', 'gm'] }, belowCost: { review: ['operations'], approve: ['management', 'gm'] }, missingRate: { review: ['operations'], approve: ['management', 'finance'] }, override: { review: ['operations'], approve: ['management', 'finance'] }, exceptional: { review: ['operations'], approve: ['management'] } },
     truckDays: { operatingDaysPerMonth: 26, defaultOneLegDays: 2, basis: 'planned' },
   };
   function policyOf(ctx) {
@@ -262,8 +262,48 @@
     if (expectedMargin !== null && expectedMargin < 0) warnings.push(`Expected selling price is below the estimated trip cost (margin ₦${expectedMargin.toLocaleString('en-NG')}).`);
     if (rateLevel !== null && rateLevel < 100 - material) warnings.push(`Commercial Alert: this client pays below the comparable route benchmark (${rateLevel}% of ${g.bestClient}'s average on ${g.route}, ${g.periodLabel}). Review expected margin and alternative fleet demand before allocation.`);
     const exception = coveredByException({ requestId: request.id, loadingDate: request.loadingDate }, ctx.rateexceptions);
-    if (!exception) { if (expectedMargin !== null && expectedMargin < 0 && policy.blocking.allocation.belowCost) blockers.push('Negative-margin job: an approved commercial exception is required before the plan can be approved.'); if (approvedRate === null && !P.isTpl(request) && policy.blocking.allocation.missingRate) blockers.push('No approved client rate: an approved commercial exception is required before the plan can be approved.'); if (rateLevel !== null && rateLevel < 100 - material && policy.blocking.allocation.belowBenchmark) blockers.push('Below-benchmark rate: an approved commercial exception is required (policy).'); }
-    return { requestId: request.id, client: request.client, route: rt.key, routeMasterId: route ? route.id : '', vehicleType, tonnage, approvedRate, approvedSource: approvedRate !== null ? rr.source : 'none', expectedSellingPrice: expected, expectedSource, estimatedCost: cost, costBasis: est.basis, costComponents: est.components, expectedMargin, marginPct: expectedMargin !== null && expected ? pct(expectedMargin, expected) : null, bestComparableRate: g ? g.bestAvg : null, bestComparableClient: g ? g.bestClient : '', comparisonPeriod: g ? g.periodLabel : '', rateLevel, competitiveness: rateLevel === null ? 'No comparable trips on this route' : rateLevel >= 99.5 ? 'Strong Rate' : rateLevel >= 100 - material ? 'Competitive' : 'Below Comparable Peers', truckDaysPerTrip: td, truckDaysRequired: round2(td * trucks), trucks, warnings, notes, blockers, flagged: warnings.length > 0, exception };
+    // Brief 8: a General Manager approval recorded on the request (for the same commercial terms) authorises the job like an approved exception
+    const gm = request.commercial && request.commercial.gmApprovedAt && request.commercial.termsHash === termsHash(request) ? request.commercial : null;
+    if (!exception && !gm) { if (expectedMargin !== null && expectedMargin < 0 && policy.blocking.allocation.belowCost) blockers.push('Negative-margin job: an approved commercial exception is required before the plan can be approved.'); if (approvedRate === null && !P.isTpl(request) && policy.blocking.allocation.missingRate) blockers.push('No approved client rate: an approved commercial exception is required before the plan can be approved.'); if (rateLevel !== null && rateLevel < 100 - material && policy.blocking.allocation.belowBenchmark) blockers.push('Below-benchmark rate: an approved commercial exception is required (policy).'); }
+    return { requestId: request.id, client: request.client, route: rt.key, routeMasterId: route ? route.id : '', vehicleType, tonnage, approvedRate, approvedSource: approvedRate !== null ? rr.source : 'none', expectedSellingPrice: expected, expectedSource, estimatedCost: cost, costBasis: est.basis, costComponents: est.components, expectedMargin, marginPct: expectedMargin !== null && expected ? pct(expectedMargin, expected) : null, bestComparableRate: g ? g.bestAvg : null, bestComparableClient: g ? g.bestClient : '', comparisonPeriod: g ? g.periodLabel : '', rateLevel, competitiveness: rateLevel === null ? 'No comparable trips on this route' : rateLevel >= 99.5 ? 'Strong Rate' : rateLevel >= 100 - material ? 'Competitive' : 'Below Comparable Peers', truckDaysPerTrip: td, truckDaysRequired: round2(td * trucks), trucks, warnings, notes, blockers, flagged: warnings.length > 0 && !gm, exception, gmApproval: gm };
+  }
+  /** The commercial terms a GM approval covers; any material change (client, lane, vehicle, trucks, price, date) clears the approval. */
+  function termsHash(request) { return ['client', 'loadingFrom', 'destination', 'vehicleType', 'tonnage', 'trucks', 'expectedSellingPrice', 'loadingDate'].map((k) => norm(String(request[k] === null || request[k] === undefined ? '' : request[k]))).join('|'); }
+  /**
+   * Brief 8 Commercial Approval: approved client rate (Price List), calculated costing rate, expected profit and margin. A request
+   * whose expected price is below cost or below the approved client rate may proceed only after General Manager approval; the
+   * approval records date, approver, remarks and approved price, and a material change triggers re-approval.
+   */
+  function commercialReview(request, ctx, comp) {
+    const ra = requestAudit(request, ctx, comp); const expected = ra.expectedSellingPrice, cost = ra.estimatedCost, approved = ra.approvedRate;
+    const belowCost = expected !== null && cost !== null && expected < cost - 0.005; const belowRate = expected !== null && approved !== null && expected < approved - 0.005;
+    const requiresGm = (belowCost || belowRate) && !P.isTpl(request) && !ra.exception; const c = request.commercial || {}; const hash = termsHash(request);
+    const gmApproved = !!c.gmApprovedAt && c.termsHash === hash; const gmRejected = !!c.gmRejectedAt && c.termsHash === hash && !gmApproved;
+    const reasons = []; if (belowCost) reasons.push(`Expected selling price ₦${expected.toLocaleString('en-NG')} is below the calculated costing rate ₦${cost.toLocaleString('en-NG')}.`); if (belowRate) reasons.push(`Expected selling price ₦${expected.toLocaleString('en-NG')} is below the approved client rate ₦${approved.toLocaleString('en-NG')}.`);
+    const status = !requiresGm ? (approved === null && !P.isTpl(request) ? 'Rate mapping missing' : 'Within approved terms') : gmApproved ? 'GM approved' : gmRejected ? 'GM rejected' : 'Awaiting GM approval';
+    return { approvedRate: approved, approvedSource: ra.approvedSource, costingRate: cost, costBasis: ra.costBasis, expectedSellingPrice: expected, expectedSource: ra.expectedSource, expectedProfit: ra.expectedMargin, marginPct: ra.marginPct, belowCost, belowRate, requiresGm, gmApproved, gmRejected, status, reasons, termsHash: hash, approval: c, missingRate: approved === null && !P.isTpl(request), audit: ra, staleApproval: !!c.gmApprovedAt && c.termsHash !== hash, exception: ra.exception || null };
+  }
+  /** Snapshot stored on the request on every save (so the status and the reports never recompute history); clears a GM approval when the terms changed. */
+  function commercialSnapshot(request, current, ctx, comp, now) {
+    const cr = commercialReview(request, ctx, comp); const prev = (current && current.commercial) || {}; const c = Object.assign({}, request.commercial || prev); // the incoming commercial block is authoritative (a cleared approval stays cleared)
+    const out = Object.assign({}, c, { approvedRate: cr.approvedRate, costingRate: cr.costingRate, expectedSellingPrice: cr.expectedSellingPrice, expectedProfit: cr.expectedProfit, marginPct: cr.marginPct, belowCost: cr.belowCost, belowRate: cr.belowRate, requiresGm: cr.requiresGm, missingRate: cr.missingRate, evaluatedAt: now || new Date().toISOString() });
+    if (out.gmApprovedAt && out.termsHash && out.termsHash !== cr.termsHash) { out.history = [...(out.history || []), { at: now || new Date().toISOString(), action: 'Re-approval required', note: `Commercial terms changed after the GM approval of ${out.gmApprovedAt} (${out.gmApprovedBy}); approval cleared`, previous: { gmApprovedAt: out.gmApprovedAt, gmApprovedBy: out.gmApprovedBy, approvedPrice: out.approvedPrice, gmRemarks: out.gmRemarks } }]; delete out.gmApprovedAt; delete out.gmApprovedBy; delete out.approvedPrice; delete out.gmRemarks; }
+    if (!out.gmApprovedAt) out.termsHash = cr.termsHash;
+    return out;
+  }
+  /** Why a GM decision on a request is refused ('' when allowed): role, remarks, approved price; a decision never changes the terms. */
+  function gmDecisionError(next, current, role) {
+    const c = next.commercial || {}; const cur = (current && current.commercial) || {};
+    const changed = (c.gmApprovedAt || '') !== (cur.gmApprovedAt || '') || (c.gmRejectedAt || '') !== (cur.gmRejectedAt || '') || num(c.approvedPrice) !== num(cur.approvedPrice) || (c.gmRemarks || '') !== (cur.gmRemarks || '');
+    if (!changed) return '';
+    // a material change to the terms clears an earlier approval (recorded in the history); that clearing is not a GM decision
+    const cleared = !c.gmApprovedAt && !!cur.gmApprovedAt && !c.gmRejectedAt && termsHash(next) !== (cur.termsHash || termsHash(current || {}));
+    if (cleared) return '';
+    if (!E.can(role, 'commercial.gmapprove')) return 'Only the General Manager approves or rejects below-cost / below-rate requests.';
+    if (c.gmApprovedAt && !E.clean(c.gmRemarks)) return 'Record the General Manager\'s remarks with the decision.';
+    if (c.gmApprovedAt && num(c.approvedPrice) === null) return 'Record the approved price.';
+    if (c.gmApprovedAt && cur.gmApprovedAt && c.gmApprovedAt !== cur.gmApprovedAt) return 'An existing GM approval is not re-stamped; a material change clears it and a new decision is recorded.';
+    return '';
   }
   /** Estimated cost of a job before a truck is known: the median rate-card parameters of the matching vehicle class on the route's distance. */
   function estimateCost(route, vehicleType, tonnage, ctx) {
@@ -406,5 +446,5 @@
     });
   }
 
-  return { DEFAULT_POLICY, policyOf, LOADING_AREAS, loadingArea, destName, compRoute, periodOf, periodLabel, vehicleClass, inScope, comparison, clientRanking, workbookVerdict, routeGaps, costingOf, truckDays, turnaroundLookup, tripsPerTruckPerMonth, truckDayStats, truckRequirement, STATUSES, SEVERITIES, VERDICTS, EXCEPTION_TYPES, EXCEPTION_STATUSES, FINDING_STATUSES, coveredByException, tripAudit, actualMargin, auditTrips, requestAudit, estimateCost, nextExceptionNo, nextFindingNo, canReview, canApprove, exceptionError, exceptionStamp, findingError, recommendations, QUESTIONS, assistant, reconcileBaseline, filterTrips };
+  return { termsHash, commercialReview, commercialSnapshot, gmDecisionError, DEFAULT_POLICY, policyOf, LOADING_AREAS, loadingArea, destName, compRoute, periodOf, periodLabel, vehicleClass, inScope, comparison, clientRanking, workbookVerdict, routeGaps, costingOf, truckDays, turnaroundLookup, tripsPerTruckPerMonth, truckDayStats, truckRequirement, STATUSES, SEVERITIES, VERDICTS, EXCEPTION_TYPES, EXCEPTION_STATUSES, FINDING_STATUSES, coveredByException, tripAudit, actualMargin, auditTrips, requestAudit, estimateCost, nextExceptionNo, nextFindingNo, canReview, canApprove, exceptionError, exceptionStamp, findingError, recommendations, QUESTIONS, assistant, reconcileBaseline, filterTrips };
 });
