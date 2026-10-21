@@ -9,13 +9,13 @@ address in Chrome, Edge, Firefox or Safari and log in.
 A working multi-user edition is published at https://claude.ai/artifact/4eqdTG5R9fhNfmkZcn7HBG (private to the
 owner until shared from the page's Share menu; give colleagues Contributor or Editor access so they can save).
 It runs the same planning engine in the browser against the workbook data, with a shared database on the
-claude.ai platform. The steps below are for JMG's own WordPress server.
+claude.ai platform. The steps below are for your own WordPress server.
 
 ## Deployment status and what is required
 
 The plugin is complete and tested on a local WordPress 6.8 installation, but **it has not been
 published to a public HTTPS site from this delivery**: publishing needs a hosting account (or a
-server) that only the JMG team can provide. To put the demo online, one of the following is needed:
+server) that only the team can provide. To put the demo online, one of the following is needed:
 
 | Option | What you provide | Time |
 |---|---|---|
@@ -75,7 +75,7 @@ Change these passwords in Administration → Users before inviting real users.
 Administration → Users & roles → "Invite a team member": username, e-mail, role, optional section
 assignment for supervisors. The generated password is shown once; the user signs in at
 `/wp-login.php`. Roles can be changed and passwords reset from the same screen. (Standard
-WordPress Users screen works too; the JMG roles appear in the role list.)
+WordPress Users screen works too; the production planning roles appear in the role list.)
 
 ### Multiple users, one live database
 All screens read and write the WordPress database through the REST API; nothing operational is kept in

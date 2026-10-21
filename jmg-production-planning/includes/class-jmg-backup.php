@@ -19,7 +19,7 @@ class JMG_Backup {
 		global $wpdb;
 		@set_time_limit( 900 );
 		if ( ! is_array( $data ) || ( $data['format'] ?? '' ) !== 'jmg-pp-backup' || empty( $data['tables'] ) ) {
-			return new WP_Error( 'jmg_backup', 'Not a JMG Production Planning backup file.' );
+			return new WP_Error( 'jmg_backup', 'Not a Production Planning backup file.' );
 		}
 		$summary = array();
 		foreach ( JMG_DB::all_tables() as $t ) {

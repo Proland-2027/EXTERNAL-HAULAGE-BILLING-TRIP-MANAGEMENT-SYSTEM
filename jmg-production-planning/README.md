@@ -1,6 +1,6 @@
-# JMG Production Planning (WordPress plugin)
+# Production Planning (WordPress plugin)
 
-A browser-based production planning and manufacturing control system for JMG Genset and Canopy
+A browser-based production planning and manufacturing control system for Genset and Canopy
 manufacturing, delivered as a WordPress plugin with its own full-screen interface
 (`https://<your-site>/production-planning/`), a REST API and a shared MySQL/MariaDB database.
 

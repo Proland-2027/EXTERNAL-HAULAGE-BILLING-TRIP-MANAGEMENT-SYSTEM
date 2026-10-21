@@ -33,7 +33,7 @@ class JMG_App {
 	}
 
 	public static function admin_menu() {
-		add_menu_page( 'JMG Production Planning', 'Production Planning', 'jmg_view', 'jmg-production-planning', array( __CLASS__, 'admin_page' ), 'dashicons-chart-area', 3 );
+		add_menu_page( 'Production Planning', 'Production Planning', 'jmg_view', 'jmg-production-planning', array( __CLASS__, 'admin_page' ), 'dashicons-chart-area', 3 );
 	}
 
 	public static function admin_bar( $bar ) {
@@ -41,7 +41,7 @@ class JMG_App {
 	}
 
 	public static function admin_page() {
-		echo '<div class="wrap"><h1>JMG Production Planning</h1><p>The application runs in its own full-screen interface.</p><p><a class="button button-primary" href="' . esc_url( self::app_url() ) . '">Open Production Planning</a></p>';
+		echo '<div class="wrap"><h1>Production Planning</h1><p>The application runs in its own full-screen interface.</p><p><a class="button button-primary" href="' . esc_url( self::app_url() ) . '">Open Production Planning</a></p>';
 		$err = get_option( 'jmg_pp_import_error' );
 		if ( $err ) { echo '<div class="notice notice-error"><p>Workbook import error at activation: ' . esc_html( $err ) . '</p></div>'; }
 		echo '<p>Shortcode for embedding in a page: <code>[jmg_production_planning]</code></p></div>';
@@ -56,7 +56,7 @@ class JMG_App {
 	public static function maybe_render() {
 		if ( ! get_query_var( 'jmg_app' ) ) { return; }
 		if ( ! is_user_logged_in() ) { wp_safe_redirect( wp_login_url( self::app_url() ) ); exit; }
-		if ( ! current_user_can( 'jmg_view' ) ) { wp_die( 'Your account has no production planning role. Ask the administrator to assign one.', 'JMG Production Planning', array( 'response' => 403 ) ); }
+		if ( ! current_user_can( 'jmg_view' ) ) { wp_die( 'Your account has no production planning role. Ask the administrator to assign one.', 'Production Planning', array( 'response' => 403 ) ); }
 		self::enqueue();
 		status_header( 200 );
 		nocache_headers();
@@ -65,7 +65,7 @@ class JMG_App {
 <head>
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JMG Production Planning</title>
+<title>Production Planning</title>
 <?php wp_print_styles( array( 'jmg-pp-app' ) ); ?>
 </head>
 <body class="jmg-body">

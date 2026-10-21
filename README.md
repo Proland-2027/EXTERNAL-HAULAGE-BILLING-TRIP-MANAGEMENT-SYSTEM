@@ -87,11 +87,11 @@ docs/               billing format and data model
 
 ---
 
-# JMG Production Planning (WordPress application)
+# Production Planning (WordPress application)
 
 The folder [`jmg-production-planning/`](jmg-production-planning/) contains a separate deliverable: a
 WordPress plugin that provides a complete production planning and manufacturing control system for
-JMG Genset and Canopy manufacturing (sales demand → multi-level BOM explosion → finite-capacity
+Genset and Canopy manufacturing (sales demand → multi-level BOM explosion → finite-capacity
 scheduling → plan confirmation → daily departmental tracking → dashboards, monthly reports, BOM
 costing and Gantt), built from the workbook `Prodction Data.xlsx`.
 

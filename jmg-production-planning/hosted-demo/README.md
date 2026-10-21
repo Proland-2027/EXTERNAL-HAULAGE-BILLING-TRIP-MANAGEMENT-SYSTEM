@@ -1,7 +1,7 @@
 # Hosted edition (claude.ai artifact)
 
 The same application, running entirely in the browser on the claude.ai artifact platform with a
-shared database (`db` capability) and viewer identity (`user`), so the JMG team can use it from any
+shared database (`db` capability) and viewer identity (`user`), so the team can use it from any
 browser without hosting. Live link (private, share from its Share menu):
 https://claude.ai/artifact/4eqdTG5R9fhNfmkZcn7HBG
 

@@ -3,7 +3,7 @@ esc = lambda t: t.replace('</script', '<\/script'); engine = esc(open('engine.js
 loader = r"""
 (function () {
   const root = document.getElementById('jmg-app');
-  const status = (msg) => { root.innerHTML = '<div class="card" style="margin:40px auto;max-width:560px"><h2>JMG Production Planning</h2><p>' + msg + '</p></div>'; };
+  const status = (msg) => { root.innerHTML = '<div class="card" style="margin:40px auto;max-width:560px"><h2>Production Planning</h2><p>' + msg + '</p></div>'; };
   window.jmgDownload = async function (filename, data, mime) {
     const blob = data instanceof Blob ? data : new Blob([data], { type: mime || 'application/octet-stream' });
     let dl = null; try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
@@ -23,7 +23,7 @@ loader = r"""
   })();
 })();
 """
-head = """<title>JMG Production Planning</title>
+head = """<title>Production Planning</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* Operations UI: fixed light look (dark sidebar, light work surface), explicit colors throughout. */

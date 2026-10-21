@@ -1,4 +1,4 @@
-/* JMG Production Planning - planning engine (browser port of the WordPress plugin classes).
+/* Production Planning - planning engine (browser port of the WordPress plugin classes).
    Masters (products, BOM, prices, sections, capacities, machines, series, stage map) come from
    data/masters.json + data/bom.json; operational state lives in the shared store (see server.js). */
 window.JMG = (function () {
@@ -10,7 +10,7 @@ window.JMG = (function () {
   const S = { settings: {}, calendar: {}, priceEdits: {}, capEdits: {}, sectionEdits: {}, overrides: {}, requests: {}, orders: {}, logs: {}, alerts: {}, audit: [] };
   E.S = S;
 
-  E.DEFAULTS = { work_start: '08:00', work_end: '17:00', break_minutes: 60, net_minutes: 480, shifts_per_day: 1, working_days: [1, 2, 3, 4, 5], transfer_rule: 'next_day', capacity_basis: 'current', inventory_enabled: 0, currency: 'NGN', include_overheads: 1, cost_basis: 'unit_cost', horizon_days: 400, company_name: 'JMG', plan_lead_days: 1 };
+  E.DEFAULTS = { work_start: '08:00', work_end: '17:00', break_minutes: 60, net_minutes: 480, shifts_per_day: 1, working_days: [1, 2, 3, 4, 5], transfer_rule: 'next_day', capacity_basis: 'current', inventory_enabled: 0, currency: 'NGN', include_overheads: 1, cost_basis: 'unit_cost', horizon_days: 400, company_name: '', plan_lead_days: 1 };
   E.setting = (k) => (S.settings && S.settings[k] != null ? S.settings[k] : E.DEFAULTS[k]);
 
   E.loadMasters = function (masters, bom) {

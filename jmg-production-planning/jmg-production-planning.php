@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: JMG Production Planning
- * Description: Production planning and manufacturing control for JMG Genset and Canopy manufacturing: sales demand, multi-level BOM explosion, finite-capacity scheduling, daily tracking, dashboards, BOM costing and Gantt.
+ * Plugin Name: Production Planning
+ * Description: Production planning and manufacturing control for Genset and Canopy manufacturing: sales demand, multi-level BOM explosion, finite-capacity scheduling, daily tracking, dashboards, BOM costing and Gantt.
  * Version: 1.0.0
- * Author: JMG Production Planning
+ * Author: Production Planning Team
  * Requires PHP: 7.4
  * Requires at least: 6.0
  * Text Domain: jmg-pp

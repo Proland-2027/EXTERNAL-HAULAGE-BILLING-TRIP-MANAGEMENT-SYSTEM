@@ -1,4 +1,4 @@
-/* JMG Production Planning - front-end application (no build step). */
+/* Production Planning - front-end application (no build step). */
 (function () {
   'use strict';
   const CFG = window.JMG_CONFIG || {};
@@ -199,11 +199,11 @@
   function shell() {
     const b = state.boot;
     const nav = NAV.map((n) => n.sec ? `<div class="sec">${n.sec}</div>` : (can(n.cap) ? `<a href="#/${n.id}" data-nav="${n.id}">${n.label}${n.badge && b.counts[n.badge] ? `<span class="badge">${b.counts[n.badge]}</span>` : ''}</a>` : '')).join('');
-    $root.innerHTML = `<div class="app"><aside class="side" id="side"><div class="brand"><b>JMG Production Planning</b><small>Genset &amp; Canopy manufacturing control · v${esc(b.version)}</small></div><nav class="nav">${nav}</nav><div class="user"><b>${esc(b.user.name)}</b>${esc(b.user.role_label || b.user.roles.join(', '))}<br><a href="${esc(b.logout_url)}">Log out</a>${can('jmg_admin') ? ` · <a href="${esc(b.admin_url)}">WP admin</a>` : ''}</div></aside><main class="main"><div class="topbar"><button class="btn menu-toggle" id="menuToggle">☰ Menu</button><h1 id="pageTitle"></h1><span class="muted small">${esc(b.today)}</span></div><div id="view"></div></main></div>`;
+    $root.innerHTML = `<div class="app"><aside class="side" id="side"><div class="brand"><b>Production Planning</b><small>Genset &amp; Canopy manufacturing control · v${esc(b.version)}</small></div><nav class="nav">${nav}</nav><div class="user"><b>${esc(b.user.name)}</b>${esc(b.user.role_label || b.user.roles.join(', '))}<br><a href="${esc(b.logout_url)}">Log out</a>${can('jmg_admin') ? ` · <a href="${esc(b.admin_url)}">WP admin</a>` : ''}</div></aside><main class="main"><div class="topbar"><button class="btn menu-toggle" id="menuToggle">☰ Menu</button><h1 id="pageTitle"></h1><span class="muted small">${esc(b.today)}</span></div><div id="view"></div></main></div>`;
     document.getElementById('menuToggle').addEventListener('click', () => document.getElementById('side').classList.toggle('open'));
     $root.querySelectorAll('[data-nav]').forEach((a) => a.addEventListener('click', () => document.getElementById('side').classList.remove('open')));
   }
-  function setTitle(t) { document.getElementById('pageTitle').textContent = t; document.title = t + ' · JMG Production Planning'; }
+  function setTitle(t) { document.getElementById('pageTitle').textContent = t; document.title = t + ' · Production Planning'; }
   function route() {
     const h = location.hash.replace(/^#\/?/, '') || 'dashboard';
     const [path, qs] = h.split('?'); const parts = path.split('/');
@@ -649,5 +649,5 @@
     else { shell(); }
   }
   window.addEventListener('hashchange', route);
-  boot().then(route).catch((e) => { $root.innerHTML = `<div class="card" style="margin:40px auto;max-width:600px"><h2>JMG Production Planning</h2><div class="alert err">${esc(e.message)}</div><p>Please log in with an account that has a production planning role.</p></div>`; });
+  boot().then(route).catch((e) => { $root.innerHTML = `<div class="card" style="margin:40px auto;max-width:600px"><h2>Production Planning</h2><div class="alert err">${esc(e.message)}</div><p>Please log in with an account that has a production planning role.</p></div>`; });
 })();

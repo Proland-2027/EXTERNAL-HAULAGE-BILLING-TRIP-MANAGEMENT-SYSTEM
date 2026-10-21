@@ -19,7 +19,7 @@ class JMG_Settings {
 			'include_overheads' => 1,
 			'cost_basis'        => 'unit_cost',             // unit_cost (workbook "Unit Cost" column) | erp (workbook "Cost per unit" ERP line cost)
 			'horizon_days'      => 400,
-			'company_name'      => 'JMG',
+			'company_name'      => '',
 			'plan_lead_days'    => 1,                      // earliest plan start = today + N working days
 		);
 	}

@@ -1,4 +1,4 @@
-/* JMG Production Planning - in-browser service layer: orders, tracking, reports, store sync and the
+/* Production Planning - in-browser service layer: orders, tracking, reports, store sync and the
    request router that replaces the WordPress REST API in the hosted demo. */
 window.JMG_SERVER = (function () {
   'use strict';
@@ -6,11 +6,11 @@ window.JMG_SERVER = (function () {
   const Srv = { ready: false, user: { id: null, name: '', isOwner: false, canWrite: null }, role: 'jmg_planner', listeners: [] };
   const ROLES = {
     administrator: { name: 'Administrator', caps: ['jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track', 'jmg_manage', 'jmg_cost', 'jmg_admin'] },
-    jmg_sales: { name: 'JMG Sales', caps: ['jmg_view', 'jmg_sales'] },
-    jmg_planner: { name: 'JMG Production Planner', caps: ['jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track'] },
-    jmg_supervisor: { name: 'JMG Section Supervisor', caps: ['jmg_view', 'jmg_track'] },
-    jmg_manager: { name: 'JMG Production Manager', caps: ['jmg_view', 'jmg_plan', 'jmg_track', 'jmg_manage'] },
-    jmg_costing: { name: 'JMG Costing / Finance', caps: ['jmg_view', 'jmg_cost'] },
+    jmg_sales: { name: 'Sales', caps: ['jmg_view', 'jmg_sales'] },
+    jmg_planner: { name: 'Production Planner', caps: ['jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track'] },
+    jmg_supervisor: { name: 'Section Supervisor', caps: ['jmg_view', 'jmg_track'] },
+    jmg_manager: { name: 'Production Manager', caps: ['jmg_view', 'jmg_plan', 'jmg_track', 'jmg_manage'] },
+    jmg_costing: { name: 'Costing / Finance', caps: ['jmg_view', 'jmg_cost'] },
   };
   Srv.ROLES = ROLES;
   const err = (msg, code) => { const e = new Error(msg); e.code = code || 'jmg_error'; return e; };
@@ -504,7 +504,7 @@ window.JMG_SERVER = (function () {
   route('PUT', /^settings$/, async (m, q, b) => { need('jmg_admin'); const allowed = Object.keys(E.DEFAULTS).concat(['inventory_qty']); const changed = {}; Object.entries(b).forEach(([k, v]) => { if (!allowed.includes(k)) { return; } if (k === 'working_days') { v = [].concat(v).map(Number); } else if (['break_minutes', 'net_minutes', 'shifts_per_day', 'inventory_enabled', 'include_overheads', 'horizon_days', 'plan_lead_days'].includes(k)) { v = Number(v); } S.settings[k] = v; changed[k] = v; }); await saveSetting('main'); audit('settings_update', 'settings', '', changed); return Object.assign({}, E.DEFAULTS, S.settings); });
   route('GET', /^admin\/audit$/, (m, q) => { let list = (S.auditDoc || []).slice().reverse(); if (q.entity) { list = list.filter((a) => a.entity === q.entity); } if (q.entity_id) { list = list.filter((a) => a.entity_id === String(q.entity_id)); } return list.slice(0, Number(q.limit) || 300); });
   route('GET', /^admin\/backup$/, () => { need('jmg_admin'); audit('backup_export', 'backup', ''); return { format: 'jmg-pp-backup', version: '1.0.0-demo', created_at: E.now(), tables: { requests: Object.values(S.requests), orders: Object.values(S.orders), logs: Object.values(S.logs), alerts: Object.values(S.alerts), settings: S.settings, calendar: S.calendar, prices: S.priceEdits, capacities: S.capEdits, sections: S.sectionEdits, overrides: S.overrides, roles: S.roles } }; });
-  route('POST', /^admin\/restore$/, async (m, q, b) => { need('jmg_admin'); if (!b || b.format !== 'jmg-pp-backup') { throw err('Not a JMG Production Planning backup file.'); } const t = b.tables || {}; for (const c of ['requests', 'orders', 'logs', 'alerts']) { for (const id of Object.keys(S[c])) { await deleteDoc(c, id); } S[c] = {}; for (const row of (t[c] || [])) { S[c][row.id] = row; await writeDoc(c, row.id, row); } } S.settings = t.settings || {}; S.calendar = t.calendar || {}; S.priceEdits = t.prices || {}; S.capEdits = t.capacities || {}; S.sectionEdits = t.sections || {}; S.overrides = t.overrides || {}; for (const id of ['main', 'calendar', 'prices', 'capacities', 'sections', 'overrides']) { await saveSetting(id); } audit('backup_restore', 'backup', ''); return { requests: (t.requests || []).length, orders: (t.orders || []).length, logs: (t.logs || []).length }; });
+  route('POST', /^admin\/restore$/, async (m, q, b) => { need('jmg_admin'); if (!b || b.format !== 'jmg-pp-backup') { throw err('Not a Production Planning backup file.'); } const t = b.tables || {}; for (const c of ['requests', 'orders', 'logs', 'alerts']) { for (const id of Object.keys(S[c])) { await deleteDoc(c, id); } S[c] = {}; for (const row of (t[c] || [])) { S[c][row.id] = row; await writeDoc(c, row.id, row); } } S.settings = t.settings || {}; S.calendar = t.calendar || {}; S.priceEdits = t.prices || {}; S.capEdits = t.capacities || {}; S.sectionEdits = t.sections || {}; S.overrides = t.overrides || {}; for (const id of ['main', 'calendar', 'prices', 'capacities', 'sections', 'overrides']) { await saveSetting(id); } audit('backup_restore', 'backup', ''); return { requests: (t.requests || []).length, orders: (t.orders || []).length, logs: (t.logs || []).length }; });
   route('GET', /^admin\/users$/, () => ({ users: Object.entries(S.roles).map(([id, r]) => ({ id, login: r.name || id.slice(0, 10), name: r.name || id.slice(0, 10), email: '', roles: [r.role], role_label: (ROLES[r.role] || {}).name || r.role, sections: r.sections || [] })), roles: ROLES, me: { id: Srv.user.id, name: Srv.user.name, role: Srv.role } }));
   route('POST', /^admin\/users$/, async (m, q, b) => { need('jmg_admin'); if (!b.user_id || !ROLES[b.role]) { throw err('viewer id and a valid role are required'); } S.roles[b.user_id] = { role: b.role, name: b.name || '', sections: [].concat(b.sections || []).map(Number).filter(Boolean) }; await writeDoc('roles', b.user_id, S.roles[b.user_id]); audit('user_role', 'user', b.user_id, { role: b.role }); return { id: b.user_id }; });
   route('PUT', /^admin\/users\/([^/]+)$/, async (m, q, b) => { need('jmg_admin'); const id = decodeURIComponent(m[1]); const r = S.roles[id] || { role: 'jmg_sales', name: '', sections: [] }; if (ROLES[b.role]) { r.role = b.role; } if (b.sections !== undefined) { r.sections = [].concat(b.sections).map(Number).filter(Boolean); } if (b.name !== undefined) { r.name = b.name; } S.roles[id] = r; await writeDoc('roles', id, r); audit('user_update', 'user', id, b); return { ok: true }; });

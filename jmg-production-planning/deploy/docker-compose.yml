@@ -1,4 +1,4 @@
-# JMG Production Planning - WordPress + MariaDB + Caddy (automatic HTTPS)
+# Production Planning - WordPress + MariaDB + Caddy (automatic HTTPS)
 # 1. cp .env.example .env  and set DOMAIN / passwords
 # 2. docker compose up -d
 # 3. ./setup.sh   (installs WordPress, activates the plugin, creates demo accounts + scenario)

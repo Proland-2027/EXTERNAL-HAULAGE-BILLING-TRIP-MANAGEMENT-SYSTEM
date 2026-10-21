@@ -2,7 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 /**
- * Imports the JMG production workbook (Prodction Data.xlsx) into the plugin tables.
+ * Imports the production workbook (Prodction Data.xlsx) into the plugin tables.
  *
  * Sheets used:
  *  - BOM                : multi-level bill of materials (products, components, quantities, costs, process hours)

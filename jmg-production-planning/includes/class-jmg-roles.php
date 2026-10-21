@@ -17,11 +17,11 @@ class JMG_Roles {
 
 	public static function roles() {
 		return array(
-			'jmg_sales'      => array( 'name' => 'JMG Sales',              'caps' => array( 'jmg_view', 'jmg_sales' ) ),
-			'jmg_planner'    => array( 'name' => 'JMG Production Planner', 'caps' => array( 'jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track' ) ),
-			'jmg_supervisor' => array( 'name' => 'JMG Section Supervisor', 'caps' => array( 'jmg_view', 'jmg_track' ) ),
-			'jmg_manager'    => array( 'name' => 'JMG Production Manager', 'caps' => array( 'jmg_view', 'jmg_plan', 'jmg_track', 'jmg_manage' ) ),
-			'jmg_costing'    => array( 'name' => 'JMG Costing / Finance',  'caps' => array( 'jmg_view', 'jmg_cost' ) ),
+			'jmg_sales'      => array( 'name' => 'Sales',              'caps' => array( 'jmg_view', 'jmg_sales' ) ),
+			'jmg_planner'    => array( 'name' => 'Production Planner', 'caps' => array( 'jmg_view', 'jmg_sales', 'jmg_plan', 'jmg_track' ) ),
+			'jmg_supervisor' => array( 'name' => 'Section Supervisor', 'caps' => array( 'jmg_view', 'jmg_track' ) ),
+			'jmg_manager'    => array( 'name' => 'Production Manager', 'caps' => array( 'jmg_view', 'jmg_plan', 'jmg_track', 'jmg_manage' ) ),
+			'jmg_costing'    => array( 'name' => 'Costing / Finance',  'caps' => array( 'jmg_view', 'jmg_cost' ) ),
 		);
 	}
 
