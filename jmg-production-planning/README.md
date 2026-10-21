@@ -49,6 +49,11 @@ deploy/                          docker-compose + HTTPS (Caddy) + setup script +
 tests/engine-test.php            engine regression test (run inside a WordPress install)
 ```
 
+## Hosted edition
+
+A ready-to-use multi-user version runs on the claude.ai artifact platform (shared database, no hosting
+needed): https://claude.ai/artifact/4eqdTG5R9fhNfmkZcn7HBG — see `hosted-demo/README.md`.
+
 ## Install (summary - see docs/DEPLOYMENT.md)
 
 1. Upload the plugin folder (or `deploy/build-zip.sh` output) to `wp-content/plugins/` and activate it.

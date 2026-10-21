@@ -4,6 +4,13 @@ The application is a WordPress plugin. It runs on any WordPress host (shared hos
 WordPress, a VPS) and needs nothing installed on users' computers: team members open the HTTPS
 address in Chrome, Edge, Firefox or Safari and log in.
 
+## Hosted edition available now
+
+A working multi-user edition is published at https://claude.ai/artifact/4eqdTG5R9fhNfmkZcn7HBG (private to the
+owner until shared from the page's Share menu; give colleagues Contributor or Editor access so they can save).
+It runs the same planning engine in the browser against the workbook data, with a shared database on the
+claude.ai platform. The steps below are for JMG's own WordPress server.
+
 ## Deployment status and what is required
 
 The plugin is complete and tested on a local WordPress 6.8 installation, but **it has not been
