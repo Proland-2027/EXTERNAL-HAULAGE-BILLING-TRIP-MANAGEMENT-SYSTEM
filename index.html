@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Haulage Billing</title>
+  <title>Trip Log · Haulage Billing</title>
   <meta name="description" content="External haulage billing, price lists with MOQ, trip log and monthly in-house vs contractor comparison report.">
   <link rel="stylesheet" href="css/styles.css">
   <!-- SheetJS for .xlsx export. If the CDN is unreachable the app silently falls back to CSV. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <style>.kpis{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:.5rem 0 .8rem}.kpi{border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem}.kpi .label{font-size:.75rem;color:var(--muted);text-transform:uppercase}.kpi .value{font-size:1.3rem;font-weight:650}.back-link{font-size:.8rem;margin-left:.5rem}</style>
 </head>
 <body>
   <header class="topbar no-print">
@@ -24,6 +25,7 @@
       <button data-view="pricelists" class="tab">Price Lists &amp; MOQ</button>
       <button data-view="billing" class="tab">Billing</button>
       <button data-view="report" class="tab">Comparison Report</button>
+      <button data-view="pricing" class="tab">Client Pricing</button>
       <button data-view="setup" class="tab">Setup</button>
       <button data-view="data" class="tab">Data</button>
     </nav>

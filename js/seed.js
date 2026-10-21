@@ -32,6 +32,23 @@
       { id: 'R-TEM-TAM', code: 'TEM-TAM', origin: 'Tema', destination: 'Tamale', distanceKm: 620 },
     ];
 
+    const clients = [
+      { id: 'K-GHACEM', code: 'GHACEM', name: 'Ghacem Ltd', contact: 'logistics@ghacem.example' },
+      { id: 'K-TOTAL', code: 'TOTAL', name: 'TotalEnergies Marketing Ghana', contact: 'supply@total.example' },
+      { id: 'K-MELCOM', code: 'MELCOM', name: 'Melcom Group', contact: 'dc@melcom.example' },
+    ];
+    // Client agreed rate cards (revenue side): per client, with validity, route × equipment type × unit × rate × MOQ.
+    const clientRateCards = [
+      { id: 'RC-GHACEM-2026', clientId: 'K-GHACEM', name: 'Ghacem – Haulage Agreement 2026', currency: 'GHS', validFrom: '2026-01-01', validTo: '2026-12-31', status: 'ACTIVE', notes: 'Per tonne delivered, MOQ 30 t for articulated trucks.',
+        lines: [['R-TEM-ACC', 'ANY', 'TONNE', 30, 62], ['R-TEM-TAK', 'ANY', 'TONNE', 30, 198], ['R-TEM-KUM', 'ANY', 'TONNE', 30, 205], ['R-TEM-SUN', 'ANY', 'TONNE', 30, 285], ['R-TEM-TAM', 'ANY', 'TONNE', 30, 395], ['R-TEM-KUM', 'Rigid 10T', 'TONNE', 10, 240]].map(([routeId, vehicleClass, unit, moq, ratePerUnit], i) => ({ id: `RC-GHACEM-2026-L${i + 1}`, routeId, vehicleClass, unit, moq, ratePerUnit })) },
+      { id: 'RC-TOTAL-2025', clientId: 'K-TOTAL', name: 'TotalEnergies – Lubricant Distribution 2025 (expired)', currency: 'GHS', validFrom: '2025-01-01', validTo: '2025-12-31', status: 'ACTIVE', notes: 'Expired – renewal under negotiation.',
+        lines: [['R-TEM-KUM', 'Rigid 10T', 'TONNE', 9, 215], ['R-TEM-ACC', 'Rigid 10T', 'TONNE', 9, 70]].map(([routeId, vehicleClass, unit, moq, ratePerUnit], i) => ({ id: `RC-TOTAL-2025-L${i + 1}`, routeId, vehicleClass, unit, moq, ratePerUnit })) },
+      { id: 'RC-TOTAL-2026', clientId: 'K-TOTAL', name: 'TotalEnergies – Bulk & Packed Lubricants 2026', currency: 'GHS', validFrom: '2026-01-01', validTo: '2026-12-31', status: 'ACTIVE', notes: 'Articulated trucks, per tonne. Rigid-truck shuttle rates still under the expired 2025 card.',
+        lines: [['R-TEM-ACC', 'Articulated 30T', 'TONNE', 30, 58], ['R-TEM-TAK', 'Articulated 30T', 'TONNE', 30, 190], ['R-TEM-KUM', 'Articulated 30T', 'TONNE', 30, 196], ['R-TEM-SUN', 'Articulated 30T', 'TONNE', 30, 272], ['R-TEM-TAM', 'Articulated 30T', 'TONNE', 30, 380]].map(([routeId, vehicleClass, unit, moq, ratePerUnit], i) => ({ id: `RC-TOTAL-2026-L${i + 1}`, routeId, vehicleClass, unit, moq, ratePerUnit })) },
+      { id: 'RC-MELCOM-2026', clientId: 'K-MELCOM', name: 'Melcom – General Cargo 2026', currency: 'GHS', validFrom: '2026-03-01', validTo: '', status: 'ACTIVE', notes: 'Flat rate per trip, articulated trucks only.',
+        lines: [['R-TEM-ACC', 'Articulated 30T', 'TRIP', 0, 1500], ['R-TEM-KUM', 'Articulated 30T', 'TRIP', 0, 6300], ['R-TEM-TAK', 'Articulated 30T', 'TRIP', 0, 6100], ['R-TEM-SUN', 'Articulated 30T', 'TRIP', 0, 8700], ['R-TEM-TAM', 'Articulated 30T', 'TRIP', 0, 12100]].map(([routeId, vehicleClass, unit, moq, ratePerUnit], i) => ({ id: `RC-MELCOM-2026-L${i + 1}`, routeId, vehicleClass, unit, moq, ratePerUnit })) },
+    ];
+
     const contractors = [
       { id: 'C-KHL', code: 'KHL', name: 'Kwame Haulage Ltd', contact: 'accounts@kwamehaulage.example', phone: '+233 24 000 0001', paymentTermsDays: 30 },
       { id: 'C-NST', code: 'NST', name: 'Northern Star Transport', contact: 'billing@northernstar.example', phone: '+233 20 000 0002', paymentTermsDays: 45 },
@@ -114,6 +131,19 @@
         billingId: null,
         remarks: '',
       });
+      // revenue side: client, manual selling price (entered by the trip clerk) and who entered it
+      const t = trips[trips.length - 1];
+      const product = t.product;
+      t.clientId = product === 'Cement' ? 'K-GHACEM' : product === 'Lubricants' ? 'K-TOTAL' : 'K-MELCOM';
+      const agreed = Pricing.compareSellingPrice(t, clientRateCards).agreedPrice;
+      if (agreed != null) {
+        const factor = rnd() < 0.18 ? 0.9 + rnd() * 0.08 : 1 + rnd() * 0.06; // ~18 % of trips are sold below the agreed price
+        t.sellingPrice = Math.round(agreed * factor / 10) * 10;
+      } else {
+        t.sellingPrice = t.vehicleClass === 'Rigid 10T' ? 2000 : 5800; // no valid rate card: manual price only
+      }
+      t.sellingPriceBy = 'ops.clerk';
+      t.sellingPriceAt = `${date}T10:00:00.000Z`;
     }
 
     const plan = [
@@ -153,7 +183,7 @@
       billings.push(b);
     });
 
-    return { version: 1, settings, routes, contractors, priceLists, trips, billings };
+    return { version: 2, settings, routes, contractors, clients, clientRateCards, priceLists, trips, billings };
   }
 
   return { build };
