@@ -623,7 +623,7 @@
     const size = (() => { try { return (localStorage.getItem(window.Store.KEY) || '').length; } catch (e) { return 0; } })();
     return `
       <div class="card"><h1>Data</h1>
-        <p>${window.Store.api.online ? `Data is stored on the application server (shared live dataset, version ${window.Store.api.version}) and cached in this browser (${fmtNum(size / 1024, 0)} KB). Server backups run automatically; you can still export a JSON copy here.` : `Server not reachable – data is held in this browser only (localStorage, ${fmtNum(size / 1024, 0)} KB). Export regularly for backup.`}</p>
+        <p>${window.Store.api.online ? `Data is stored on the application server (shared live dataset, version ${window.Store.api.version}) and cached in this browser (${fmtNum(size / 1024, 0)} KB). Server backups run automatically; you can still export a JSON copy here.` : `Data is stored in this browser (localStorage, ${fmtNum(size / 1024, 0)} KB) – no shared server detected. Export regularly for backup or to move to another computer; import restores a backup.`}</p>
         <div class="row">
           <button class="btn primary" data-action="data-export">Export backup (.json)</button>
           <label class="btn">Import backup… <input type="file" accept="application/json,.json" data-action="data-import" hidden></label>
