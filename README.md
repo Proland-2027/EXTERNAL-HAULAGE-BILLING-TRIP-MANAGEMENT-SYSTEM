@@ -15,6 +15,11 @@ external contractors**:
   active price list, with MOQ adjustments, cost-component breakdown, levies, VAT, totals and signature
   blocks. Printable, exportable to Excel/CSV, with a DRAFT → APPROVED → PAID → VOID lifecycle.
   See [docs/BILLING_FORMAT.md](docs/BILLING_FORMAT.md).
+* **Client agreed price vs manual selling price** — client rate cards (per client, route, equipment type,
+  unit, MOQ, validity dates). Every trip shows the **Client Agreed Price** beside the manually entered
+  **Selling Price**, the variance (`Selling − Agreed`) and flags for prices below the agreed rate and
+  for missing or expired rates. Who entered the selling price and when is recorded. The **Client
+  Pricing** tab is management's exception report with approve / reject.
 * **Monthly comparison report (In-house Analysis)** — for any month: internal vs contractor cost,
   cost per tonne by route, the in-house saving against contractor rates, the outsourcing premium,
   the internal fixed / variable / fixed-variable / diesel structure, MOQ top-ups paid, and
@@ -27,7 +32,8 @@ No build, no server required: open `index.html` in a modern browser (Chrome, Edg
 
 Optionally serve it (`npm start`, or `python3 -m http.server 8080`) and open <http://localhost:8080>.
 
-Data lives in the browser's local storage. Use **Data → Export backup** regularly and to move the
+Data lives in the browser's local storage. When the page is served by a host that offers the small
+`/api/triplog/state` endpoint (see `js/store.js`), the dataset is shared live between all users instead. Use **Data → Export backup** regularly and to move the
 dataset to another computer; **Import backup** restores it. **Reset to demo data** reloads the sample
 dataset (Ghana routes from Tema, two contractors, August–October 2026 trips, logged August and
 September billings).
@@ -43,7 +49,8 @@ Excel export uses SheetJS from a CDN; when offline the same data downloads as CS
 3. **Billing** → pick the party and month, *Preview*, check the MOQ flags and any “no tariff line”
    errors, then *Save & log billing*. Do this once for each contractor and once for the internal fleet.
 4. **Comparison Report** → choose the month (and optionally a single contractor). Export to Excel or print.
-5. Approve / mark paid billings as they move through finance. Void and regenerate if a trip was wrong.
+5. **Client Pricing** → review trips sold below the client's agreed rate or without a valid rate; approve or reject with a note.
+6. Approve / mark paid billings as they move through finance. Void and regenerate if a trip was wrong.
 
 ## How amounts are calculated
 
@@ -55,6 +62,8 @@ Excel export uses SheetJS from a CDN; when offline the same data downloads as CS
 | Internal cost per unit | `trip cost ÷ billable qty` |
 | Levies / VAT | `subtotal × levy %`, then `(subtotal + levies) × VAT %`; internal billing untaxed by default |
 | In-house saving | internal trips re-priced at the contractor tariff − internal cost |
+| Client agreed price | rate-card rate × `max(qty, MOQ)` (or the flat `TRIP` rate) for the client, route, equipment type and trip date |
+| Price variance | `manual selling price − client agreed price`; negative = below agreed → management review |
 | Outsourcing premium | contractor billing − the same trips priced at the internal cost model |
 
 Tariff line lookup: exact route + vehicle class first, then the route's `ANY` class line. Trips with no

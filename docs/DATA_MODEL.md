@@ -1,6 +1,6 @@
 # Data Model
 
-Everything is one JSON document (see *Data → Export backup*). Field names below are the ones in the file.
+Everything is one JSON document stored on the application server (`triplog_state`, versioned) and cached in the browser (see *Data → Export backup*). Field names below are the ones in the file.
 
 ## settings
 `company`, `companyAddress`, `currency`, `vatRate`, `levyRate`, `taxInternal` (bool),
@@ -34,10 +34,19 @@ The price list for a billing is chosen automatically: the `ACTIVE` list for the 
 covers the first day of the period, else the newest active list, else any list. It can be overridden
 when generating a billing.
 
+## clients[] and clientRateCards[]
+`clients`: `id`, `code`, `name`, `contact`. `clientRateCards`: `id`, `clientId`, `name`, `currency`, `validFrom`, `validTo`,
+`status` (`ACTIVE` | `DRAFT` | `VOID`), `notes`, `lines[]` of `{ id, routeId, vehicleClass (or ANY), unit, moq, ratePerUnit }`.
+A trip's **Client Agreed Price** = the matching line's rate × billable quantity (MOQ applied) or the flat `TRIP` rate;
+the match uses client + route + equipment type + the card's validity for the trip date.
+
 ## trips[]
-`id`, `date`, `waybill`, `partyId`, `vehicleNo`, `vehicleClass`, `driver`, `routeId`, `product`, `qty`,
-`unit`, `distanceKm`, `dieselLitres` (optional, internal), `status` (`COMPLETED` | `CANCELLED`),
-`billingId` (set once the trip is on a logged billing), `remarks`.
+`id`, `date`, `waybill`, `partyId`, `clientId`, `vehicleNo`, `vehicleClass`, `driver`, `routeId`, `product`, `qty`,
+`unit`, `distanceKm`, `dieselLitres` (optional, internal), `sellingPrice` (manual), `sellingPriceBy`, `sellingPriceAt`,
+`pricingApproval` (`{ decision, by, at, note, sellingPrice }` when management decided an exception),
+`status` (`COMPLETED` | `CANCELLED`), `billingId` (set once the trip is on a logged billing), `remarks`.
+`Pricing.compareSellingPrice(trip, clientRateCards)` returns agreed price, variance (= selling − agreed), flags
+(`BELOW_AGREED`, `MISSING_RATE`, `EXPIRED_RATE`, `NO_CLIENT`, `NO_SELLING_PRICE`) and whether approval is needed.
 
 ## billings[]
 `id`, `number`, `partyId`, `period` (`YYYY-MM`), `priceListId`, `priceListName`, `currency`,

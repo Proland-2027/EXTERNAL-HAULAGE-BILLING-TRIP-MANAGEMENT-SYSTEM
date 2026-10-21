@@ -447,8 +447,53 @@
     return { current, previous, deltas };
   }
 
+  // ------------------------------------------------------------------ client rate cards (revenue side)
+  /**
+   * Client rate card line lookup: client + route + equipment type (vehicle class) + validity dates.
+   * Returns { status: 'OK' | 'EXPIRED' | 'MISSING' | 'NO_CLIENT', card, line, rate, unit, moq }.
+   * Exact equipment match wins over an "ANY" line; among cards covering the date the newest validFrom wins.
+   */
+  function resolveClientRate(rateCards, clientId, routeId, equipmentType, dateStr) {
+    if (!clientId) return { status: 'NO_CLIENT', card: null, line: null, rate: null, unit: null, moq: 0 };
+    const mine = (rateCards || []).filter((c) => c.clientId === clientId && (c.status || 'ACTIVE') !== 'VOID');
+    const hasLine = (c) => resolveLine(c, routeId, equipmentType);
+    const covering = mine.filter((c) => listCoversDate(c, dateStr) && hasLine(c)).sort((a, b) => String(b.validFrom || '').localeCompare(String(a.validFrom || '')));
+    if (covering.length) { const card = covering[0]; const line = hasLine(card); return { status: 'OK', card, line, rate: num(line.ratePerUnit), unit: line.unit || 'TONNE', moq: num(line.moq) }; }
+    const anyDate = mine.filter(hasLine).sort((a, b) => String(b.validTo || '').localeCompare(String(a.validTo || '')));
+    if (anyDate.length) { const card = anyDate[0]; const line = hasLine(card); return { status: 'EXPIRED', card, line, rate: num(line.ratePerUnit), unit: line.unit || 'TONNE', moq: num(line.moq) }; }
+    return { status: 'MISSING', card: null, line: null, rate: null, unit: null, moq: 0 };
+  }
+
+  /**
+   * Client Agreed Price for a trip = approved rate × billable quantity (MOQ applied), or the flat trip rate.
+   * The manual selling price is never overwritten. Price Variance = Manual Selling Price − Client Agreed Price.
+   */
+  function compareSellingPrice(trip, rateCards) {
+    const r = resolveClientRate(rateCards, trip.clientId, trip.routeId, trip.vehicleClass, trip.date);
+    const selling = trip.sellingPrice == null || trip.sellingPrice === '' ? null : num(trip.sellingPrice);
+    let agreed = null;
+    if (r.rate != null) agreed = round2(r.unit === 'TRIP' ? r.rate : applyMoq(trip.qty, r.moq).billableQty * r.rate);
+    const variance = selling != null && agreed != null ? round2(selling - agreed) : null;
+    const variancePct = variance != null && agreed ? round2((variance / agreed) * 100) : null;
+    const flags = [];
+    if (r.status === 'MISSING') flags.push('MISSING_RATE');
+    if (r.status === 'EXPIRED') flags.push('EXPIRED_RATE');
+    if (r.status === 'NO_CLIENT') flags.push('NO_CLIENT');
+    if (selling == null) flags.push('NO_SELLING_PRICE');
+    if (variance != null && variance < 0) flags.push('BELOW_AGREED');
+    const needsApproval = flags.includes('BELOW_AGREED') || flags.includes('MISSING_RATE') || flags.includes('EXPIRED_RATE');
+    return { status: r.status, cardName: r.card ? r.card.name : null, cardId: r.card ? r.card.id : null, lineId: r.line ? r.line.id : null, rate: r.rate, unit: r.unit, moq: r.moq, sellingPrice: selling, agreedPrice: agreed, variance, variancePct, flags, needsApproval, approval: trip.pricingApproval || null };
+  }
+
+  /** Management exception report: every trip whose selling price needs review, with its approval state. */
+  function pricingExceptions(trips, rateCards) {
+    return (trips || []).filter((t) => (t.status || 'COMPLETED') !== 'CANCELLED').map((t) => ({ trip: t, cmp: compareSellingPrice(t, rateCards) })).filter((x) => x.cmp.needsApproval || x.cmp.approval)
+      .map((x) => ({ ...x, state: x.cmp.approval ? x.cmp.approval.decision : 'PENDING' }));
+  }
+
   return {
     INTERNAL, ANY_CLASS, COMPONENTS, COMPONENT_LABELS,
+    resolveClientRate, compareSellingPrice, pricingExceptions,
     num, round2, round3, periodOf, previousPeriod, periodLabel, routeName,
     listCoversDate, pickPriceList, resolveLine, applyMoq, priceTrip, selectTrips,
     buildBilling, nextBillingNumber, periodLines, buildComparison, buildMonthlyComparison,
