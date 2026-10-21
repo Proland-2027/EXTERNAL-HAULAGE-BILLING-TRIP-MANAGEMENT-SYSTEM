@@ -1,0 +1,2 @@
+# Deny direct web access to the application sources when the document root is the repository root.
+Require all denied
