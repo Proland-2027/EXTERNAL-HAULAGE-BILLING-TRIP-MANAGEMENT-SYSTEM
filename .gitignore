@@ -2,3 +2,5 @@ node_modules/
 .DS_Store
 *.log
 screenshots/
+shots/
+production-planning/tests/shots/
