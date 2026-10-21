@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Haulage Billing</title>
+  <title>Trip Log &amp; Haulage Billing</title>
   <meta name="description" content="External haulage billing, price lists with MOQ, trip log and monthly in-house vs contractor comparison report.">
   <link rel="stylesheet" href="css/styles.css">
   <!-- SheetJS for .xlsx export. If the CDN is unreachable the app silently falls back to CSV. -->
@@ -21,12 +21,15 @@
     <nav class="tabs" id="nav" aria-label="Sections">
       <button data-view="dashboard" class="tab">Dashboard</button>
       <button data-view="trips" class="tab">Trips</button>
+      <button data-view="clientrates" class="tab">Client Rates</button>
+      <button data-view="exceptions" class="tab">Pricing Exceptions</button>
       <button data-view="pricelists" class="tab">Price Lists &amp; MOQ</button>
       <button data-view="billing" class="tab">Billing</button>
       <button data-view="report" class="tab">Comparison Report</button>
       <button data-view="setup" class="tab">Setup</button>
       <button data-view="data" class="tab">Data</button>
     </nav>
+    <span id="sync-status" class="small muted"></span>
     <button class="btn ghost sm" id="theme-toggle" title="Toggle dark mode">Light / Dark</button>
   </header>
 

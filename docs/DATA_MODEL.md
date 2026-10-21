@@ -57,3 +57,21 @@ estimated from the active price lists) plus two benchmarks:
 
 * **internalAtContractorRate / inhouseSaving** — internal trips re-priced at the contractor tariff.
 * **contractorAtInternalCost / outsourcingPremium** — contractor trips re-priced at the internal cost model.
+
+## customers[] and clientRateCards[] (Trip Log — client agreed price)
+`customers[]`: `id`, `code`, `name`, `contact`, `phone`.
+
+`clientRateCards[]`: `id`, `customerId`, `name`, `currency`, `validFrom`, `validTo`, `status` (`ACTIVE` | `DRAFT` | `ARCHIVED`), `notes`,
+`lines[]` of `{ id, routeId, vehicleClass (equipment class or ANY), unit (TONNE … or TRIP), moq, ratePerUnit }`.
+
+Trip fields added: `customerId`, `sellingPrice` (manual, never overwritten), `sellingPriceBy`, `sellingPriceAt`,
+`pricingException` `{ status: OPEN | APPROVED | REJECTED, by, at, comment, sellingPrice, agreedPrice, variance }`.
+
+`Pricing.compareSellingPrice(trip, clientRateCards)` returns the agreed price (`rate × max(qty, MOQ)` or the flat trip
+rate), `variance = selling − agreed`, and flags `BELOW_AGREED`, `RATE_MISSING`, `RATE_EXPIRED`, `RATE_NOT_YET_VALID`,
+`NO_SELLING_PRICE`. `Pricing.pricingExceptions()` lists the trips needing management review.
+
+## Server persistence
+When the Trip Log is opened from the production planning site by a signed-in user, the whole document above is stored
+in the `pp_haulage_state` table (versioned, audited) and shared by all users; otherwise it stays in browser storage.
+The production planning schema itself is documented in `server/schema/schema.sql`.

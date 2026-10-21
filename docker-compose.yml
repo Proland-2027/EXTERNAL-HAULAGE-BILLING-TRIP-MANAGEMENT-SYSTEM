@@ -1,0 +1,39 @@
+# docker compose up -d --build   → http://localhost:8080  (put Caddy/Nginx with HTTPS in front for a public URL; see docs/DEPLOYMENT.md)
+services:
+  app:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    ports: ["8080:80"]
+    environment:
+      PP_DB_DRIVER: mysql
+      PP_DB_HOST: db
+      PP_DB_NAME: proland_production
+      PP_DB_USER: proland
+      PP_DB_PASSWORD: ${DB_PASSWORD:-change-me-please}
+      PP_BASE_URL: ${BASE_URL:-http://localhost:8080}
+      PP_SEED_DEMO: ${SEED_DEMO:-1}
+    volumes:
+      - app-data:/var/www/app/server/data
+    depends_on: [db]
+    restart: unless-stopped
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: proland_production
+      MARIADB_USER: proland
+      MARIADB_PASSWORD: ${DB_PASSWORD:-change-me-please}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-change-me-root}
+    volumes:
+      - db-data:/var/lib/mysql
+    restart: unless-stopped
+  # Optional automatic HTTPS: set DOMAIN=planning.example.com and run `docker compose --profile https up -d`
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    ports: ["80:80", "443:443"]
+    environment: { DOMAIN: ${DOMAIN:-localhost} }
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [app]
+    restart: unless-stopped
+volumes: { app-data: {}, db-data: {}, caddy-data: {} }

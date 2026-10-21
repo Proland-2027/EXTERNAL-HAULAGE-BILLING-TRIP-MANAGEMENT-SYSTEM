@@ -1,11 +1,16 @@
 {
-  "name": "external-haulage-billing-trip-management-system",
+  "name": "proland-production-planning",
   "version": "1.0.0",
-  "description": "External haulage billing format linked to price lists and MOQ, trip log, and monthly in-house vs contractor comparison report.",
+  "description": "Integrated production planning, manufacturing tracking and BOM costing for gensets and canopies, plus the external haulage billing / Trip Log application.",
   "private": true,
   "scripts": {
-    "test": "node --test tests/*.test.js",
-    "start": "python3 -m http.server 8080 || npx --yes serve ."
+    "start": "php -S 0.0.0.0:8080 -t server/public server/public/index.php",
+    "setup": "php server/bin/console migrate && php server/bin/console import && php server/bin/console seed-users && php server/bin/console seed-demo",
+    "test": "node --test tests/*.test.js && php server/tests/run.php",
+    "test:js": "node --test tests/*.test.js",
+    "test:php": "php server/tests/run.php",
+    "backup": "php server/bin/console backup",
+    "build:wp": "./scripts/build-wp-plugin.sh"
   },
   "license": "UNLICENSED"
 }

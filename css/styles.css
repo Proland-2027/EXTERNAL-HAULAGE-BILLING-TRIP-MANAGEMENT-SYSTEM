@@ -201,3 +201,8 @@ pre.code { background: var(--surface-2); padding: .6rem .8rem; border-radius: 8p
   .doc .doc-title { font-size: 1.1rem; }
   tr, .party, .kpi { break-inside: avoid; }
 }
+
+/* ---------- client rates / pricing exceptions ---------- */
+tr.flagged td { background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.good { color: var(--good); } .bad { color: var(--bad); }
+#sync-status { margin-right: .5rem; }

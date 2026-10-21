@@ -56,6 +56,21 @@
       'C-NST': [['R-TEM-KUM', 28, 162], ['R-TEM-SUN', 28, 228], ['R-TEM-TAM', 28, 318]],
     };
 
+    const customers = [
+      { id: 'K-GHACEM', code: 'GHACEM', name: 'Ghacem Cement Distribution', contact: 'logistics@ghacem.example' },
+      { id: 'K-TOTAL', code: 'TOTAL', name: 'TotalEnergies Lubricants Ghana', contact: 'supply@totalenergies.example' },
+      { id: 'K-MELCOM', code: 'MELCOM', name: 'Melcom Retail Stores', contact: 'dc@melcom.example' },
+    ];
+    // Client rate cards: the agreed selling price per customer, keyed by route + equipment class, with validity dates.
+    const clientRateCards = [
+      { id: 'CR-GHACEM-2026', customerId: 'K-GHACEM', name: 'Ghacem haulage agreement 2026', currency: 'GHS', validFrom: '2026-01-01', validTo: '2026-12-31', status: 'ACTIVE', notes: 'Per tonne delivered, MOQ 30 t per articulated load',
+        lines: [['R-TEM-ACC', 'ANY', 30, 62], ['R-TEM-TAK', 'ANY', 30, 205], ['R-TEM-KUM', 'ANY', 30, 215], ['R-TEM-SUN', 'ANY', 30, 290], ['R-TEM-TAM', 'ANY', 30, 395], ['R-TEM-KUM', 'Rigid 10T', 10, 240]].map(([routeId, vehicleClass, moq, ratePerUnit], i) => ({ id: `CR-GHACEM-L${i + 1}`, routeId, vehicleClass, unit: 'TONNE', moq, ratePerUnit })) },
+      { id: 'CR-TOTAL-2025', customerId: 'K-TOTAL', name: 'TotalEnergies rate card 2025 (expired)', currency: 'GHS', validFrom: '2025-01-01', validTo: '2025-12-31', status: 'ACTIVE', notes: 'Renewal pending — rates expired 31 Dec 2025',
+        lines: [['R-TEM-KUM', 'ANY', 28, 198], ['R-TEM-TAM', 'ANY', 28, 372], ['R-TEM-ACC', 'Rigid 10T', 9, 80]].map(([routeId, vehicleClass, moq, ratePerUnit], i) => ({ id: `CR-TOTAL-L${i + 1}`, routeId, vehicleClass, unit: 'TONNE', moq, ratePerUnit })) },
+      { id: 'CR-MELCOM-2026', customerId: 'K-MELCOM', name: 'Melcom distribution tariff 2026', currency: 'GHS', validFrom: '2026-01-01', validTo: '2026-12-31', status: 'ACTIVE', notes: 'Flat rate per trip for the Accra shuttle; per tonne elsewhere',
+        lines: [['R-TEM-ACC', 'ANY', 0, 2100, 'TRIP'], ['R-TEM-TAK', 'ANY', 30, 210, 'TONNE'], ['R-TEM-SUN', 'ANY', 30, 295, 'TONNE']].map(([routeId, vehicleClass, moq, ratePerUnit, unit], i) => ({ id: `CR-MELCOM-L${i + 1}`, routeId, vehicleClass, unit, moq, ratePerUnit })) },
+    ];
+
     const priceLists = [
       {
         id: 'PL-INT-2026', name: 'Billing Price List 2026 (Internal)', partyId: Pricing.INTERNAL,
@@ -96,8 +111,18 @@
       const qty = opts.qty != null ? opts.qty : Math.round((nominal - rnd() * 4.5) * 10) / 10; // sometimes under MOQ
       const line = priceLists[0].lines.find((l) => l.routeId === routeId && l.vehicleClass === vehicleClass) || priceLists[0].lines.find((l) => l.routeId === routeId);
       const dieselLitres = isInternal ? Math.round(line.dieselLitres * (0.93 + rnd() * 0.16)) : undefined;
+      // customer + manual selling price (the agreed price is looked up from the client rate card for comparison)
+      const customerId = opts.customerId || (routeId === 'R-TEM-ACC' ? (rnd() < 0.5 ? 'K-MELCOM' : 'K-GHACEM') : routeId === 'R-TEM-TAM' || (routeId === 'R-TEM-KUM' && rnd() < 0.3) ? 'K-TOTAL' : 'K-GHACEM');
+      const agreed = Pricing.compareSellingPrice({ customerId, routeId, vehicleClass, qty, date }, clientRateCards).agreedPrice;
+      let sellingPrice;
+      if (agreed != null) { const f = rnd(); sellingPrice = Math.round(agreed * (f < 0.15 ? 0.93 : f < 0.3 ? 1.04 : 1)); } // 15% of trips priced under the agreement
+      else sellingPrice = Math.round(qty * (routeId === 'R-TEM-ACC' ? 70 : routeId === 'R-TEM-TAM' ? 380 : 200));
       trips.push({
         id: `T-${String(n).padStart(4, '0')}`,
+        customerId,
+        sellingPrice,
+        sellingPriceBy: 'sales',
+        sellingPriceAt: `${date}T09:00:00.000Z`,
         date,
         waybill: `WB-${date.slice(2, 4)}${date.slice(5, 7)}-${String(n).padStart(4, '0')}`,
         partyId,
@@ -153,7 +178,7 @@
       billings.push(b);
     });
 
-    return { version: 1, settings, routes, contractors, priceLists, trips, billings };
+    return { version: 2, settings, routes, contractors, customers, clientRateCards, priceLists, trips, billings };
   }
 
   return { build };

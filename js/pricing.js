@@ -447,8 +447,76 @@
     return { current, previous, deltas };
   }
 
+
+  // ------------------------------------------------------------------ client rate cards & agreed price
+  /**
+   * Client rate card: the approved price the CUSTOMER pays, keyed by route + equipment (vehicle) class with
+   * validity dates. The manual Selling Price on a trip is never overwritten — it is compared with the agreed price.
+   */
+  function pickClientRateCard(rateCards, customerId, dateStr) {
+    const mine = (rateCards || []).filter((c) => c.customerId === customerId);
+    if (!mine.length) return { card: null, status: 'MISSING' };
+    const active = mine.filter((c) => (c.status || 'ACTIVE') === 'ACTIVE');
+    const covering = active.filter((c) => listCoversDate(c, dateStr));
+    const byNewest = (a, b) => String(b.validFrom || '').localeCompare(String(a.validFrom || ''));
+    if (covering.length) return { card: covering.sort(byNewest)[0], status: 'OK' };
+    const expired = active.filter((c) => c.validTo && dateStr > c.validTo).sort(byNewest);
+    if (expired.length) return { card: expired[0], status: 'EXPIRED' };
+    const future = active.filter((c) => c.validFrom && dateStr < c.validFrom);
+    if (future.length) return { card: future[0], status: 'NOT_YET_VALID' };
+    return { card: null, status: 'MISSING' };
+  }
+
+  /** Resolve the agreed rate line for a trip: customer + route + equipment class + date. */
+  function resolveClientRate(rateCards, { customerId, routeId, vehicleClass, date }) {
+    if (!customerId) return { status: 'NO_CUSTOMER', card: null, line: null };
+    const pick = pickClientRateCard(rateCards, customerId, date);
+    if (!pick.card) return { status: 'MISSING', card: null, line: null };
+    const line = resolveLine(pick.card, routeId, vehicleClass);
+    if (!line) return { status: 'MISSING', card: pick.card, line: null };
+    return { status: pick.status, card: pick.card, line };
+  }
+
+  /**
+   * Compare a trip's manual selling price with the client agreed price.
+   * agreedPrice = rate × max(qty, MOQ) for per-unit lines, or the flat rate for TRIP lines.
+   * Price Variance = Manual Selling Price − Client Agreed Price.
+   */
+  function compareSellingPrice(trip, rateCards, { tolerancePct = 0 } = {}) {
+    const r = resolveClientRate(rateCards, { customerId: trip.customerId, routeId: trip.routeId, vehicleClass: trip.vehicleClass, date: trip.date });
+    const selling = trip.sellingPrice === '' || trip.sellingPrice == null ? null : num(trip.sellingPrice);
+    const out = { status: r.status, cardId: r.card ? r.card.id : null, cardName: r.card ? r.card.name : null, lineId: r.line ? r.line.id : null, rate: r.line ? num(r.line.ratePerUnit) : null, unit: r.line ? r.line.unit : null, moq: r.line ? num(r.line.moq) : 0, agreedPrice: null, sellingPrice: selling, variance: null, variancePct: null, flags: [] };
+    if (r.line && (r.status === 'OK' || r.status === 'EXPIRED' || r.status === 'NOT_YET_VALID')) {
+      const q = r.line.unit === 'TRIP' ? 1 : Math.max(num(trip.qty), num(r.line.moq));
+      out.agreedPrice = round2(num(r.line.ratePerUnit) * q);
+      out.agreedQty = q;
+    }
+    if (r.status === 'MISSING') out.flags.push('RATE_MISSING');
+    if (r.status === 'EXPIRED') out.flags.push('RATE_EXPIRED');
+    if (r.status === 'NOT_YET_VALID') out.flags.push('RATE_NOT_YET_VALID');
+    if (r.status === 'NO_CUSTOMER') out.flags.push('NO_CUSTOMER');
+    if (selling == null) out.flags.push('NO_SELLING_PRICE');
+    if (selling != null && out.agreedPrice != null) {
+      out.variance = round2(selling - out.agreedPrice);
+      out.variancePct = out.agreedPrice ? round2((out.variance / out.agreedPrice) * 100) : null;
+      if (selling < out.agreedPrice * (1 - tolerancePct / 100) - 0.5) out.flags.push('BELOW_AGREED'); // 0.5 = rounding tolerance
+    }
+    out.needsReview = out.flags.some((f) => f === 'BELOW_AGREED' || f === 'RATE_MISSING' || f === 'RATE_EXPIRED');
+    return out;
+  }
+
+  const PRICING_FLAG_LABELS = { BELOW_AGREED: 'Selling price below agreed client price', RATE_MISSING: 'No client rate for this route / equipment', RATE_EXPIRED: 'Client rate card expired', RATE_NOT_YET_VALID: 'Client rate card not yet valid', NO_CUSTOMER: 'No customer on trip', NO_SELLING_PRICE: 'Selling price not entered' };
+
+  /** Trips that need management review (flagged), with their exception status. */
+  function pricingExceptions(trips, rateCards, opts = {}) {
+    return (trips || []).map((t) => ({ trip: t, pricing: compareSellingPrice(t, rateCards, opts), exception: t.pricingException || null }))
+      .filter((x) => x.pricing.needsReview)
+      .sort((a, b) => String(b.trip.date).localeCompare(String(a.trip.date)));
+  }
+
   return {
-    INTERNAL, ANY_CLASS, COMPONENTS, COMPONENT_LABELS,
+    INTERNAL, ANY_CLASS, COMPONENTS, COMPONENT_LABELS, PRICING_FLAG_LABELS,
+    pickClientRateCard, resolveClientRate, compareSellingPrice, pricingExceptions,
     num, round2, round3, periodOf, previousPeriod, periodLabel, routeName,
     listCoversDate, pickPriceList, resolveLine, applyMoq, priceTrip, selectTrips,
     buildBilling, nextBillingNumber, periodLines, buildComparison, buildMonthlyComparison,
