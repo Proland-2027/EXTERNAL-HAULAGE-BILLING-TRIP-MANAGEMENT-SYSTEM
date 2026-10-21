@@ -154,3 +154,63 @@ test('comparison report uses logged billings and benchmarks each side at the oth
   assert.equal(mom.previous.period, '2026-08');
   assert.equal(mom.deltas.internalAmount.change, P.round2(mom.current.totals.internal.amount - mom.previous.totals.internal.amount));
 });
+
+// ------------------------------------------------------------------ client agreed price vs manual selling price
+const rateCards = [
+  { id: 'CR1', customerId: 'K1', name: 'Card 2026', status: 'ACTIVE', validFrom: '2026-01-01', validTo: '2026-12-31', lines: [
+    { id: 'C1', routeId: 'R1', vehicleClass: 'ANY', unit: 'TONNE', moq: 30, ratePerUnit: 200 },
+    { id: 'C2', routeId: 'R1', vehicleClass: 'Rigid 10T', unit: 'TRIP', moq: 0, ratePerUnit: 2500 },
+  ] },
+  { id: 'CR0', customerId: 'K2', name: 'Old card 2025', status: 'ACTIVE', validFrom: '2025-01-01', validTo: '2025-12-31', lines: [{ id: 'C3', routeId: 'R1', vehicleClass: 'ANY', unit: 'TONNE', moq: 30, ratePerUnit: 180 }] },
+];
+
+test('client agreed price is rate × max(qty, MOQ) and the manual selling price is compared, never replaced', () => {
+  const below = P.compareSellingPrice({ customerId: 'K1', routeId: 'R1', vehicleClass: 'Articulated 30T', qty: 28, date: '2026-03-05', sellingPrice: 5500 }, rateCards);
+  assert.equal(below.agreedPrice, 6000);             // 200 × MOQ 30
+  assert.equal(below.sellingPrice, 5500);            // untouched
+  assert.equal(below.variance, -500);
+  assert.deepEqual(below.flags, ['BELOW_AGREED']);
+  assert.equal(below.needsReview, true);
+  const above = P.compareSellingPrice({ customerId: 'K1', routeId: 'R1', vehicleClass: 'Articulated 30T', qty: 31, date: '2026-03-05', sellingPrice: 6400 }, rateCards);
+  assert.equal(above.agreedPrice, 6200);
+  assert.equal(above.variance, 200);
+  assert.deepEqual(above.flags, []);
+});
+
+test('equipment-class specific flat per-trip rate wins over the ANY line', () => {
+  const r = P.compareSellingPrice({ customerId: 'K1', routeId: 'R1', vehicleClass: 'Rigid 10T', qty: 8, date: '2026-06-01', sellingPrice: 2500 }, rateCards);
+  assert.equal(r.unit, 'TRIP');
+  assert.equal(r.agreedPrice, 2500);
+  assert.equal(r.variance, 0);
+});
+
+test('missing and expired client rates are flagged for review', () => {
+  const missing = P.compareSellingPrice({ customerId: 'K1', routeId: 'R9', vehicleClass: 'ANY', qty: 30, date: '2026-03-05', sellingPrice: 100 }, rateCards);
+  assert.equal(missing.agreedPrice, null);
+  assert.deepEqual(missing.flags, ['RATE_MISSING']);
+  const expired = P.compareSellingPrice({ customerId: 'K2', routeId: 'R1', vehicleClass: 'ANY', qty: 30, date: '2026-03-05', sellingPrice: 5400 }, rateCards);
+  assert.equal(expired.status, 'EXPIRED');
+  assert.equal(expired.agreedPrice, 5400);           // last known rate still shown for reference
+  assert.ok(expired.flags.includes('RATE_EXPIRED'));
+  assert.equal(expired.needsReview, true);
+  const noPrice = P.compareSellingPrice({ customerId: 'K1', routeId: 'R1', vehicleClass: 'ANY', qty: 30, date: '2026-03-05' }, rateCards);
+  assert.ok(noPrice.flags.includes('NO_SELLING_PRICE'));
+});
+
+test('pricing exceptions list only the trips needing management review', () => {
+  const trips = [
+    { id: 'A', customerId: 'K1', routeId: 'R1', vehicleClass: 'ANY', qty: 30, date: '2026-03-05', sellingPrice: 6000 },
+    { id: 'B', customerId: 'K1', routeId: 'R1', vehicleClass: 'ANY', qty: 30, date: '2026-03-06', sellingPrice: 5000, pricingException: { status: 'APPROVED', by: 'mgmt' } },
+    { id: 'C', customerId: 'K2', routeId: 'R1', vehicleClass: 'ANY', qty: 30, date: '2026-03-07', sellingPrice: 5400 },
+  ];
+  const ex = P.pricingExceptions(trips, rateCards);
+  assert.deepEqual(ex.map((x) => x.trip.id), ['C', 'B']);
+  assert.equal(ex[1].exception.status, 'APPROVED');
+});
+
+test('seed dataset carries customers, rate cards and selling prices on every trip', () => {
+  const db = Seed.build();
+  assert.ok(db.customers.length >= 3 && db.clientRateCards.length >= 3);
+  assert.ok(db.trips.every((t) => t.customerId && t.sellingPrice != null && t.sellingPriceBy));
+  assert.ok(P.pricingExceptions(db.trips, db.clientRateCards).length > 0);
+});

@@ -7,3 +7,4 @@ server/data/*.sqlite
 server/data/*.sqlite-*
 server/data/backups/
 server/data/uploaded-*.xlsx
+dist/

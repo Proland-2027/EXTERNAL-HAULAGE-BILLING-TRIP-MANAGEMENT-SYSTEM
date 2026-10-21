@@ -5,11 +5,13 @@
   const $ = (sel, el = document) => el.querySelector(sel);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  let db = window.Store.load();
+  let db = null; // loaded asynchronously (shared server dataset when signed in, otherwise this browser's storage)
   const state = {
     view: 'dashboard',
     period: null,
-    tripFilter: { period: '', partyId: '', routeId: '', status: '', billed: '' },
+    tripFilter: { period: '', partyId: '', routeId: '', status: '', billed: '', pricing: '' },
+    clientRateId: null,
+    exceptionFilter: 'OPEN',
     priceListId: null,
     billing: { partyId: P.INTERNAL, period: null, priceListId: '', preview: null, openId: null },
     report: { period: null, contractorId: '' },
@@ -35,7 +37,29 @@
     const withBilling = db.billings.map((b) => b.period).sort().reverse()[0];
     return withBilling || periods()[0] || today().slice(0, 7);
   };
-  const save = () => window.Store.save(db);
+  const currentUser = () => (window.Store.sync.user || {}).username || 'local-user';
+  const canApprovePricing = () => window.Store.can('haulage.approve');
+  function save(audit) {
+    window.Store.saveAsync(db, audit).then(renderSyncStatus).catch((e) => {
+      toast(e.message);
+      if (e.conflict) window.Store.loadAsync().then((d) => { db = d; state.billing.preview = null; render(); renderSyncStatus(); });
+    });
+  }
+  function renderSyncStatus() {
+    const el = $('#sync-status'); if (!el) return;
+    const sy = window.Store.sync;
+    if (sy.mode === 'server') el.innerHTML = `<span class="badge good" title="Shared dataset on the server (version ${sy.version})">shared · ${esc((sy.user || {}).display_name || '')}</span>`;
+    else if (sy.mode === 'login-required') el.innerHTML = `<span class="badge warn">not signed in — browser copy only · <a href="/">sign in</a></span>`;
+    else el.innerHTML = `<span class="badge" title="${esc(sy.lastError || '')}">browser storage only</span>`;
+  }
+  const customer = (id) => db.customers.find((c) => c.id === id);
+  const customerName = (id) => (customer(id) || {}).name || (id ? id : '');
+  const pricingOf = (t) => P.compareSellingPrice(t, db.clientRateCards);
+  const pricingBadge = (pr, t) => {
+    if (!pr.flags.length) return '<span class="badge good">at agreed</span>';
+    const ex = t && t.pricingException;
+    return pr.flags.map((f) => `<span class="badge ${f === 'BELOW_AGREED' || f === 'RATE_MISSING' || f === 'RATE_EXPIRED' ? 'bad' : 'warn'}" title="${esc(P.PRICING_FLAG_LABELS[f] || f)}">${esc(f.replace(/_/g, ' ').toLowerCase())}</span>`).join(' ') + (ex ? ` <span class="badge ${ex.status === 'APPROVED' ? 'good' : ex.status === 'REJECTED' ? 'bad' : 'warn'}" title="${esc(ex.comment || '')} — ${esc(ex.by || '')} ${esc((ex.at || '').slice(0, 10))}">${esc(ex.status.toLowerCase())}</span>` : '');
+  };
   const options = (items, value, { allLabel = null, key = 'id', label = 'name' } = {}) =>
     (allLabel != null ? `<option value="">${esc(allLabel)}</option>` : '') +
     items.map((i) => `<option value="${esc(i[key])}" ${String(i[key]) === String(value) ? 'selected' : ''}>${esc(typeof label === 'function' ? label(i) : i[label])}</option>`).join('');
@@ -71,7 +95,7 @@
     document.querySelectorAll('#nav .tab').forEach((b) => b.classList.toggle('active', b.dataset.view === state.view));
     $('#brand-company').textContent = db.settings.company || '';
     const v = $('#view');
-    const views = { dashboard: renderDashboard, trips: renderTrips, pricelists: renderPriceLists, billing: renderBilling, report: renderReport, setup: renderSetup, data: renderData };
+    const views = { dashboard: renderDashboard, trips: renderTrips, clientrates: renderClientRates, exceptions: renderPricingExceptions, pricelists: renderPriceLists, billing: renderBilling, report: renderReport, setup: renderSetup, data: renderData };
     v.innerHTML = views[state.view]();
     if (state.view === 'report' || state.view === 'dashboard') window.Charts.bindTooltips(v);
   }
@@ -134,7 +158,7 @@
   // ------------------------------------------------------------------ trips
   function renderTrips() {
     const f = state.tripFilter;
-    const rows = db.trips.filter((t) => (!f.period || P.periodOf(t.date) === f.period) && (!f.partyId || t.partyId === f.partyId) && (!f.routeId || t.routeId === f.routeId) && (!f.status || t.status === f.status) && (!f.billed || (f.billed === 'yes') === !!t.billingId))
+    const rows = db.trips.filter((t) => (!f.period || P.periodOf(t.date) === f.period) && (!f.partyId || t.partyId === f.partyId) && (!f.routeId || t.routeId === f.routeId) && (!f.status || t.status === f.status) && (!f.billed || (f.billed === 'yes') === !!t.billingId) && (!f.pricing || (f.pricing === 'flagged') === pricingOf(t).needsReview))
       .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
     const totQty = rows.reduce((s, t) => s + P.num(t.qty), 0);
     return `
@@ -146,15 +170,20 @@
           <label>Route<select data-filter="routeId">${options(db.routes, f.routeId, { allLabel: 'All routes', label: (r) => `${r.origin} → ${r.destination}` })}</select></label>
           <label>Status<select data-filter="status">${options([{ id: 'COMPLETED', name: 'Completed' }, { id: 'CANCELLED', name: 'Cancelled' }], f.status, { allLabel: 'All' })}</select></label>
           <label>Billing<select data-filter="billed">${options([{ id: 'yes', name: 'Billed' }, { id: 'no', name: 'Unbilled' }], f.billed, { allLabel: 'All' })}</select></label>
-          <span class="muted small" style="align-self:center">${rows.length} trips · ${fmtNum(totQty, 1)} units</span>
+          <label>Pricing<select data-filter="pricing">${options([{ id: 'flagged', name: 'Flagged (below agreed / no rate)' }, { id: 'ok', name: 'At or above agreed' }], f.pricing, { allLabel: 'All' })}</select></label>
+          <span class="muted small" style="align-self:center">${rows.length} trips · ${fmtNum(totQty, 1)} units · ${rows.filter((t) => pricingOf(t).needsReview).length} flagged for pricing review</span>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Waybill</th><th>Party</th><th>Vehicle</th><th>Class</th><th>Driver</th><th>Route</th><th>Product</th><th class="num">Qty</th><th>Unit</th><th class="num">Km</th><th class="num">Diesel L</th><th>Status</th><th>Billing</th><th></th></tr></thead>
-          <tbody>${rows.length ? rows.map((t) => `<tr>
-            <td class="nowrap">${esc(t.date)}</td><td>${esc(t.waybill)}</td><td>${esc(partyName(t.partyId))}</td><td class="nowrap">${esc(t.vehicleNo)}</td><td>${esc(t.vehicleClass)}</td><td>${esc(t.driver)}</td>
-            <td>${esc(routeLabel(t.routeId))}</td><td>${esc(t.product)}</td><td class="num">${fmtNum(t.qty, 3)}</td><td>${esc(t.unit)}</td><td class="num">${fmtNum(t.distanceKm, 0)}</td><td class="num">${t.dieselLitres != null && t.dieselLitres !== '' ? fmtNum(t.dieselLitres, 1) : ''}</td>
+          <thead><tr><th>Date</th><th>Waybill</th><th>Customer</th><th>Party</th><th>Vehicle</th><th>Class</th><th>Route</th><th>Product</th><th class="num">Qty</th><th>Unit</th><th class="num">Km</th><th class="num" title="Manual entry">Selling price</th><th class="num" title="From the client rate card">Client agreed price</th><th class="num" title="Selling − Agreed">Variance</th><th>Pricing</th><th>Status</th><th>Billing</th><th></th></tr></thead>
+          <tbody>${rows.length ? rows.map((t) => { const pr = pricingOf(t); return `<tr class="${pr.flags.includes('BELOW_AGREED') && !(t.pricingException && t.pricingException.status === 'APPROVED') ? 'flagged' : ''}">
+            <td class="nowrap">${esc(t.date)}</td><td>${esc(t.waybill)}</td><td>${esc(customerName(t.customerId))}</td><td>${esc(partyName(t.partyId))}</td><td class="nowrap">${esc(t.vehicleNo)}</td><td>${esc(t.vehicleClass)}</td>
+            <td>${esc(routeLabel(t.routeId))}</td><td>${esc(t.product)}</td><td class="num">${fmtNum(t.qty, 3)}</td><td>${esc(t.unit)}</td><td class="num">${fmtNum(t.distanceKm, 0)}</td>
+            <td class="num" title="entered by ${esc(t.sellingPriceBy || '')} ${esc((t.sellingPriceAt || '').slice(0, 16).replace('T', ' '))}">${t.sellingPrice != null && t.sellingPrice !== '' ? fmtMoney(t.sellingPrice) : '<span class="muted">—</span>'}</td>
+            <td class="num" title="${esc(pr.cardName || '')}${pr.rate != null ? ` · ${fmtMoney(pr.rate)} / ${esc(pr.unit)}` : ''}">${pr.agreedPrice != null ? fmtMoney(pr.agreedPrice) : '<span class="muted">—</span>'}</td>
+            <td class="num">${pr.variance != null ? `<span class="${pr.variance < 0 ? 'bad' : pr.variance > 0 ? 'good' : ''}">${pr.variance > 0 ? '+' : ''}${fmtMoney(pr.variance)}</span>` : '—'}</td>
+            <td>${pricingBadge(pr, t)}</td>
             <td>${statusBadge(t.status || 'COMPLETED')}</td><td>${t.billingId ? `<a href="#" data-action="open-billing" data-id="${esc(t.billingId)}">${esc((db.billings.find((b) => b.id === t.billingId) || {}).number || t.billingId)}</a>` : '<span class="muted">—</span>'}</td>
-            <td class="actions"><button class="btn sm" data-action="trip-edit" data-id="${esc(t.id)}">Edit</button> <button class="btn sm ghost danger" data-action="trip-delete" data-id="${esc(t.id)}">✕</button></td></tr>`).join('') : '<tr><td colspan="15"><div class="empty">No trips match the filter.</div></td></tr>'}
+            <td class="actions"><button class="btn sm" data-action="trip-edit" data-id="${esc(t.id)}">Edit</button> <button class="btn sm ghost danger" data-action="trip-delete" data-id="${esc(t.id)}">✕</button></td></tr>`; }).join('') : '<tr><td colspan="18"><div class="empty">No trips match the filter.</div></td></tr>'}
           </tbody></table></div>
       </div>`;
   }
@@ -164,34 +193,133 @@
     const units = db.settings.units || ['TONNE'];
     const r = route(t.routeId);
     return `<div class="form-grid">
-      ${field('Date', 'date', 'date', t.date || today(), 'required')}
+      ${field('Date', 'date', 'date', t.date || today(), 'required data-price-input')}
+      ${selectField('Customer (client billed)', 'customerId', options(db.customers, t.customerId || (db.customers[0] || {}).id, { allLabel: '— none —' }), 'data-price-input')}
       ${selectField('Party (haulier)', 'partyId', options(parties(), t.partyId || P.INTERNAL), 'required')}
       ${field('Waybill / Trip No.', 'waybill', 'text', t.waybill || '', 'required')}
       ${field('Vehicle No.', 'vehicleNo', 'text', t.vehicleNo || '')}
-      ${selectField('Vehicle class', 'vehicleClass', options(classes.map((c) => ({ id: c, name: c })), t.vehicleClass || classes[0]))}
+      ${selectField('Vehicle class (equipment type)', 'vehicleClass', options(classes.map((c) => ({ id: c, name: c })), t.vehicleClass || classes[0]), 'data-price-input')}
       ${field('Driver', 'driver', 'text', t.driver || '')}
-      ${selectField('Route', 'routeId', options(db.routes, t.routeId || (db.routes[0] || {}).id, { label: (x) => `${x.origin} → ${x.destination} (${x.distanceKm} km)` }), 'required data-autofill-km')}
+      ${selectField('Route', 'routeId', options(db.routes, t.routeId || (db.routes[0] || {}).id, { label: (x) => `${x.origin} → ${x.destination} (${x.distanceKm} km)` }), 'required data-autofill-km data-price-input')}
       <label>Product<input name="product" list="products" value="${esc(t.product || '')}"><datalist id="products">${(db.settings.products || []).map((p) => `<option value="${esc(p)}">`).join('')}</datalist></label>
-      ${field('Quantity loaded', 'qty', 'number', t.qty != null ? t.qty : '', 'step="0.001" min="0" required')}
+      ${field('Quantity loaded', 'qty', 'number', t.qty != null ? t.qty : '', 'step="0.001" min="0" required data-price-input')}
       ${selectField('Unit', 'unit', options(units.map((u) => ({ id: u, name: u })), t.unit || 'TONNE'))}
       ${field('Distance (km)', 'distanceKm', 'number', t.distanceKm != null ? t.distanceKm : (r ? r.distanceKm : ''), 'step="0.1" min="0"')}
       ${field('Diesel used (litres, internal fleet)', 'dieselLitres', 'number', t.dieselLitres != null ? t.dieselLitres : '', 'step="0.1" min="0" placeholder="blank = standard litres"')}
       ${selectField('Status', 'status', options([{ id: 'COMPLETED', name: 'Completed' }, { id: 'CANCELLED', name: 'Cancelled' }], t.status || 'COMPLETED'))}
       <label class="full">Remarks<input name="remarks" value="${esc(t.remarks || '')}"></label>
     </div>
+    <h3 style="margin-top:1rem">Selling price vs client agreed price</h3>
+    <div class="form-grid">
+      ${field(`Selling price (manual entry, ${cur()} per trip)`, 'sellingPrice', 'number', t.sellingPrice != null ? t.sellingPrice : '', 'step="0.01" min="0" data-price-input')}
+      <label>Client agreed price (rate card)<input name="agreedPrice" value="" readonly data-agreed></label>
+      <label>Price variance = Selling − Agreed<input name="variance" value="" readonly data-variance></label>
+      <div class="full" data-pricing-info></div>
+    </div>
+    ${t.sellingPriceBy ? `<p class="hint">Selling price last entered by <b>${esc(t.sellingPriceBy)}</b> on ${esc((t.sellingPriceAt || '').slice(0, 16).replace('T', ' '))}.</p>` : ''}
     ${t.billingId ? `<p class="hint err">This trip is already on billing ${esc((db.billings.find((b) => b.id === t.billingId) || {}).number || '')}. Edits here do not change that logged billing — void and regenerate it if the change should be billed.</p>` : '<p class="hint">Quantity below the price-list MOQ is billed at the MOQ. Leave diesel blank to use the standard litres from the price list.</p>'}`;
   }
   function openTripForm(t) {
     modal(t ? 'Edit trip' : 'Log trip', tripForm(t || {}), (v) => {
       const rec = t || { id: window.Store.uid('T'), billingId: null };
-      Object.assign(rec, { date: v.date, partyId: v.partyId, waybill: v.waybill.trim(), vehicleNo: v.vehicleNo.trim(), vehicleClass: v.vehicleClass, driver: v.driver.trim(), routeId: v.routeId, product: v.product.trim(), qty: P.num(v.qty), unit: v.unit, distanceKm: v.distanceKm === '' ? P.num((route(v.routeId) || {}).distanceKm) : P.num(v.distanceKm), dieselLitres: v.dieselLitres === '' ? undefined : P.num(v.dieselLitres), status: v.status, remarks: v.remarks.trim() });
+      const newPrice = v.sellingPrice === '' ? null : P.num(v.sellingPrice);
+      const priceChanged = (rec.sellingPrice == null ? null : P.num(rec.sellingPrice)) !== newPrice;
+      Object.assign(rec, { date: v.date, customerId: v.customerId || null, partyId: v.partyId, waybill: v.waybill.trim(), vehicleNo: v.vehicleNo.trim(), vehicleClass: v.vehicleClass, driver: v.driver.trim(), routeId: v.routeId, product: v.product.trim(), qty: P.num(v.qty), unit: v.unit, distanceKm: v.distanceKm === '' ? P.num((route(v.routeId) || {}).distanceKm) : P.num(v.distanceKm), dieselLitres: v.dieselLitres === '' ? undefined : P.num(v.dieselLitres), status: v.status, remarks: v.remarks.trim(), sellingPrice: newPrice });
+      if (priceChanged || !rec.sellingPriceBy) { rec.sellingPriceBy = currentUser(); rec.sellingPriceAt = new Date().toISOString(); if (rec.pricingException && priceChanged) rec.pricingException = { ...rec.pricingException, status: 'OPEN', note: 'Selling price changed after decision — re-review' }; }
+      const pr = pricingOf(rec);
+      if (!pr.needsReview) rec.pricingException = null;
       if (!t) db.trips.push(rec);
-      save(); render(); toast(t ? 'Trip updated' : 'Trip logged');
+      save({ action: t ? 'TRIP_UPDATED' : 'TRIP_CREATED', id: rec.id, waybill: rec.waybill, sellingPrice: rec.sellingPrice, agreedPrice: pr.agreedPrice, variance: pr.variance, flags: pr.flags }); render();
+      toast(t ? 'Trip updated' : 'Trip logged' + (pr.needsReview ? ' — flagged for pricing review' : ''));
     });
+    const form = $('#modal-form');
+    const refreshPricing = () => {
+      const v = {}; new FormData(form).forEach((x, k) => (v[k] = x));
+      const pr = P.compareSellingPrice({ customerId: v.customerId, routeId: v.routeId, vehicleClass: v.vehicleClass, qty: v.qty, date: v.date, sellingPrice: v.sellingPrice }, db.clientRateCards);
+      form.querySelector('[data-agreed]').value = pr.agreedPrice != null ? `${fmtMoney(pr.agreedPrice)} (${fmtMoney(pr.rate)} / ${pr.unit}${pr.moq ? `, MOQ ${pr.moq}` : ''})` : pr.status === 'MISSING' ? 'no client rate for this route / equipment' : pr.status === 'NO_CUSTOMER' ? 'select a customer' : '—';
+      form.querySelector('[data-variance]').value = pr.variance != null ? `${pr.variance > 0 ? '+' : ''}${fmtMoney(pr.variance)} (${pr.variancePct > 0 ? '+' : ''}${fmtNum(pr.variancePct, 1)}%)` : '';
+      form.querySelector('[data-pricing-info]').innerHTML = pr.flags.length ? `<div class="hint err">${pr.flags.map((f) => esc(P.PRICING_FLAG_LABELS[f] || f)).join(' · ')}${pr.cardName ? ` · card: ${esc(pr.cardName)}` : ''}. ${pr.needsReview ? 'This trip will be listed for management approval.' : ''}</div>` : `<div class="hint">Selling price matches or exceeds the agreed client price (${esc(pr.cardName || '')}). The manual selling price is kept as entered.</div>`;
+    };
+    form.querySelectorAll('[data-price-input]').forEach((el) => { el.addEventListener('input', refreshPricing); el.addEventListener('change', refreshPricing); });
+    refreshPricing();
     $('#modal-form').addEventListener('change', (e) => {
       if (e.target.matches('[data-autofill-km]')) { const r = route(e.target.value); if (r) $('#modal-form [name="distanceKm"]').value = r.distanceKm; }
     });
   }
+
+  // ------------------------------------------------------------------ client rate cards (agreed selling prices)
+  function renderClientRates() {
+    const cards = [...db.clientRateCards].sort((a, b) => customerName(a.customerId).localeCompare(customerName(b.customerId)) || String(b.validFrom).localeCompare(String(a.validFrom)));
+    if (!state.clientRateId || !cards.find((c) => c.id === state.clientRateId)) state.clientRateId = (cards[0] || {}).id;
+    const c = cards.find((x) => x.id === state.clientRateId);
+    const classes = ['ANY', ...(db.settings.vehicleClasses || [])];
+    const units = db.settings.units || ['TONNE', 'TRIP'];
+    const tripsOn = (card) => db.trips.filter((t) => pricingOf(t).cardId === card.id).length;
+    return `
+      <div class="grid" style="grid-template-columns: 280px 1fr">
+        <div class="card">
+          <div class="card-head"><h2>Client rate cards</h2><button class="btn sm primary" data-action="cr-new">+ Card</button></div>
+          <div class="list">${cards.map((x) => `<button class="list-item ${x.id === state.clientRateId ? 'active' : ''}" data-action="cr-select" data-id="${esc(x.id)}"><div><b>${esc(customerName(x.customerId))}</b><div class="small muted">${esc(x.name)}</div><div class="small muted">${esc(x.validFrom || '')} → ${esc(x.validTo || '')} · ${x.lines.length} lines · ${tripsOn(x)} trips</div></div>${statusBadge(x.status)}</button>`).join('') || '<div class="empty">No client rate cards yet.</div>'}</div>
+          <p class="hint">The agreed client price is looked up by customer, route, equipment (vehicle) class and the trip date against the validity of the card. It is shown beside the manual selling price and never overwrites it.</p>
+        </div>
+        ${c ? `<div class="card">
+          <div class="card-head"><h1>${esc(c.name)}</h1><div class="row"><button class="btn sm" data-action="cr-duplicate" data-id="${esc(c.id)}">Duplicate for next year</button><button class="btn sm" data-action="cr-export" data-id="${esc(c.id)}">Export</button><button class="btn sm ghost danger" data-action="cr-delete" data-id="${esc(c.id)}">Delete</button></div></div>
+          <div class="form-grid" data-cr-head="${esc(c.id)}">
+            ${selectField('Customer', 'customerId', options(db.customers, c.customerId))}
+            ${field('Name', 'name', 'text', c.name)}
+            ${field('Valid from', 'validFrom', 'date', c.validFrom || '')}
+            ${field('Valid to', 'validTo', 'date', c.validTo || '')}
+            ${selectField('Status', 'status', options([{ id: 'ACTIVE', name: 'Active' }, { id: 'DRAFT', name: 'Draft' }, { id: 'ARCHIVED', name: 'Archived' }], c.status))}
+            <label class="full">Notes<input name="notes" value="${esc(c.notes || '')}"></label>
+          </div>
+          <h3 style="margin-top:1rem">Agreed rates <span class="muted small">— per unit × max(qty, MOQ), or a flat rate per trip</span></h3>
+          <div class="table-wrap"><table class="compact" data-cr-lines="${esc(c.id)}">
+            <thead><tr><th>Route</th><th>Equipment class</th><th>Unit</th><th class="num">MOQ</th><th class="num">Agreed rate</th><th class="num">Agreed price @MOQ</th><th></th></tr></thead>
+            <tbody>${c.lines.map((l) => `<tr data-line="${esc(l.id)}">
+              <td><select data-field="routeId">${options(db.routes, l.routeId, { label: (x) => `${x.origin} → ${x.destination}` })}</select></td>
+              <td><select data-field="vehicleClass">${options(classes.map((x) => ({ id: x, name: x })), l.vehicleClass || 'ANY')}</select></td>
+              <td><select data-field="unit">${options(units.map((u) => ({ id: u, name: u })), l.unit || 'TONNE')}</select></td>
+              <td class="num"><input type="number" step="0.001" min="0" data-field="moq" value="${esc(l.moq != null ? l.moq : 0)}" ${l.unit === 'TRIP' ? 'disabled' : ''}></td>
+              <td class="num"><input type="number" step="0.01" min="0" data-field="ratePerUnit" value="${esc(l.ratePerUnit != null ? l.ratePerUnit : 0)}"></td>
+              <td class="num">${fmtMoney(l.unit === 'TRIP' ? l.ratePerUnit : P.num(l.ratePerUnit) * P.num(l.moq))}</td>
+              <td class="actions"><button class="btn sm ghost danger" data-action="cr-line-delete" data-id="${esc(l.id)}">✕</button></td></tr>`).join('') || '<tr><td colspan="7"><div class="empty">No rates on this card.</div></td></tr>'}</tbody>
+          </table></div>
+          <div class="row" style="margin-top:.6rem"><button class="btn sm" data-action="cr-line-add" data-id="${esc(c.id)}">+ Rate line</button></div>
+        </div>` : '<div class="card"><div class="empty">Select or create a client rate card.</div></div>'}
+      </div>`;
+  }
+
+  // ------------------------------------------------------------------ pricing exceptions (management review)
+  function renderPricingExceptions() {
+    const all = P.pricingExceptions(db.trips, db.clientRateCards);
+    const f = state.exceptionFilter;
+    const rows = all.filter((x) => !f || ((x.exception || {}).status || 'OPEN') === f);
+    const counts = { OPEN: 0, APPROVED: 0, REJECTED: 0 }; all.forEach((x) => (counts[(x.exception || {}).status || 'OPEN']++));
+    const below = all.filter((x) => x.pricing.flags.includes('BELOW_AGREED'));
+    const shortfall = below.reduce((s, x) => s + Math.abs(x.pricing.variance || 0), 0);
+    return `
+      <div class="card">
+        <div class="card-head"><div><h1>Pricing exceptions</h1><div class="muted small">Trips whose manual selling price is below the client agreed price, or that have no valid client rate. Management reviews and approves or rejects each exception; the selling price itself is never changed here.</div></div>
+          <div class="row"><select data-exfilter>${options([{ id: 'OPEN', name: `Open (${counts.OPEN})` }, { id: 'APPROVED', name: `Approved (${counts.APPROVED})` }, { id: 'REJECTED', name: `Rejected (${counts.REJECTED})` }], f, { allLabel: `All (${all.length})` })}</select><button class="btn" data-action="ex-export">Export</button></div></div>
+        <div class="kpis">
+          <div class="kpi"><div class="label">Open exceptions</div><div class="value">${counts.OPEN}</div><div class="delta">awaiting management decision</div></div>
+          <div class="kpi"><div class="label">Trips below agreed price</div><div class="value">${below.length}</div><div class="delta">revenue shortfall ${fmtMoney(shortfall, true)}</div></div>
+          <div class="kpi"><div class="label">Missing / expired rates</div><div class="value">${all.filter((x) => x.pricing.flags.includes('RATE_MISSING') || x.pricing.flags.includes('RATE_EXPIRED')).length}</div><div class="delta">update the client rate cards</div></div>
+        </div>
+        <div class="table-wrap" style="margin-top:1rem"><table class="compact">
+          <thead><tr><th>Date</th><th>Waybill</th><th>Customer</th><th>Route</th><th>Class</th><th class="num">Qty</th><th class="num">Selling price</th><th class="num">Agreed price</th><th class="num">Variance</th><th>Flags</th><th>Entered by</th><th>Decision</th><th></th></tr></thead>
+          <tbody>${rows.length ? rows.map(({ trip: t, pricing: pr, exception: ex }) => `<tr>
+            <td class="nowrap">${esc(t.date)}</td><td>${esc(t.waybill)}</td><td>${esc(customerName(t.customerId))}</td><td>${esc(routeLabel(t.routeId))}</td><td>${esc(t.vehicleClass)}</td><td class="num">${fmtNum(t.qty, 2)}</td>
+            <td class="num">${t.sellingPrice != null ? fmtMoney(t.sellingPrice) : '—'}</td><td class="num">${pr.agreedPrice != null ? fmtMoney(pr.agreedPrice) : '—'}</td><td class="num">${pr.variance != null ? `<span class="${pr.variance < 0 ? 'bad' : ''}">${fmtMoney(pr.variance)}</span>` : '—'}</td>
+            <td>${pr.flags.map((fl) => `<span class="badge ${fl === 'BELOW_AGREED' ? 'bad' : 'warn'}" title="${esc(P.PRICING_FLAG_LABELS[fl] || fl)}">${esc(fl.replace(/_/g, ' ').toLowerCase())}</span>`).join(' ')}</td>
+            <td class="small">${esc(t.sellingPriceBy || '')}<br><span class="muted">${esc((t.sellingPriceAt || '').slice(0, 10))}</span></td>
+            <td>${ex ? `${statusBadge(ex.status)}<div class="small muted">${esc(ex.by || '')} ${esc((ex.at || '').slice(0, 10))}${ex.comment ? ` — ${esc(ex.comment)}` : ''}</div>` : '<span class="badge warn">OPEN</span>'}</td>
+            <td class="actions">${canApprovePricing() ? `<button class="btn sm" data-action="ex-decide" data-id="${esc(t.id)}" data-status="APPROVED">Approve</button> <button class="btn sm ghost danger" data-action="ex-decide" data-id="${esc(t.id)}" data-status="REJECTED">Reject</button>` : '<span class="muted small">management only</span>'} <button class="btn sm ghost" data-action="trip-edit" data-id="${esc(t.id)}">Edit trip</button></td></tr>`).join('') : '<tr><td colspan="13"><div class="empty">No pricing exceptions.</div></td></tr>'}</tbody>
+        </table></div>
+      </div>`;
+  }
+  const crForm = (c = {}) => `<div class="form-grid">${selectField('Customer', 'customerId', options(db.customers, c.customerId || (db.customers[0] || {}).id))}${field('Name', 'name', 'text', c.name || `Client rate card ${new Date().getFullYear()}`, 'required')}${field('Valid from', 'validFrom', 'date', c.validFrom || `${new Date().getFullYear()}-01-01`)}${field('Valid to', 'validTo', 'date', c.validTo || `${new Date().getFullYear()}-12-31`)}</div>`;
+  const customerForm = (c = {}) => `<div class="form-grid">${field('Code', 'code', 'text', c.code || '', 'required maxlength="8"')}${field('Name', 'name', 'text', c.name || '', 'required')}${field('Contact / email', 'contact', 'text', c.contact || '')}${field('Phone', 'phone', 'text', c.phone || '')}</div>`;
 
   // ------------------------------------------------------------------ price lists & MOQ
   function renderPriceLists() {
@@ -505,6 +633,12 @@
       </div>
       <div class="grid two">
         <div class="card">
+          <div class="card-head"><h2>Customers (clients billed)</h2><button class="btn sm primary" data-action="customer-new">+ Customer</button></div>
+          <table class="compact"><thead><tr><th>Code</th><th>Name</th><th>Contact</th><th class="num">Rate cards</th><th></th></tr></thead><tbody>
+            ${db.customers.map((c) => `<tr><td>${esc(c.code)}</td><td>${esc(c.name)}</td><td class="small">${esc(c.contact || '')}${c.phone ? '<br>' + esc(c.phone) : ''}</td><td class="num">${db.clientRateCards.filter((x) => x.customerId === c.id).length}</td><td class="actions"><button class="btn sm" data-action="customer-edit" data-id="${esc(c.id)}">Edit</button> <button class="btn sm ghost danger" data-action="customer-delete" data-id="${esc(c.id)}">✕</button></td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">No customers.</div></td></tr>'}
+          </tbody></table>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Routes</h2><button class="btn sm primary" data-action="route-new">+ Route</button></div>
           <table class="compact"><thead><tr><th>Code</th><th>Origin</th><th>Destination</th><th class="num">Km</th><th></th></tr></thead><tbody>
             ${db.routes.map((r) => `<tr><td>${esc(r.code)}</td><td>${esc(r.origin)}</td><td>${esc(r.destination)}</td><td class="num">${fmtNum(r.distanceKm, 0)}</td><td class="actions"><button class="btn sm" data-action="route-edit" data-id="${esc(r.id)}">Edit</button> <button class="btn sm ghost danger" data-action="route-delete" data-id="${esc(r.id)}">✕</button></td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">No routes.</div></td></tr>'}
@@ -526,7 +660,7 @@
     const size = (() => { try { return (localStorage.getItem(window.Store.KEY) || '').length; } catch (e) { return 0; } })();
     return `
       <div class="card"><h1>Data</h1>
-        <p>All data is stored in this browser (localStorage, ${fmtNum(size / 1024, 0)} KB). Export regularly for backup or to move to another computer; import restores a backup.</p>
+        <p>${window.Store.sync.mode === 'server' ? `This Trip Log is the <b>shared dataset on the server</b> (version ${window.Store.sync.version}) — every signed-in user sees and edits the same records; changes are audited under your user name (${esc(currentUser())}). A browser copy (${fmtNum(size / 1024, 0)} KB) is kept for offline reading.` : `All data is stored in this browser (localStorage, ${fmtNum(size / 1024, 0)} KB). ${window.Store.sync.mode === 'login-required' ? '<b>Sign in on the main application to work on the shared server dataset.</b>' : ''} Export regularly for backup or to move to another computer; import restores a backup.`}</p>
         <div class="row">
           <button class="btn primary" data-action="data-export">Export backup (.json)</button>
           <label class="btn">Import backup… <input type="file" accept="application/json,.json" data-action="data-import" hidden></label>
@@ -535,7 +669,7 @@
         </div>
         <h3 style="margin-top:1rem">Counts</h3>
         <table class="compact" style="max-width:420px"><tbody>
-          <tr><td>Routes</td><td class="num">${db.routes.length}</td></tr><tr><td>Contractors</td><td class="num">${db.contractors.length}</td></tr><tr><td>Price lists</td><td class="num">${db.priceLists.length}</td></tr><tr><td>Trips</td><td class="num">${db.trips.length}</td></tr><tr><td>Billings</td><td class="num">${db.billings.length}</td></tr>
+          <tr><td>Customers</td><td class="num">${db.customers.length}</td></tr><tr><td>Client rate cards</td><td class="num">${db.clientRateCards.length}</td></tr><tr><td>Routes</td><td class="num">${db.routes.length}</td></tr><tr><td>Contractors</td><td class="num">${db.contractors.length}</td></tr><tr><td>Price lists</td><td class="num">${db.priceLists.length}</td></tr><tr><td>Trips</td><td class="num">${db.trips.length}</td></tr><tr><td>Billings</td><td class="num">${db.billings.length}</td></tr>
         </tbody></table>
       </div>`;
   }
@@ -547,9 +681,18 @@
     if (el.matches('[data-filter]')) { state.tripFilter[el.dataset.filter] = el.value; render(); return; }
     if (el.matches('[data-bill]')) { state.billing[el.dataset.bill] = el.value; if (el.dataset.bill !== 'priceListId') state.billing.priceListId = ''; state.billing.preview = null; render(); return; }
     if (el.matches('[data-report]')) { state.report[el.dataset.report] = el.value; render(); return; }
+    if (el.matches('[data-exfilter]')) { state.exceptionFilter = el.value; render(); return; }
+    const crHead = el.closest('[data-cr-head]');
+    if (crHead) { const c = db.clientRateCards.find((x) => x.id === crHead.dataset.crHead); if (!c) return; c[el.name] = el.value; save({ action: 'CLIENT_RATE_UPDATED', id: c.id, field: el.name }); render(); return; }
+    const crRow = el.closest('[data-cr-lines] tr[data-line]');
+    if (crRow) {
+      const c = db.clientRateCards.find((x) => x.id === crRow.closest('[data-cr-lines]').dataset.crLines); const line = c && c.lines.find((l) => l.id === crRow.dataset.line); if (!line) return;
+      line[el.dataset.field] = el.type === 'number' ? P.num(el.value) : el.value; if (el.dataset.field === 'unit' && el.value === 'TRIP') line.moq = 0;
+      save({ action: 'CLIENT_RATE_LINE_UPDATED', id: c.id, line: line.id, field: el.dataset.field, value: el.value }); render(); return;
+    }
     if (el.matches('[data-action="data-import"]')) {
       const f = el.files[0]; if (!f) return;
-      f.text().then((txt) => { db = window.Store.importJson(txt); state.billing.preview = null; render(); toast('Backup imported'); }).catch((err) => toast(`Import failed: ${err.message}`));
+      f.text().then((txt) => { db = window.Store.importJson(txt); state.billing.preview = null; save({ action: 'BACKUP_IMPORTED' }); render(); toast('Backup imported'); }).catch((err) => toast(`Import failed: ${err.message}`));
       return;
     }
     const head = el.closest('[data-pl-head]');
@@ -585,8 +728,24 @@
       'export-trips': () => {
         const f = state.tripFilter;
         const rows = db.trips.filter((t) => (!f.period || P.periodOf(t.date) === f.period) && (!f.partyId || t.partyId === f.partyId));
-        window.Exporter.workbook(`trips-${f.period || 'all'}`, [{ name: 'Trips', rows: [['Date', 'Waybill', 'Party', 'Vehicle', 'Class', 'Driver', 'Route', 'Product', 'Qty', 'Unit', 'Km', 'Diesel L', 'Status', 'Billing', 'Remarks'], ...rows.map((t) => [t.date, t.waybill, partyName(t.partyId), t.vehicleNo, t.vehicleClass, t.driver, routeLabel(t.routeId), t.product, t.qty, t.unit, t.distanceKm, t.dieselLitres, t.status, (db.billings.find((b) => b.id === t.billingId) || {}).number || '', t.remarks])] }]);
+        window.Exporter.workbook(`trips-${f.period || 'all'}`, [{ name: 'Trips', rows: [['Date', 'Waybill', 'Customer', 'Party', 'Vehicle', 'Class', 'Driver', 'Route', 'Product', 'Qty', 'Unit', 'Km', 'Diesel L', 'Selling price', 'Client agreed price', 'Variance', 'Pricing flags', 'Exception status', 'Price entered by', 'Status', 'Billing', 'Remarks'], ...rows.map((t) => { const pr = pricingOf(t); return [t.date, t.waybill, customerName(t.customerId), partyName(t.partyId), t.vehicleNo, t.vehicleClass, t.driver, routeLabel(t.routeId), t.product, t.qty, t.unit, t.distanceKm, t.dieselLitres, t.sellingPrice, pr.agreedPrice, pr.variance, pr.flags.join(' '), (t.pricingException || {}).status || '', t.sellingPriceBy, t.status, (db.billings.find((b) => b.id === t.billingId) || {}).number || '', t.remarks]; })] }]);
       },
+      'cr-select': () => { state.clientRateId = id; render(); },
+      'cr-new': () => modal('New client rate card', crForm(), (v) => { const c = { id: window.Store.uid('CR'), customerId: v.customerId, name: v.name.trim(), currency: cur(), validFrom: v.validFrom, validTo: v.validTo, status: 'ACTIVE', notes: '', lines: db.routes.map((r) => ({ id: window.Store.uid('L'), routeId: r.id, vehicleClass: 'ANY', unit: 'TONNE', moq: 0, ratePerUnit: 0 })) }; db.clientRateCards.push(c); state.clientRateId = c.id; save({ action: 'CLIENT_RATE_CREATED', id: c.id }); render(); toast('Rate card created with one line per route'); }, { submitLabel: 'Create' }),
+      'cr-duplicate': () => { const src = db.clientRateCards.find((x) => x.id === id); const y = (parseInt((src.validFrom || '').slice(0, 4), 10) || new Date().getFullYear()) + 1; const copy = JSON.parse(JSON.stringify(src)); copy.id = window.Store.uid('CR'); copy.name = src.name.replace(/\d{4}/, String(y)) + (src.name.match(/\d{4}/) ? '' : ` ${y}`); copy.status = 'DRAFT'; copy.validFrom = `${y}-01-01`; copy.validTo = `${y}-12-31`; copy.lines.forEach((l) => (l.id = window.Store.uid('L'))); db.clientRateCards.push(copy); state.clientRateId = copy.id; save({ action: 'CLIENT_RATE_CREATED', id: copy.id }); render(); toast('Duplicated as draft'); },
+      'cr-delete': () => { if (confirm('Delete this client rate card? Trips keep their manual selling prices; agreed prices will show as missing.')) { db.clientRateCards = db.clientRateCards.filter((x) => x.id !== id); save({ action: 'CLIENT_RATE_DELETED', id }); render(); } },
+      'cr-export': () => { const c = db.clientRateCards.find((x) => x.id === id); window.Exporter.workbook(c.name.replace(/\W+/g, '_'), [{ name: 'Client rates', rows: [['Customer', customerName(c.customerId)], ['Name', c.name], ['Valid', `${c.validFrom || ''} → ${c.validTo || ''}`], ['Status', c.status], [], ['Route', 'Equipment class', 'Unit', 'MOQ', 'Agreed rate', 'Agreed price @MOQ'], ...c.lines.map((l) => [routeLabel(l.routeId), l.vehicleClass, l.unit, l.moq, l.ratePerUnit, l.unit === 'TRIP' ? l.ratePerUnit : P.round2(P.num(l.ratePerUnit) * P.num(l.moq))])] }]); },
+      'cr-line-add': () => { const c = db.clientRateCards.find((x) => x.id === id); c.lines.push({ id: window.Store.uid('L'), routeId: (db.routes[0] || {}).id, vehicleClass: 'ANY', unit: 'TONNE', moq: 0, ratePerUnit: 0 }); save({ action: 'CLIENT_RATE_LINE_ADDED', id: c.id }); render(); },
+      'cr-line-delete': () => { const c = db.clientRateCards.find((x) => x.id === state.clientRateId); c.lines = c.lines.filter((l) => l.id !== id); save({ action: 'CLIENT_RATE_LINE_DELETED', id: c.id, line: id }); render(); },
+      'ex-decide': () => {
+        if (!canApprovePricing()) return toast('Only management can approve pricing exceptions');
+        const t = db.trips.find((x) => x.id === id); const status = btn.dataset.status; const pr = pricingOf(t);
+        modal(`${status === 'APPROVED' ? 'Approve' : 'Reject'} pricing exception — ${t.waybill}`, `<p class="small">${esc(customerName(t.customerId))} · ${esc(routeLabel(t.routeId))} · selling ${fmtMoney(t.sellingPrice, true)} vs agreed ${pr.agreedPrice != null ? fmtMoney(pr.agreedPrice, true) : '—'} (${pr.flags.map((f) => P.PRICING_FLAG_LABELS[f]).join('; ')})</p>${field('Comment / reason', 'comment', 'text', '', 'required')}`, (v) => { t.pricingException = { status, by: currentUser(), at: new Date().toISOString(), comment: v.comment.trim(), sellingPrice: t.sellingPrice, agreedPrice: pr.agreedPrice, variance: pr.variance }; save({ action: 'PRICING_EXCEPTION_' + status, id: t.id, waybill: t.waybill, comment: v.comment }); render(); toast(`Exception ${status.toLowerCase()}`); }, { submitLabel: status === 'APPROVED' ? 'Approve' : 'Reject', danger: status === 'REJECTED' });
+      },
+      'ex-export': () => { const rows = P.pricingExceptions(db.trips, db.clientRateCards); window.Exporter.workbook(`pricing-exceptions-${today()}`, [{ name: 'Exceptions', rows: [['Date', 'Waybill', 'Customer', 'Route', 'Class', 'Qty', 'Selling price', 'Agreed price', 'Variance', 'Flags', 'Entered by', 'Decision', 'Decided by', 'Comment'], ...rows.map(({ trip: t, pricing: pr, exception: ex }) => [t.date, t.waybill, customerName(t.customerId), routeLabel(t.routeId), t.vehicleClass, t.qty, t.sellingPrice, pr.agreedPrice, pr.variance, pr.flags.join(' '), t.sellingPriceBy, (ex || {}).status || 'OPEN', (ex || {}).by || '', (ex || {}).comment || ''])] }]); },
+      'customer-new': () => modal('New customer', customerForm(), (v) => { db.customers.push({ id: window.Store.uid('K'), code: v.code.trim().toUpperCase(), name: v.name.trim(), contact: v.contact.trim(), phone: v.phone.trim() }); save({ action: 'CUSTOMER_CREATED' }); render(); }),
+      'customer-edit': () => { const c = customer(id); modal('Edit customer', customerForm(c), (v) => { Object.assign(c, { code: v.code.trim().toUpperCase(), name: v.name.trim(), contact: v.contact.trim(), phone: v.phone.trim() }); save({ action: 'CUSTOMER_UPDATED', id }); render(); }); },
+      'customer-delete': () => { const n = db.trips.filter((t) => t.customerId === id).length; if (n) return toast(`${n} trip(s) belong to this customer — cannot delete`); if (confirm('Delete customer and its rate cards?')) { db.customers = db.customers.filter((c) => c.id !== id); db.clientRateCards = db.clientRateCards.filter((c) => c.customerId !== id); save({ action: 'CUSTOMER_DELETED', id }); render(); } },
       'pl-select': () => { state.priceListId = id; render(); },
       'pl-new': () => modal('New price list', `<div class="form-grid">${field('Name', 'name', 'text', `Billing Price List ${new Date().getFullYear() + 1}`, 'required')}${selectField('Party', 'partyId', options(parties(), P.INTERNAL))}${field('Valid from', 'validFrom', 'date', `${new Date().getFullYear() + 1}-01-01`)}${field('Valid to', 'validTo', 'date', `${new Date().getFullYear() + 1}-12-31`)}${field('Diesel price / litre (internal lists)', 'dieselPricePerLitre', 'number', db.settings.defaultDieselPricePerLitre || '', 'step="0.01"')}</div>`, (v) => {
         const pl = { id: window.Store.uid('PL'), name: v.name.trim(), partyId: v.partyId, currency: cur(), validFrom: v.validFrom, validTo: v.validTo, status: 'DRAFT', dieselPricePerLitre: P.num(v.dieselPricePerLitre), notes: '', lines: db.routes.map((r) => ({ id: window.Store.uid('L'), routeId: r.id, vehicleClass: 'ANY', unit: 'TONNE', moq: 0, ratePerUnit: 0, fixedCost: 0, variableCostPerKm: 0, fixedVariableCost: 0, dieselLitres: 0 })) };
@@ -655,10 +814,11 @@
         { name: 'Routes', rows: [['Code', 'Origin', 'Destination', 'Km'], ...db.routes.map((r) => [r.code, r.origin, r.destination, r.distanceKm])] },
         { name: 'Contractors', rows: [['Code', 'Name', 'Contact', 'Phone', 'Terms (days)'], ...db.contractors.map((c) => [c.code, c.name, c.contact, c.phone, c.paymentTermsDays])] },
       ]),
-      'data-reset': () => { if (confirm('Replace ALL data with the demo dataset? Export a backup first if needed.')) { db = window.Store.reset(); state.billing.preview = null; state.billing.openId = null; state.priceListId = null; render(); toast('Demo data restored'); } },
+      'data-reset': () => { if (confirm('Replace ALL data with the demo dataset? Export a backup first if needed.')) { db = window.Store.reset(); state.billing.preview = null; state.billing.openId = null; state.priceListId = null; save({ action: 'RESET_DEMO' }); render(); toast('Demo data restored'); } },
     };
     if (act[a]) act[a]();
   });
 
-  render();
+  $('#view').innerHTML = '<div class="muted">Loading…</div>';
+  window.Store.loadAsync().then((d) => { db = d; render(); renderSyncStatus(); });
 })();

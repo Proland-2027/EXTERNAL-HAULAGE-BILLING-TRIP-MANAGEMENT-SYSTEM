@@ -1,0 +1,7 @@
+# Only the front-end folders are served directly; the engine, data and backups are reached through WordPress.
+<FilesMatch "\.(php|sqlite|xlsx|gz)$">
+  Require all denied
+</FilesMatch>
+<Files "proland-production.php">
+  Require all denied
+</Files>

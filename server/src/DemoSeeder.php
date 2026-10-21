@@ -21,7 +21,7 @@ final class DemoSeeder
         $admin = $db->one("SELECT * FROM {p}users WHERE username='admin'");
         $this->app->auth->setCurrentUser($admin);
         $log('Clearing previous demo transactions');
-        foreach (['daily_reports', 'op_loads', 'op_deps', 'order_deps', 'materials', 'operations', 'orders', 'plans', 'sales_requests', 'inventory_movements'] as $t) $db->run("DELETE FROM {p}$t");
+        foreach (['daily_reports', 'op_loads', 'op_deps', 'order_deps', 'materials', 'operations', 'orders', 'plans', 'sales_requests', 'inventory_movements', 'haulage_state'] as $t) $db->run("DELETE FROM {p}$t");
         $db->run("DELETE FROM {p}audit_log WHERE action NOT IN ('WORKBOOK_IMPORTED')");
 
         $cal = $this->app->calendar;

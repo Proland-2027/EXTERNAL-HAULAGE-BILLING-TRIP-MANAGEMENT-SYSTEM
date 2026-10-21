@@ -20,9 +20,9 @@
     { hash: '#/capacity', label: 'Capacity Master', ico: '⏱', perm: 'reports.view' },
     { hash: '#/exceptions', label: 'Exception Report', ico: '⚠', perm: 'reports.view' },
     { group: 'Other' },
-    { href: '/haulage/', label: 'Trip Log (Haulage)', ico: '⛟', perm: 'reports.view' },
+    { href: window.PP_HAULAGE_URL || '/haulage/', label: 'Trip Log (Haulage)', ico: '⛟', perm: 'reports.view' },
     { hash: '#/admin', label: 'Administration', ico: '⚒', perm: 'admin' },
-    { href: '/docs/USER_GUIDE.md', label: 'User guide', ico: '?', perm: 'reports.view' },
+    { href: window.PP_DOCS_URL || '/docs/USER_GUIDE.md', label: 'User guide', ico: '?', perm: 'reports.view' },
   ];
 
   const can = (perm) => !!(state.user && state.user.perms.includes(perm));
@@ -65,7 +65,7 @@
     try { state.meta = await window.Api.get('/meta'); } catch (e) { toast(e.message, true); }
     renderNav();
     $('#theme-toggle').onclick = () => { state.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; localStorage.setItem('pp.theme', state.theme); applyTheme(); };
-    $('#logout-btn').onclick = async () => { await window.Api.post('/auth/logout', {}); location.hash = ''; location.reload(); };
+    $('#logout-btn').onclick = async () => { const r = await window.Api.post('/auth/logout', {}); location.hash = ''; if (r && r.redirect) location.href = r.redirect; else location.reload(); };
     $('#menu-btn').onclick = () => $('#sidebar').classList.toggle('open');
     $('#view').addEventListener('click', () => $('#sidebar').classList.remove('open'));
     window.addEventListener('pp:unauthorized', () => renderLogin('Your session has expired. Please sign in again.'));

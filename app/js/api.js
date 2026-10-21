@@ -1,7 +1,7 @@
 /* api.js — JSON client. Standalone: /api/...; WordPress: window.PP_API_BASE = '/wp-json/proland/v1' with a nonce header. */
 (function (root) {
   'use strict';
-  const base = root.PP_API_BASE || '/api';
+  const base = String(root.PP_API_BASE || '/api').replace(/\/+$/, '');
   async function call(method, path, body, opts = {}) {
     const headers = { 'X-Requested-With': 'fetch', Accept: 'application/json' };
     if (root.PP_WP_NONCE) headers['X-WP-Nonce'] = root.PP_WP_NONCE;
